@@ -165,7 +165,7 @@ nav button b { margin-left: auto; font-size: 8px; color: #091110; background: va
 .scrim { display: none; }
 
 button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--aqua); outline-offset: 4px; }
-.portfolio-export { display: flex; gap: 8px; align-items: center; background: rgba(86,217,202,.1); border: 1px solid rgba(86,217,202,.25); border-radius: 10px; padding: 11px 14px; color: var(--aqua); cursor: pointer; font-size: 12px; }
+.portfolio-export { display: flex; gap: 8px; align-items: center; background: rgba(86,217,202,.1); border: 1px solid rgba(86,217,202,.25); border-radius: 10px; padding: 11px 14px; color: var(--aqua); cursor: pointer; font-size: 12px; text-decoration: none; }
 .demo-notice { display: flex; gap: 10px; align-items: center; padding: 13px 16px; border: 1px solid rgba(157,139,255,.2); border-radius: 12px; color: #bdb4e7; background: rgba(157,139,255,.06); font-size: 12px; line-height: 1.6; }
 .demo-notice svg { flex-shrink: 0; }
 .portfolio-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 24px 0 16px; }
@@ -613,7 +613,7 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
   .instrument-row { grid-template-columns: minmax(100px,1fr) auto; }
   .instrument-track { display: none; }
   .dna-row { grid-template-columns: 112px 1fr 25px; }
-  .operations-actions { width: 100%; justify-content: space-between; }
+  .operations-actions { width: 100%; justify-content: space-between; flex-wrap: wrap; }
   .operations-kpis { grid-template-columns: 1fr; }
   .flow-card, .ledger-card, .timeline-card, .trade-inspector { padding: 17px; }
   .ledger-tools { width: 100%; flex-direction: column; }

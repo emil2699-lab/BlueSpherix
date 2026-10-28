@@ -2,12 +2,9 @@
 
 import { useState } from "react";
 import { ArrowUpRight, Download, ShieldCheck } from "lucide-react";
+import { DEMO_ACCOUNTS } from "./demo-data";
 
-const accounts = [
-  { id: "alpha", name: "Alpha Momentum", strategy: "Forex · London breakout", type: "Reale", equity: 127842.6, balance: 127311.6, drawdown: 6.24, trades: 142, color: "#56d9ca", returns: [0, 1.2, .8, 2.4, 1.7, 4.1, 3.6, 5.8, 5.1, 7.4, 6.9, 10.17] },
-  { id: "atlas", name: "Atlas Swing", strategy: "Multi-asset · Swing trading", type: "Reale", equity: 58340, balance: 58120, drawdown: 3.8, trades: 38, color: "#9d8bff", returns: [0, .4, .8, 1.6, 1.2, 2.1, 2.8, 2.4, 3.2, 4.1, 4.5, 5.62] },
-  { id: "nova", name: "Nova Lab", strategy: "Oro · Strategia sperimentale", type: "Demo", equity: 24480, balance: 24560, drawdown: 9.1, trades: 64, color: "#ff6f7d", returns: [0, 1.8, -.4, -2.1, -1, .6, -.8, -2.8, -1.4, -.6, -1.1, -2.08] },
-];
+const accounts = DEMO_ACCOUNTS;
 const money = (value: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "USD" }).format(value);
 const percent = (value: number) => `${value > 0 ? "+" : ""}${value.toLocaleString("it-IT", { maximumFractionDigits: 2 })}%`;
 

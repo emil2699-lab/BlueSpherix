@@ -15,31 +15,19 @@ import {
   Sparkles,
   Target,
 } from "lucide-react";
+import { ALPHA_ACCOUNT, DEMO_PERIOD_STATS, DEMO_TRADES, OPEN_PNL, RECENT_PLAN_COUNT, tradesForPeriod, type DemoPeriod, type DemoTrade } from "./demo-data";
 
-type Period = "30G" | "90G" | "1A";
+type Period = DemoPeriod;
 type TradeFilter = "Tutte" | "Aperte" | "Chiuse" | "In profitto" | "In perdita";
 type Proposal = "classic" | "focus";
 type Layout = "separate" | "mixed";
 
-const periodStats: Record<Period, { net: number; trades: number; win: number; averageR: number; flow: number[] }> = {
-  "30G": { net: 11782, trades: 142, win: 57.7, averageR: .68, flow: [320, -180, 610, 240, -95, 780, 420, -260, 910, 360, 620, 418] },
-  "90G": { net: 26840, trades: 386, win: 55.4, averageR: .61, flow: [880, 430, -520, 1240, 760, -310, 1820, 940, -680, 1430, 1120, 1680] },
-  "1A": { net: 62470, trades: 1184, win: 53.8, averageR: .54, flow: [2140, -920, 3680, 1890, -1430, 4210, 2760, -880, 5140, 3240, -1760, 4480] },
-};
-
-const trades = [
-  { id: "T-1048", day: "Oggi", date: "28 ott · 09:14", time: "09:14", symbol: "EURUSD", side: "Long", volume: "1.20", entry: "1.08142", current: "1.08491", exit: "—", result: 418.8, status: "Aperta", setup: "London breakout", duration: "2h 18m", r: .64, mfe: 512, mae: -96, note: "Breakout confermato sopra il massimo asiatico. Rischio ridotto dopo il primo impulso." },
-  { id: "T-1047", day: "Oggi", date: "28 ott · 08:42", time: "08:42", symbol: "XAUUSD", side: "Long", volume: "0.35", entry: "2.734,18", current: "2.741,62", exit: "—", result: 260.4, status: "Aperta", setup: "Trend continuation", duration: "2h 50m", r: .48, mfe: 344, mae: -72, note: "Entrata su pullback dopo la conferma del trend intraday." },
-  { id: "T-1046", day: "Oggi", date: "28 ott · 07:56", time: "07:56", symbol: "GBPJPY", side: "Short", volume: "0.60", entry: "198.224", current: "198.471", exit: "—", result: -148.2, status: "Aperta", setup: "Range rejection", duration: "3h 36m", r: -.31, mfe: 88, mae: -214, note: "Il prezzo è rientrato nel range. Setup ancora valido, ma vicino al livello di invalidazione." },
-  { id: "T-1045", day: "Ieri", date: "27 ott · 15:38", time: "15:38", symbol: "US500", side: "Long", volume: "0.80", entry: "5.827,40", exit: "5.838,52", result: 890, status: "Chiusa", setup: "NY momentum", duration: "1h 12m", r: 1.42, mfe: 1012, mae: -140, note: "Momentum forte dopo l’apertura USA. Uscita sul secondo target pianificato." },
-  { id: "T-1044", day: "Ieri", date: "27 ott · 10:06", time: "10:06", symbol: "EURUSD", side: "Long", volume: "1.00", entry: "1.07890", exit: "1.08510", result: 620, status: "Chiusa", setup: "London breakout", duration: "2h 41m", r: 1.18, mfe: 744, mae: -82, note: "Esecuzione coerente con il piano. Stop portato a pareggio dopo 1R." },
-  { id: "T-1043", day: "26 ottobre", date: "26 ott · 14:51", time: "14:51", symbol: "XAUUSD", side: "Short", volume: "0.25", entry: "2.742,80", exit: "2.751,40", result: -215, status: "Chiusa", setup: "Failed breakout", duration: "46m", r: -.72, mfe: 61, mae: -228, note: "Ingresso anticipato prima della conferma. Da rivedere nel diario." },
-  { id: "T-1042", day: "26 ottobre", date: "26 ott · 09:22", time: "09:22", symbol: "GBPJPY", side: "Long", volume: "0.40", entry: "197.114", exit: "197.984", result: 348, status: "Chiusa", setup: "Session trend", duration: "3h 08m", r: .92, mfe: 410, mae: -105, note: "Trend pulito durante Londra, gestione regolare fino al target." },
-  { id: "T-1041", day: "25 ottobre", date: "25 ott · 16:12", time: "16:12", symbol: "USDJPY", side: "Long", volume: "0.70", entry: "151.804", exit: "151.592", result: -148.4, status: "Chiusa", setup: "NY reversal", duration: "38m", r: -.48, mfe: 54, mae: -162, note: "Reversal non confermato dal volume. Stop rispettato senza modifiche." },
-];
+const periodStats = DEMO_PERIOD_STATS;
+const trades = DEMO_TRADES;
 
 const money = (value: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value);
 const signedMoney = (value: number) => `${value > 0 ? "+" : ""}${money(value)}`;
+const groupedTradeDays = (items: DemoTrade[]) => [...new Map(items.map((trade) => [trade.day, trade.day])).keys()].map((day) => ({ day, trades: items.filter((trade) => trade.day === day) }));
 
 export default function Operations() {
   const [layout, setLayout] = useState<Layout>("separate");
@@ -51,10 +39,11 @@ export default function Operations() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [selected, setSelected] = useState("T-1048");
   const stats = periodStats[period];
+  const periodTrades = useMemo(() => tradesForPeriod(period), [period]);
 
   const visible = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    const matching = trades.filter((trade) => {
+    const matching = periodTrades.filter((trade) => {
       if (filter === "Aperte" && trade.status !== "Aperta") return false;
       if (filter === "Chiuse" && trade.status !== "Chiusa") return false;
       if (filter === "In profitto" && trade.result <= 0) return false;
@@ -64,9 +53,9 @@ export default function Operations() {
     if (sort === "Migliori") return [...matching].sort((a, b) => b.result - a.result);
     if (sort === "Peggiori") return [...matching].sort((a, b) => a.result - b.result);
     return matching;
-  }, [filter, query, sort]);
+  }, [filter, periodTrades, query, sort]);
 
-  const selectedTrade = visible.find((trade) => trade.id === selected) ?? visible[0] ?? trades[0];
+  const selectedTrade = visible.find((trade) => trade.id === selected) ?? visible[0] ?? periodTrades[0] ?? trades[0];
   const maxFlow = Math.max(...stats.flow.map((value) => Math.abs(value)));
 
   const download = () => {
@@ -96,7 +85,8 @@ export default function Operations() {
           <div className="range-switch" aria-label="Periodo operazioni">
             {(["30G", "90G", "1A"] as Period[]).map((item) => <button key={item} aria-pressed={period === item} className={period === item ? "active" : ""} onClick={() => setPeriod(item)}>{item}</button>)}
           </div>
-          <button className="portfolio-export" onClick={download}><Download size={15} /> Esporta</button>
+          <button className="portfolio-export" onClick={download}><Download size={15} /> Esporta vista</button>
+          <a className="portfolio-export" href="./data/demo-operations.csv" download><Download size={15} /> CSV completo</a>
         </div>
       </section>
 
@@ -128,8 +118,8 @@ export default function Operations() {
         <>
           <section className="operations-kpis">
             <article className="glass-card"><p className="eyebrow">Risultato netto</p><strong className="up">{money(stats.net)}</strong><small>Nel periodo selezionato</small></article>
-            <article className="glass-card"><p className="eyebrow">Operazioni</p><strong>{stats.trades}</strong><small>Media {(stats.trades / (period === "30G" ? 30 : period === "90G" ? 90 : 365)).toLocaleString("it-IT", { maximumFractionDigits: 1 })} al giorno</small></article>
-            <article className="glass-card"><p className="eyebrow">Win rate</p><strong>{stats.win.toLocaleString("it-IT")}%</strong><small>Chiusure positive sul totale</small></article>
+            <article className="glass-card"><p className="eyebrow">Operazioni</p><strong>{stats.trades}</strong><small>{stats.closedTrades} chiuse · {stats.trades - stats.closedTrades} aperte</small></article>
+            <article className="glass-card"><p className="eyebrow">Win rate</p><strong>{stats.win.toLocaleString("it-IT")}%</strong><small>{stats.wins} vincenti su {stats.closedTrades} chiuse</small></article>
             <article className="glass-card"><p className="eyebrow">R medio</p><strong>{stats.averageR.toLocaleString("it-IT", { minimumFractionDigits: 2 })}R</strong><small>Rendimento corretto per il rischio</small></article>
           </section>
 
@@ -138,7 +128,7 @@ export default function Operations() {
             <div className="flow-chart" aria-label="Sequenza di risultati positivi e negativi">
               {stats.flow.map((value, index) => <div className="flow-column" key={`${period}-${index}`}><span className={value >= 0 ? "gain" : "loss"} style={{ height: `${20 + Math.abs(value) / maxFlow * 70}%` }} title={signedMoney(value)} /><small>{index + 1}</small></div>)}
             </div>
-            <div className="flow-insight"><Sparkles size={17} /><span>Le perdite restano contenute rispetto ai picchi positivi: il rapporto medio guadagno/perdita è 1,73.</span></div>
+            <div className="flow-insight"><Sparkles size={17} /><span>Il rapporto medio guadagno/perdita calcolato nel periodo è {stats.averageWinLoss.toLocaleString("it-IT")}.</span></div>
           </article>
 
           <section className="glass-card ledger-card">
@@ -173,9 +163,9 @@ export default function Operations() {
       {layout === "separate" && proposal === "focus" && (
         <>
           <section className="focus-kpis">
-            <article className="glass-card focus-result"><p className="eyebrow">Oggi, in tempo reale</p><strong className="up">+$531,00</strong><span><ArrowUpRight size={14} /> 3 posizioni aperte</span></article>
-            <article className="glass-card"><p className="eyebrow">Qualità esecutiva</p><strong>88<span>/100</span></strong><small>Disciplina sopra la tua media</small></article>
-            <article className="glass-card"><p className="eyebrow">Rischio attivo</p><strong>0,84%</strong><small>Zona abituale · limite 1,50%</small></article>
+            <article className="glass-card focus-result"><p className="eyebrow">Oggi, in tempo reale</p><strong className="up">{signedMoney(OPEN_PNL)}</strong><span><ArrowUpRight size={14} /> {trades.filter(trade => trade.status === "Aperta").length} posizioni aperte</span></article>
+            <article className="glass-card"><p className="eyebrow">Qualità esecutiva</p><strong>{ALPHA_ACCOUNT.executionQuality}<span>/100</span></strong><small>Disciplina sopra la tua media</small></article>
+            <article className="glass-card"><p className="eyebrow">Rischio attivo</p><strong>{ALPHA_ACCOUNT.activeRisk.toLocaleString("it-IT")}%</strong><small>Zona abituale · limite {ALPHA_ACCOUNT.riskLimit.toLocaleString("it-IT", { minimumFractionDigits: 2 })}%</small></article>
           </section>
 
           <TimelineWorkspace visible={visible} selectedTrade={selectedTrade} setSelected={setSelected} query={query} setQuery={setQuery} filter={filter} setFilter={setFilter} />
@@ -193,14 +183,13 @@ export default function Operations() {
 }
 
 function HybridOverview({ stats, period, maxFlow }: { stats: (typeof periodStats)[Period]; period: Period; maxFlow: number }) {
-  const dayCount = period === "30G" ? 30 : period === "90G" ? 90 : 365;
   const metrics = [
-    { label: "Operazioni", value: stats.trades.toString(), detail: `media ${(stats.trades / dayCount).toLocaleString("it-IT", { maximumFractionDigits: 1 })} al giorno` },
-    { label: "Win rate", value: `${stats.win.toLocaleString("it-IT")}%`, detail: "chiusure positive" },
-    { label: "R medio", value: `${stats.averageR.toLocaleString("it-IT", { minimumFractionDigits: 2 })}R`, detail: "corretto per rischio" },
-    { label: "Oggi", value: "+$531", detail: "3 posizioni aperte", tone: "up" },
-    { label: "Qualità", value: "88/100", detail: "sopra la media" },
-    { label: "Rischio", value: "0,84%", detail: "zona abituale · limite 1,50%" },
+    { label: "Operazioni", value: stats.trades.toString(), detail: `${stats.closedTrades} chiuse · ${stats.trades - stats.closedTrades} aperte` },
+    { label: "Win rate", value: `${stats.win.toLocaleString("it-IT")}%`, detail: `${stats.wins} vincenti su ${stats.closedTrades} chiuse` },
+    { label: "R medio", value: `${stats.averageR.toLocaleString("it-IT", { minimumFractionDigits: 2 })}R`, detail: "sulle operazioni chiuse" },
+    { label: "Oggi", value: signedMoney(OPEN_PNL), detail: `${trades.filter(trade => trade.status === "Aperta").length} posizioni aperte`, tone: "up" },
+    { label: "Qualità", value: `${ALPHA_ACCOUNT.executionQuality}/100`, detail: "sopra la media" },
+    { label: "Rischio", value: `${ALPHA_ACCOUNT.activeRisk.toLocaleString("it-IT")}%`, detail: `zona abituale · limite ${ALPHA_ACCOUNT.riskLimit.toLocaleString("it-IT", { minimumFractionDigits: 2 })}%` },
   ];
   return <section className="hybrid-overview">
     <article className="glass-card hybrid-flow-card">
@@ -211,7 +200,7 @@ function HybridOverview({ stats, period, maxFlow }: { stats: (typeof periodStats
       <div className="hybrid-flow" aria-label={`Sequenza risultati del periodo ${period}`}>
         {stats.flow.map((value, index) => <i key={`${period}-hybrid-${index}`} className={value >= 0 ? "gain" : "loss"} style={{ height: `${20 + Math.abs(value) / maxFlow * 80}%` }} title={signedMoney(value)} />)}
       </div>
-      <div className="hybrid-insight"><Sparkles size={15} /><span>Le perdite restano contenute: rapporto medio guadagno/perdita 1,73.</span></div>
+      <div className="hybrid-insight"><Sparkles size={15} /><span>Rapporto medio guadagno/perdita: {stats.averageWinLoss.toLocaleString("it-IT")}.</span></div>
     </article>
     <div className="hybrid-metrics">
       {metrics.map((metric) => <article className="glass-card" key={metric.label}><p>{metric.label}</p><strong className={metric.tone}>{metric.value}</strong><small>{metric.detail}</small></article>)}
@@ -238,12 +227,10 @@ function HybridLedger({ visible, selectedTrade, setSelected, query, setQuery, so
     <TradeFilters filter={filter} setFilter={setFilter} />
     <div className="hybrid-table">
       <div className="hybrid-row hybrid-header"><span>Data</span><span>Strumento</span><span>Direzione</span><span>Setup</span><span>Durata</span><span>Risultato</span><span>Stato</span><span /></div>
-      {[{ key: "Oggi", label: "Oggi · 28 ottobre" }, { key: "Ieri", label: "Ieri · 27 ottobre" }, { key: "26 ottobre", label: "26 ottobre" }, { key: "25 ottobre", label: "25 ottobre" }].map((day) => {
-        const dayTrades = visible.filter((trade) => trade.day === day.key);
-        if (!dayTrades.length) return null;
+      {groupedTradeDays(visible).map(({ day, trades: dayTrades }) => {
         const total = dayTrades.reduce((sum, trade) => sum + trade.result, 0);
-        return <div className="hybrid-day" key={day.key}>
-          <div className="hybrid-day-head"><span>{day.label}</span><strong className={total >= 0 ? "up" : "down"}>{signedMoney(total)}</strong></div>
+        return <div className="hybrid-day" key={day}>
+          <div className="hybrid-day-head"><span>{day}</span><strong className={total >= 0 ? "up" : "down"}>{signedMoney(total)}</strong></div>
           {dayTrades.map((trade) => {
             const isSelected = selectedTrade.id === trade.id;
             return <div className={`hybrid-trade ${trade.result < 0 ? (Math.abs(trade.result) >= 200 ? "loss severe" : "loss") : ""} ${isSelected ? "selected" : ""}`} key={trade.id}>
@@ -264,8 +251,8 @@ function HybridLedger({ visible, selectedTrade, setSelected, query, setQuery, so
                   <div className="journey-labels"><span>MAE<strong className="down">{money(trade.mae)}</strong></span><span>MFE<strong className="up">+{money(trade.mfe)}</strong></span></div>
                 </div>
                 <dl className="hybrid-values">
-                  <div><dt>Ingresso</dt><dd>{trade.entry}</dd></div>
-                  <div><dt>{trade.status === "Aperta" ? "Prezzo corrente" : "Uscita"}</dt><dd>{trade.status === "Aperta" ? trade.current : trade.exit}</dd></div>
+                  <div><dt>Ingresso</dt><dd>{trade.entryLabel}</dd></div>
+                  <div><dt>{trade.status === "Aperta" ? "Prezzo corrente" : "Uscita"}</dt><dd>{trade.status === "Aperta" ? trade.currentLabel : trade.exitLabel}</dd></div>
                   <div><dt>Risultato in R</dt><dd className={trade.r >= 0 ? "up" : "down"}>{trade.r > 0 ? "+" : ""}{trade.r}R</dd></div>
                 </dl>
                 <div className="hybrid-note"><Sparkles size={16} /><div><strong>Lettura operativa</strong><p>{trade.note}</p></div></div>
@@ -296,9 +283,7 @@ function TimelineWorkspace({ visible, selectedTrade, setSelected, query, setQuer
       </div>
       <TradeFilters filter={filter} setFilter={setFilter} />
       <div className="trade-timeline">
-        {["Oggi", "Ieri", "26 ottobre", "25 ottobre"].map((day) => {
-          const dayTrades = visible.filter((trade) => trade.day === day);
-          if (!dayTrades.length) return null;
+        {groupedTradeDays(visible).map(({ day, trades: dayTrades }) => {
           const total = dayTrades.reduce((sum, trade) => sum + trade.result, 0);
           return <div className="timeline-day" key={day}>
             <div className="timeline-day-head"><span>{day}</span><strong className={total >= 0 ? "up" : "down"}>{signedMoney(total)}</strong></div>
@@ -327,8 +312,8 @@ function TimelineWorkspace({ visible, selectedTrade, setSelected, query, setQuer
         <div className="journey-labels"><span>MAE<strong className="down">{money(selectedTrade.mae)}</strong></span><span>MFE<strong className="up">+{money(selectedTrade.mfe)}</strong></span></div>
       </div>
       <dl className="inspector-values">
-        <div><dt>Ingresso</dt><dd>{selectedTrade.entry}</dd></div>
-        <div><dt>{selectedTrade.status === "Aperta" ? "Prezzo corrente" : "Uscita"}</dt><dd>{selectedTrade.status === "Aperta" ? selectedTrade.current : selectedTrade.exit}</dd></div>
+        <div><dt>Ingresso</dt><dd>{selectedTrade.entryLabel}</dd></div>
+        <div><dt>{selectedTrade.status === "Aperta" ? "Prezzo corrente" : "Uscita"}</dt><dd>{selectedTrade.status === "Aperta" ? selectedTrade.currentLabel : selectedTrade.exitLabel}</dd></div>
         <div><dt>Setup</dt><dd>{selectedTrade.setup}</dd></div>
         <div><dt>Apertura</dt><dd>{selectedTrade.date}</dd></div>
       </dl>
@@ -339,9 +324,9 @@ function TimelineWorkspace({ visible, selectedTrade, setSelected, query, setQuer
 
 function FocusPattern() {
   return <article className="glass-card focus-pattern">
-    <div className="pattern-score"><span><Sparkles size={16} /> Spherix pattern</span><strong>6 su 8</strong><small>trade coerenti con il piano</small></div>
+    <div className="pattern-score"><span><Sparkles size={16} /> Spherix pattern</span><strong>{RECENT_PLAN_COUNT} su 8</strong><small>trade coerenti con il piano</small></div>
     <div className="pattern-copy"><p className="eyebrow">Cosa sta funzionando</p><h2>London breakout rimane il setup più pulito.</h2><p>Le entrate tra le 08:40 e le 10:10 mostrano escursioni avverse più contenute e un R medio superiore.</p></div>
-    <div className="pattern-bars" aria-label="Coerenza degli ultimi otto trade">{trades.map((trade) => <i key={trade.id} className={trade.result >= 0 ? "positive" : "negative"} title={`${trade.symbol}: ${signedMoney(trade.result)}`} />)}</div>
+    <div className="pattern-bars" aria-label="Coerenza degli ultimi otto trade">{trades.slice(0, 8).map((trade) => <i key={trade.id} className={trade.result >= 0 ? "positive" : "negative"} title={`${trade.symbol}: ${signedMoney(trade.result)}`} />)}</div>
   </article>;
 }
 
@@ -358,7 +343,7 @@ function TradeTools({ query, setQuery, sort, setSort }: { query: string; setQuer
 
 function TradeDetail({ trade }: { trade: typeof trades[number] }) {
   return <div className="trade-detail">
-    <div className="trade-detail-values"><span>Ingresso<strong>{trade.entry}</strong></span><span>Uscita<strong>{trade.exit}</strong></span><span>MFE<strong className="up">+{money(trade.mfe)}</strong></span><span>MAE<strong className="down">{money(trade.mae)}</strong></span><span>Risultato in R<strong className={trade.r >= 0 ? "up" : "down"}>{trade.r > 0 ? "+" : ""}{trade.r}R</strong></span></div>
+    <div className="trade-detail-values"><span>Ingresso<strong>{trade.entryLabel}</strong></span><span>{trade.status === "Aperta" ? "Corrente" : "Uscita"}<strong>{trade.status === "Aperta" ? trade.currentLabel : trade.exitLabel}</strong></span><span>MFE<strong className="up">+{money(trade.mfe)}</strong></span><span>MAE<strong className="down">{money(trade.mae)}</strong></span><span>Risultato in R<strong className={trade.r >= 0 ? "up" : "down"}>{trade.r > 0 ? "+" : ""}{trade.r}R</strong></span></div>
     <div className="trade-note"><Sparkles size={16} /><div><strong>Nota del trade</strong><p>{trade.note}</p></div></div>
   </div>;
 }

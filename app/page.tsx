@@ -29,22 +29,11 @@ import { useEffect, useMemo, useState } from "react";
 import Portfolio from "./portfolio";
 import Analytics from "./analytics";
 import Operations from "./operations";
+import { ALPHA_ACCOUNT, BEST_RECENT_TRADE, BEST_SESSION_30D, DASHBOARD_RANGE_STATS, DEMO_BALANCE_SERIES, DEMO_EQUITY_SERIES, DEMO_PERIOD_STATS, OPEN_PNL, OPEN_TRADES, type DashboardRange } from "./demo-data";
 
-type Range = "1W" | "1M" | "3M" | "1Y";
-
-const equitySeries: Record<Range, number[]> = {
-  "1W": [122, 123.2, 122.7, 124.1, 125.4, 125.1, 127.8],
-  "1M": [116, 117.2, 116.8, 118.7, 117.9, 120.2, 119.4, 121.1, 120.7, 123.8, 122.9, 124.4, 126.1, 125.5, 127.8],
-  "3M": [101, 103, 102, 106, 105, 109, 108, 113, 111, 115, 114, 119, 118, 121, 120, 124, 122, 126, 125, 127.8],
-  "1Y": [74, 77, 75, 80, 83, 79, 85, 88, 86, 91, 89, 95, 99, 96, 103, 101, 108, 106, 113, 118, 115, 121, 119, 125, 127.8],
-};
-
-const balanceSeries: Record<Range, number[]> = {
-  "1W": [121.8, 122.6, 122.9, 123.7, 124.8, 125.6, 126.9],
-  "1M": [115.4, 116.3, 117.1, 117.9, 118.5, 119.2, 120.1, 120.9, 121.2, 122.1, 123.2, 124.1, 125, 125.8, 126.9],
-  "3M": [100, 102, 103, 105, 106, 108, 109, 111, 112, 114, 115, 117, 118, 120, 121, 122, 123, 124, 125, 126.9],
-  "1Y": [73, 76, 78, 81, 82, 84, 86, 88, 90, 92, 94, 96, 98, 101, 103, 106, 108, 111, 114, 117, 120, 122, 124, 126, 126.9],
-};
+type Range = DashboardRange;
+const equitySeries = DEMO_EQUITY_SERIES;
+const balanceSeries = DEMO_BALANCE_SERIES;
 
 const navItems = [
   { label: "Oggi", icon: LayoutDashboard, target: "overview" },
@@ -55,11 +44,9 @@ const navItems = [
   { label: "Lab", icon: FlaskConical, target: "story" },
 ];
 
-const positions = [
-  { symbol: "EURUSD", side: "Long", volume: "1.20", open: "1.08142", current: "1.08491", pnl: "+$418.80", trend: "up" },
-  { symbol: "XAUUSD", side: "Long", volume: "0.35", open: "2,734.18", current: "2,741.62", pnl: "+$260.40", trend: "up" },
-  { symbol: "GBPJPY", side: "Short", volume: "0.60", open: "198.224", current: "198.471", pnl: "−$148.20", trend: "down" },
-];
+const money = (value: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(value);
+const signedMoney = (value: number) => `${value > 0 ? "+" : ""}${money(value)}`;
+const positions = OPEN_TRADES.map((trade) => ({ ...trade, open: trade.entryLabel, currentPrice: trade.currentLabel, pnl: signedMoney(trade.result), trend: trade.result >= 0 ? "up" : "down" }));
 
 function pathFor(values: number[], width: number, height: number, padding = 4) {
   const min = Math.min(...values);
@@ -142,7 +129,9 @@ export default function Home() {
   const [range, setRange] = useState<Range>("1M");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [privateMode, setPrivateMode] = useState(true);
-  const performance = useMemo(() => range === "1W" ? "+4.74%" : range === "1M" ? "+10.17%" : range === "3M" ? "+26.53%" : "+72.70%", [range]);
+  const performance = useMemo(() => `${DASHBOARD_RANGE_STATS[range].returnPct >= 0 ? "+" : ""}${DASHBOARD_RANGE_STATS[range].returnPct.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`, [range]);
+  const rangeProfit = DASHBOARD_RANGE_STATS[range].net;
+  const riskState = ALPHA_ACCOUNT.riskScore < 35 ? "Calmo" : ALPHA_ACCOUNT.riskScore < 65 ? "Moderato" : "Elevato";
 
   const goTo = (target: string) => {
     setView(target);
@@ -201,44 +190,44 @@ export default function Home() {
           <section className="hero-grid">
             <article className="equity-card glass-card">
               <div className="card-head">
-                <div><p className="eyebrow">Equity totale</p><div className="equity-value"><strong>$127,842.60</strong><span><ArrowUpRight size={14} /> $864.20 oggi</span></div></div>
+                <div><p className="eyebrow">Equity totale</p><div className="equity-value"><strong>{money(ALPHA_ACCOUNT.equity)}</strong><span><ArrowUpRight size={14} /> {signedMoney(OPEN_PNL)} oggi</span></div></div>
                 <div className="legend"><span><i className="equity" /> Equity</span><span><i className="balance" /> Balance</span><button aria-label="Opzioni grafico">•••</button></div>
               </div>
               <EquityChart range={range} />
-              <div className="chart-summary"><div><span>Rendimento</span><strong>{performance}</strong></div><div><span>Profitto netto</span><strong>$12,442.60</strong></div><div><span>Data confidence</span><strong className="confidence"><ShieldCheck size={15} /> 99.8%</strong></div></div>
+              <div className="chart-summary"><div><span>Rendimento</span><strong>{performance}</strong></div><div><span>Profitto netto</span><strong>{money(rangeProfit)}</strong></div><div><span>Data confidence</span><strong className="confidence"><ShieldCheck size={15} /> {DASHBOARD_RANGE_STATS[range].confidence}%</strong></div></div>
             </article>
 
             <article className="risk-card glass-card" id="risk">
-              <div className="card-head"><div><p className="eyebrow">Risk weather</p><h2>Calmo</h2></div><span className="status-badge"><i /> Sotto controllo</span></div>
-              <div className="risk-orbit"><div className="orbit-ring ring-one" /><div className="orbit-ring ring-two" /><div className="orbit-core"><strong>24</strong><span>/ 100</span></div><span className="risk-label label-a">Margin<br /><b>18%</b></span><span className="risk-label label-b">Exposure<br /><b>32%</b></span><span className="risk-label label-c">Correlation<br /><b>Low</b></span></div>
-              <p className="risk-copy">L’esposizione EUR è aumentata, ma resta entro la tua zona abituale.</p>
+              <div className="card-head"><div><p className="eyebrow">Risk weather</p><h2>{riskState}</h2></div><span className="status-badge"><i /> {ALPHA_ACCOUNT.activeRisk <= ALPHA_ACCOUNT.riskLimit ? "Sotto controllo" : "Limite superato"}</span></div>
+              <div className="risk-orbit"><div className="orbit-ring ring-one" /><div className="orbit-ring ring-two" /><div className="orbit-core"><strong>{ALPHA_ACCOUNT.riskScore}</strong><span>/ 100</span></div><span className="risk-label label-a">Margin<br /><b>{ALPHA_ACCOUNT.marginUsage.toLocaleString("it-IT")}%</b></span><span className="risk-label label-b">Risk<br /><b>{ALPHA_ACCOUNT.activeRisk.toLocaleString("it-IT")}%</b></span><span className="risk-label label-c">Limit<br /><b>{ALPHA_ACCOUNT.riskLimit.toLocaleString("it-IT")}%</b></span></div>
+              <p className="risk-copy">Il rischio aperto è calcolato sulle {positions.length} posizioni correnti e resta entro il limite impostato.</p>
               <button className="text-action">Apri Risk Center <ArrowRight size={15} /></button>
             </article>
           </section>
 
           <section className="metrics">
-            <MetricCard label="Profitto mensile" value="+$11,782" detail="↑ 18.4% sul mese scorso" values={[10,18,16,27,23,35,31,49,44,58]} />
-            <MetricCard label="Drawdown massimo" value="6.24%" detail="2.1% sotto la tua media" values={[42,38,33,35,28,31,24,21,18,15]} tone="violet" />
-            <MetricCard label="Profit factor" value="1.86" detail="Edge stabile · 142 trade" values={[18,23,21,29,34,31,38,41,46,49]} tone="amber" />
+            <MetricCard label="Profitto mensile" value={signedMoney(DEMO_PERIOD_STATS["30G"].net)} detail={`Calcolato su ${DEMO_PERIOD_STATS["30G"].trades} operazioni`} values={DEMO_EQUITY_SERIES["1M"]} />
+            <MetricCard label="Drawdown massimo" value={`${ALPHA_ACCOUNT.maxDrawdown.toLocaleString("it-IT")}%`} detail={`Drawdown corrente ${ALPHA_ACCOUNT.currentDrawdown.toLocaleString("it-IT")}%`} values={DEMO_BALANCE_SERIES["1Y"]} tone="violet" />
+            <MetricCard label="Profit factor" value={DEMO_PERIOD_STATS["30G"].factor.toLocaleString("it-IT")} detail={`${DEMO_PERIOD_STATS["30G"].wins} vincenti · ${DEMO_PERIOD_STATS["30G"].losses} perdenti`} values={DEMO_PERIOD_STATS["30G"].flow} tone="amber" />
           </section>
 
           <section className="lower-grid">
             <article className="positions-card glass-card" id="positions">
-              <div className="section-head"><div><p className="eyebrow">Posizioni aperte</p><h2>3 posizioni · +$531.00</h2></div><button className="quiet-button">Vedi tutte <ArrowRight size={14} /></button></div>
+              <div className="section-head"><div><p className="eyebrow">Posizioni aperte</p><h2>{positions.length} posizioni · {signedMoney(OPEN_PNL)}</h2></div><button className="quiet-button">Vedi tutte <ArrowRight size={14} /></button></div>
               <div className="position-table">
                 <div className="table-row table-header"><span>Strumento</span><span>Direzione</span><span>Volume</span><span>Apertura</span><span>Corrente</span><span>P&amp;L</span></div>
-                {positions.map((position) => <div className={`table-row ${position.trend === "down" ? "negative-row" : ""}`} key={position.symbol}><span className="symbol"><i>{position.symbol.slice(0, 2)}</i><strong>{position.symbol}</strong></span><span className={position.side === "Long" ? "long" : "short"}>{position.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{position.side}</span><span>{position.volume}</span><span>{position.open}</span><span>{position.current}</span><strong className={position.trend}>{position.pnl}</strong></div>)}
+                {positions.map((position) => <div className={`table-row ${position.trend === "down" ? "negative-row" : ""}`} key={position.symbol}><span className="symbol"><i>{position.symbol.slice(0, 2)}</i><strong>{position.symbol}</strong></span><span className={position.side === "Long" ? "long" : "short"}>{position.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{position.side}</span><span>{position.volumeLabel}</span><span>{position.open}</span><span>{position.currentPrice}</span><strong className={position.trend}>{position.pnl}</strong></div>)}
               </div>
             </article>
 
             <article className="insight-card glass-card">
-              <div className="insight-icon"><BrainCircuit size={20} /></div><p className="eyebrow">Spherix insight</p><h2>La sessione di Londra genera il 64% del tuo edge.</h2><p>Negli ultimi 30 giorni, i trade aperti tra le 09:00 e le 11:30 hanno avuto un profit factor di 2.41.</p><button>Esplora il pattern <Sparkles size={15} /></button><small><ShieldCheck size={12} /> Calcolato su 86 operazioni</small>
+              <div className="insight-icon"><BrainCircuit size={20} /></div><p className="eyebrow">Spherix insight</p><h2>La sessione {BEST_SESSION_30D.name} genera il {BEST_SESSION_30D.share.toLocaleString("it-IT")}% del risultato.</h2><p>Negli ultimi 30 giorni questa sessione ha un profit factor di {BEST_SESSION_30D.factor.toLocaleString("it-IT")} e un win rate del {BEST_SESSION_30D.win.toLocaleString("it-IT")}%.</p><button>Esplora il pattern <Sparkles size={15} /></button><small><ShieldCheck size={12} /> Calcolato su {BEST_SESSION_30D.trades} operazioni</small>
             </article>
           </section>
 
           <section className="story-card glass-card" id="story">
-            <div className="section-head"><div><p className="eyebrow">Equity story</p><h2>Questa settimana, in tre momenti.</h2></div><button className="quiet-button"><Sparkles size={14} /> Genera report</button></div>
-            <div className="story-line"><div className="story-item positive"><span>1</span><div><small>Lunedì · 10:18</small><strong>Breakout EURUSD confermato</strong><p>Il setup London Open ha aggiunto $620 mantenendo il rischio allo 0.7%.</p></div></div><div className="story-item caution"><span>2</span><div><small>Mercoledì · 15:42</small><strong>Concentrazione temporanea su USD</strong><p>Tre posizioni correlate hanno portato l’esposizione complessiva al 38%.</p></div></div><div className="story-item positive"><span>3</span><div><small>Oggi · 11:06</small><strong>Nuovo massimo di equity</strong><p>La curva ha superato $127.8k con drawdown corrente inferiore all’1%.</p></div></div></div>
+            <div className="section-head"><div><p className="eyebrow">Equity story</p><h2>Gli ultimi 30 giorni, in tre numeri.</h2></div><button className="quiet-button"><Sparkles size={14} /> Genera report</button></div>
+            <div className="story-line"><div className="story-item positive"><span>1</span><div><small>{BEST_RECENT_TRADE.date}</small><strong>{BEST_RECENT_TRADE.setup} · {BEST_RECENT_TRADE.symbol}</strong><p>La migliore operazione del periodo ha aggiunto {money(BEST_RECENT_TRADE.netPnl)} con un risultato di {BEST_RECENT_TRADE.rMultiple.toLocaleString("it-IT")}R.</p></div></div><div className="story-item caution"><span>2</span><div><small>Rischio corrente</small><strong>{positions.length} posizioni aperte</strong><p>Il rischio complessivo è {ALPHA_ACCOUNT.activeRisk.toLocaleString("it-IT")}% dell’equity, contro un limite di {ALPHA_ACCOUNT.riskLimit.toLocaleString("it-IT")}%.</p></div></div><div className="story-item positive"><span>3</span><div><small>Equity riconciliata</small><strong>{money(ALPHA_ACCOUNT.equity)}</strong><p>Balance {money(ALPHA_ACCOUNT.balance)} più P&amp;L aperto {signedMoney(OPEN_PNL)}.</p></div></div></div>
           </section>
 
           <section className="calendar-strip" id="calendar"><div><CalendarDays size={19} /><span><strong>3 eventi ad alto impatto</strong> nelle prossime 24 ore</span></div><div className="event-pills"><span>14:30 · USD GDP</span><span>16:00 · USD Consumer Confidence</span><button>Apri calendario <ArrowRight size={14} /></button></div></section>

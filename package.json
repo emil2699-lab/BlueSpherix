@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "data:csv": "node --no-warnings --experimental-strip-types scripts/export-demo-csv.mjs",
+    "data:check": "node --no-warnings --experimental-strip-types scripts/check-demo-data.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

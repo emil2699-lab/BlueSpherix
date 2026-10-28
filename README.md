@@ -21,13 +21,23 @@ npm run build
 npm run start
 ```
 
+The demo ledger is deterministic and contains 314 operations. Regenerate its downloadable CSV with:
+
+```bash
+npm run data:csv
+npm run data:check
+```
+
+The generated file is `public/data/demo-operations.csv`. Dashboard, Analytics, Operations, and the Alpha Momentum account in Portfolio calculate their totals from the same ledger: balance, equity, open P&L, win rate, profit factor, expectancy, average R, drawdown, sessions, instruments, heatmaps, and period curves are not maintained as independent display values.
+
 ## Current scope
 
 - Responsive macOS/Safari-first dashboard
 - Equity and balance timeline with period controls
 - Risk Weather, performance metrics, open positions, insights, and Equity Story
 - Dark visual system and installable web-app metadata
-- Demo data kept inside the UI until the MT5 bridge contract is defined
+- Deterministic 314-operation demo ledger with a downloadable CSV
+- Shared calculation layer used across all product sections
 
 ## Visual language
 
