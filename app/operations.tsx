@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -218,7 +218,25 @@ function TimelineWorkspace({ contained = false, visible, selectedTrade, setSelec
   filter: TradeFilter;
   setFilter: (filter: TradeFilter) => void;
 }) {
-  return <section className={`focus-workspace ${contained ? "contained-stream" : ""}`}>
+  const inspectorRef = useRef<HTMLElement>(null);
+  const [focusHeight, setFocusHeight] = useState(578);
+
+  useEffect(() => {
+    if (!contained || !inspectorRef.current) return;
+    const inspector = inspectorRef.current;
+    const syncHeight = () => {
+      const nextHeight = Math.ceil(inspector.getBoundingClientRect().height);
+      setFocusHeight((currentHeight) => currentHeight === nextHeight ? currentHeight : nextHeight);
+    };
+    syncHeight();
+    const observer = new ResizeObserver(syncHeight);
+    observer.observe(inspector);
+    return () => observer.disconnect();
+  }, [contained, selectedTrade.id]);
+
+  const workspaceStyle = contained ? { "--focus-panel-height": `${focusHeight}px` } as CSSProperties : undefined;
+
+  return <section className={`focus-workspace ${contained ? "contained-stream" : ""}`} style={workspaceStyle}>
     <article className="glass-card timeline-card">
       <div className="focus-toolbar">
         <div><p className="eyebrow">Trade stream</p><h2>{visible.length} esecuzioni nel contesto</h2></div>
@@ -243,7 +261,7 @@ function TimelineWorkspace({ contained = false, visible, selectedTrade, setSelec
       </div>
     </article>
 
-    <aside className={`glass-card trade-inspector ${selectedTrade.result < 0 ? `negative-surface ${Math.abs(selectedTrade.result) >= 200 ? "negative-strong" : ""}` : ""}`}>
+    <aside ref={inspectorRef} className={`glass-card trade-inspector ${selectedTrade.result < 0 ? `negative-surface ${Math.abs(selectedTrade.result) >= 200 ? "negative-strong" : ""}` : ""}`}>
       <div className="inspector-head">
         <span className="inspector-symbol">{selectedTrade.symbol.slice(0, 2)}</span>
         <div><p>{selectedTrade.id} · {selectedTrade.status}</p><h2>{selectedTrade.symbol}</h2><span className={selectedTrade.side === "Long" ? "long" : "short"}>{selectedTrade.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{selectedTrade.side} · {selectedTrade.volume} lot</span></div>
