@@ -9,6 +9,7 @@ import {
   Download,
   Focus,
   LayoutList,
+  Layers3,
   Search,
   ShieldCheck,
   Sparkles,
@@ -18,6 +19,7 @@ import {
 type Period = "30G" | "90G" | "1A";
 type TradeFilter = "Tutte" | "Aperte" | "Chiuse" | "In profitto" | "In perdita";
 type Proposal = "classic" | "focus";
+type Layout = "separate" | "mixed";
 
 const periodStats: Record<Period, { net: number; trades: number; win: number; averageR: number; flow: number[] }> = {
   "30G": { net: 11782, trades: 142, win: 57.7, averageR: .68, flow: [320, -180, 610, 240, -95, 780, 420, -260, 910, 360, 620, 418] },
@@ -40,6 +42,7 @@ const money = (value: number) => new Intl.NumberFormat("it-IT", { style: "curren
 const signedMoney = (value: number) => `${value > 0 ? "+" : ""}${money(value)}`;
 
 export default function Operations() {
+  const [layout, setLayout] = useState<Layout>("separate");
   const [proposal, setProposal] = useState<Proposal>("focus");
   const [period, setPeriod] = useState<Period>("30G");
   const [filter, setFilter] = useState<TradeFilter>("Tutte");
@@ -87,7 +90,7 @@ export default function Operations() {
         <div>
           <p className="date-line">Ogni esecuzione, nel suo contesto</p>
           <h1>Operazioni.</h1>
-          <p>Due proposte complete da provare e confrontare.</p>
+          <p>Scegli due viste specializzate oppure un unico spazio operativo.</p>
         </div>
         <div className="operations-actions">
           <div className="range-switch" aria-label="Periodo operazioni">
@@ -97,20 +100,31 @@ export default function Operations() {
         </div>
       </section>
 
-      <div className="proposal-picker" aria-label="Confronta le proposte per Operazioni">
-        <button className={proposal === "classic" ? "active" : ""} aria-pressed={proposal === "classic"} onClick={() => setProposal("classic")}>
+      <div className="proposal-picker layout-picker" aria-label="Scegli la struttura della sezione Operazioni">
+        <button className={layout === "separate" ? "active" : ""} aria-pressed={layout === "separate"} onClick={() => setLayout("separate")}>
           <span className="proposal-icon"><LayoutList size={18} /></span>
-          <span><small>Proposta A · precedente</small><strong>Registro completo</strong><em>Più dati insieme, tabella estesa e Result flow.</em></span>
+          <span><small>Due prospettive</small><strong>Viste separate</strong><em>Scegli tra il registro completo e la lettura contestuale.</em></span>
         </button>
-        <button className={proposal === "focus" ? "active" : ""} aria-pressed={proposal === "focus"} onClick={() => setProposal("focus")}>
-          <span className="proposal-icon"><Focus size={18} /></span>
-          <span><small>Proposta B · nuova</small><strong>Timeline + Focus</strong><em>Scansione più rapida e dettaglio sempre visibile.</em></span>
+        <button className={layout === "mixed" ? "active" : ""} aria-pressed={layout === "mixed"} onClick={() => setLayout("mixed")}>
+          <span className="proposal-icon"><Layers3 size={18} /></span>
+          <span><small>Una sola esperienza</small><strong>Vista unificata</strong><em>Flusso, operazioni e dettaglio senza informazioni ripetute.</em></span>
         </button>
       </div>
 
       <div className="demo-notice"><ShieldCheck size={16} /><span><strong>Registro dimostrativo.</strong> Operazioni e risultati sono simulati; il registro verrà popolato automaticamente dal collegamento MT5.</span></div>
 
-      {proposal === "classic" ? (
+      {layout === "separate" && <div className="proposal-picker view-picker" aria-label="Scegli quale vista separata mostrare">
+        <button className={proposal === "classic" ? "active" : ""} aria-pressed={proposal === "classic"} onClick={() => setProposal("classic")}>
+          <span className="proposal-icon"><LayoutList size={18} /></span>
+          <span><small>Vista tabellare</small><strong>Registro completo</strong><em>Più dati insieme, tabella estesa e Result flow.</em></span>
+        </button>
+        <button className={proposal === "focus" ? "active" : ""} aria-pressed={proposal === "focus"} onClick={() => setProposal("focus")}>
+          <span className="proposal-icon"><Focus size={18} /></span>
+          <span><small>Vista contestuale</small><strong>Timeline + Focus</strong><em>Scansione più rapida e dettaglio sempre visibile.</em></span>
+        </button>
+      </div>}
+
+      {layout === "separate" && proposal === "classic" && (
         <>
           <section className="operations-kpis">
             <article className="glass-card"><p className="eyebrow">Risultato netto</p><strong className="up">{money(stats.net)}</strong><small>Nel periodo selezionato</small></article>
@@ -154,7 +168,9 @@ export default function Operations() {
             {!visible.length && <div className="ledger-empty">Nessuna operazione corrisponde ai filtri selezionati.</div>}
           </section>
         </>
-      ) : (
+      )}
+
+      {layout === "separate" && proposal === "focus" && (
         <>
           <section className="focus-kpis">
             <article className="glass-card focus-result"><p className="eyebrow">Oggi, in tempo reale</p><strong className="up">+$531,00</strong><span><ArrowUpRight size={14} /> 3 posizioni aperte</span></article>
@@ -162,63 +178,102 @@ export default function Operations() {
             <article className="glass-card"><p className="eyebrow">Rischio attivo</p><strong>0,84%</strong><small>Zona abituale · limite 1,50%</small></article>
           </section>
 
-          <section className="focus-workspace">
-            <article className="glass-card timeline-card">
-              <div className="focus-toolbar">
-                <div><p className="eyebrow">Trade stream</p><h2>{visible.length} esecuzioni nel contesto</h2></div>
-                <label className="trade-search"><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cerca trade" aria-label="Cerca operazioni" /></label>
-              </div>
-              <TradeFilters filter={filter} setFilter={setFilter} />
-              <div className="trade-timeline">
-                {["Oggi", "Ieri", "26 ottobre", "25 ottobre"].map((day) => {
-                  const dayTrades = visible.filter((trade) => trade.day === day);
-                  if (!dayTrades.length) return null;
-                  const total = dayTrades.reduce((sum, trade) => sum + trade.result, 0);
-                  return <div className="timeline-day" key={day}>
-                    <div className="timeline-day-head"><span>{day}</span><strong className={total >= 0 ? "up" : "down"}>{signedMoney(total)}</strong></div>
-                    {dayTrades.map((trade) => <button key={trade.id} className={`timeline-trade ${selectedTrade.id === trade.id ? "selected" : ""} ${trade.result < 0 ? (Math.abs(trade.result) >= 200 ? "loss severe" : "loss") : ""}`} onClick={() => setSelected(trade.id)}>
-                      <time>{trade.time}</time>
-                      <span className="timeline-symbol"><i>{trade.symbol.slice(0, 2)}</i><span><strong>{trade.symbol}</strong><small>{trade.setup}</small></span></span>
-                      <span className={trade.side === "Long" ? "long" : "short"}>{trade.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{trade.side}</span>
-                      <span className="timeline-status">{trade.status}</span>
-                      <strong className={trade.result >= 0 ? "up" : "down"}>{signedMoney(trade.result)}</strong>
-                    </button>)}
-                  </div>;
-                })}
-                {!visible.length && <div className="ledger-empty">Nessuna operazione corrisponde ai filtri selezionati.</div>}
-              </div>
-            </article>
-
-            <aside className={`glass-card trade-inspector ${selectedTrade.result < 0 ? `negative-surface ${Math.abs(selectedTrade.result) >= 200 ? "negative-strong" : ""}` : ""}`}>
-              <div className="inspector-head">
-                <span className="inspector-symbol">{selectedTrade.symbol.slice(0, 2)}</span>
-                <div><p>{selectedTrade.id} · {selectedTrade.status}</p><h2>{selectedTrade.symbol}</h2><span className={selectedTrade.side === "Long" ? "long" : "short"}>{selectedTrade.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{selectedTrade.side} · {selectedTrade.volume} lot</span></div>
-              </div>
-              <div className="inspector-result"><span>Risultato</span><strong className={selectedTrade.result >= 0 ? "up" : "down"}>{signedMoney(selectedTrade.result)}</strong><small>{selectedTrade.r > 0 ? "+" : ""}{selectedTrade.r}R · {selectedTrade.duration}</small></div>
-              <div className="trade-journey">
-                <div className="section-head"><div><p className="eyebrow">Trade journey</p><h3>Dal rischio al risultato</h3></div><Target size={18} /></div>
-                <div className="journey-track"><i className="mae" style={{ width: `${Math.min(38, 12 + Math.abs(selectedTrade.mae) / 12)}%` }} /><i className="mfe" style={{ width: `${Math.min(55, 16 + selectedTrade.mfe / 25)}%` }} /><span /></div>
-                <div className="journey-labels"><span>MAE<strong className="down">{money(selectedTrade.mae)}</strong></span><span>MFE<strong className="up">+{money(selectedTrade.mfe)}</strong></span></div>
-              </div>
-              <dl className="inspector-values">
-                <div><dt>Ingresso</dt><dd>{selectedTrade.entry}</dd></div>
-                <div><dt>{selectedTrade.status === "Aperta" ? "Prezzo corrente" : "Uscita"}</dt><dd>{selectedTrade.exit}</dd></div>
-                <div><dt>Setup</dt><dd>{selectedTrade.setup}</dd></div>
-                <div><dt>Apertura</dt><dd>{selectedTrade.date}</dd></div>
-              </dl>
-              <div className="inspector-note"><Sparkles size={16} /><div><strong>Lettura operativa</strong><p>{selectedTrade.note}</p></div></div>
-            </aside>
-          </section>
-
-          <article className="glass-card focus-pattern">
-            <div className="pattern-score"><span><Sparkles size={16} /> Spherix pattern</span><strong>6 su 8</strong><small>trade coerenti con il piano</small></div>
-            <div className="pattern-copy"><p className="eyebrow">Cosa sta funzionando</p><h2>London breakout rimane il setup più pulito.</h2><p>Le entrate tra le 08:40 e le 10:10 mostrano escursioni avverse più contenute e un R medio superiore.</p></div>
-            <div className="pattern-bars" aria-label="Coerenza degli ultimi otto trade">{trades.map((trade) => <i key={trade.id} className={trade.result >= 0 ? "positive" : "negative"} title={`${trade.symbol}: ${signedMoney(trade.result)}`} />)}</div>
-          </article>
+          <TimelineWorkspace visible={visible} selectedTrade={selectedTrade} setSelected={setSelected} query={query} setQuery={setQuery} filter={filter} setFilter={setFilter} />
+          <FocusPattern />
         </>
       )}
+
+      {layout === "mixed" && <>
+        <MixedPulse stats={stats} period={period} maxFlow={maxFlow} />
+        <TimelineWorkspace visible={visible} selectedTrade={selectedTrade} setSelected={setSelected} query={query} setQuery={setQuery} filter={filter} setFilter={setFilter} />
+        <FocusPattern />
+      </>}
     </div>
   );
+}
+
+function MixedPulse({ stats, period, maxFlow }: { stats: (typeof periodStats)[Period]; period: Period; maxFlow: number }) {
+  return <article className="glass-card mixed-pulse">
+    <div className="mixed-result">
+      <p className="eyebrow">Risultato netto · {period}</p>
+      <strong className="up">{money(stats.net)}</strong>
+      <span><ArrowUpRight size={14} /> Curva positiva e perdite contenute</span>
+    </div>
+    <div className="mixed-flow" aria-label={`Sequenza risultati del periodo ${period}`}>
+      {stats.flow.map((value, index) => <i key={`${period}-mixed-${index}`} className={value >= 0 ? "gain" : "loss"} style={{ height: `${20 + Math.abs(value) / maxFlow * 80}%` }} title={signedMoney(value)} />)}
+    </div>
+    <div className="mixed-stats">
+      <span>Operazioni<strong>{stats.trades}</strong></span>
+      <span>Win rate<strong>{stats.win.toLocaleString("it-IT")}%</strong></span>
+      <span>R medio<strong>{stats.averageR.toLocaleString("it-IT", { minimumFractionDigits: 2 })}R</strong></span>
+    </div>
+  </article>;
+}
+
+function TimelineWorkspace({ visible, selectedTrade, setSelected, query, setQuery, filter, setFilter }: {
+  visible: typeof trades;
+  selectedTrade: typeof trades[number];
+  setSelected: (id: string) => void;
+  query: string;
+  setQuery: (query: string) => void;
+  filter: TradeFilter;
+  setFilter: (filter: TradeFilter) => void;
+}) {
+  return <section className="focus-workspace">
+    <article className="glass-card timeline-card">
+      <div className="focus-toolbar">
+        <div><p className="eyebrow">Trade stream</p><h2>{visible.length} esecuzioni nel contesto</h2></div>
+        <label className="trade-search"><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cerca trade" aria-label="Cerca operazioni" /></label>
+      </div>
+      <TradeFilters filter={filter} setFilter={setFilter} />
+      <div className="trade-timeline">
+        {["Oggi", "Ieri", "26 ottobre", "25 ottobre"].map((day) => {
+          const dayTrades = visible.filter((trade) => trade.day === day);
+          if (!dayTrades.length) return null;
+          const total = dayTrades.reduce((sum, trade) => sum + trade.result, 0);
+          return <div className="timeline-day" key={day}>
+            <div className="timeline-day-head"><span>{day}</span><strong className={total >= 0 ? "up" : "down"}>{signedMoney(total)}</strong></div>
+            {dayTrades.map((trade) => <button key={trade.id} className={`timeline-trade ${selectedTrade.id === trade.id ? "selected" : ""} ${trade.result < 0 ? (Math.abs(trade.result) >= 200 ? "loss severe" : "loss") : ""}`} onClick={() => setSelected(trade.id)}>
+              <time>{trade.time}</time>
+              <span className="timeline-symbol"><i>{trade.symbol.slice(0, 2)}</i><span><strong>{trade.symbol}</strong><small>{trade.setup}</small></span></span>
+              <span className={trade.side === "Long" ? "long" : "short"}>{trade.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{trade.side}</span>
+              <span className="timeline-status">{trade.status}</span>
+              <strong className={trade.result >= 0 ? "up" : "down"}>{signedMoney(trade.result)}</strong>
+            </button>)}
+          </div>;
+        })}
+        {!visible.length && <div className="ledger-empty">Nessuna operazione corrisponde ai filtri selezionati.</div>}
+      </div>
+    </article>
+
+    <aside className={`glass-card trade-inspector ${selectedTrade.result < 0 ? `negative-surface ${Math.abs(selectedTrade.result) >= 200 ? "negative-strong" : ""}` : ""}`}>
+      <div className="inspector-head">
+        <span className="inspector-symbol">{selectedTrade.symbol.slice(0, 2)}</span>
+        <div><p>{selectedTrade.id} · {selectedTrade.status}</p><h2>{selectedTrade.symbol}</h2><span className={selectedTrade.side === "Long" ? "long" : "short"}>{selectedTrade.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{selectedTrade.side} · {selectedTrade.volume} lot</span></div>
+      </div>
+      <div className="inspector-result"><span>Risultato</span><strong className={selectedTrade.result >= 0 ? "up" : "down"}>{signedMoney(selectedTrade.result)}</strong><small>{selectedTrade.r > 0 ? "+" : ""}{selectedTrade.r}R · {selectedTrade.duration}</small></div>
+      <div className="trade-journey">
+        <div className="section-head"><div><p className="eyebrow">Trade journey</p><h3>Dal rischio al risultato</h3></div><Target size={18} /></div>
+        <div className="journey-track"><i className="mae" style={{ width: `${Math.min(38, 12 + Math.abs(selectedTrade.mae) / 12)}%` }} /><i className="mfe" style={{ width: `${Math.min(55, 16 + selectedTrade.mfe / 25)}%` }} /><span /></div>
+        <div className="journey-labels"><span>MAE<strong className="down">{money(selectedTrade.mae)}</strong></span><span>MFE<strong className="up">+{money(selectedTrade.mfe)}</strong></span></div>
+      </div>
+      <dl className="inspector-values">
+        <div><dt>Ingresso</dt><dd>{selectedTrade.entry}</dd></div>
+        <div><dt>{selectedTrade.status === "Aperta" ? "Prezzo corrente" : "Uscita"}</dt><dd>{selectedTrade.exit}</dd></div>
+        <div><dt>Setup</dt><dd>{selectedTrade.setup}</dd></div>
+        <div><dt>Apertura</dt><dd>{selectedTrade.date}</dd></div>
+      </dl>
+      <div className="inspector-note"><Sparkles size={16} /><div><strong>Lettura operativa</strong><p>{selectedTrade.note}</p></div></div>
+    </aside>
+  </section>;
+}
+
+function FocusPattern() {
+  return <article className="glass-card focus-pattern">
+    <div className="pattern-score"><span><Sparkles size={16} /> Spherix pattern</span><strong>6 su 8</strong><small>trade coerenti con il piano</small></div>
+    <div className="pattern-copy"><p className="eyebrow">Cosa sta funzionando</p><h2>London breakout rimane il setup più pulito.</h2><p>Le entrate tra le 08:40 e le 10:10 mostrano escursioni avverse più contenute e un R medio superiore.</p></div>
+    <div className="pattern-bars" aria-label="Coerenza degli ultimi otto trade">{trades.map((trade) => <i key={trade.id} className={trade.result >= 0 ? "positive" : "negative"} title={`${trade.symbol}: ${signedMoney(trade.result)}`} />)}</div>
+  </article>;
 }
 
 function TradeFilters({ filter, setFilter }: { filter: TradeFilter; setFilter: (filter: TradeFilter) => void }) {
