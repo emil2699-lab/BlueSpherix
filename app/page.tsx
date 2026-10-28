@@ -28,7 +28,6 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import Portfolio from "./portfolio";
 import Analytics from "./analytics";
-import Operations from "./operations";
 
 type Range = "1W" | "1M" | "3M" | "1Y";
 
@@ -127,7 +126,7 @@ export default function Home() {
       const target = window.location.hash.slice(1) || "overview";
       setView(target);
       requestAnimationFrame(() => {
-        if (target === "portfolio" || target === "analytics" || target === "positions") window.scrollTo(0, 0);
+        if (target === "portfolio" || target === "analytics") window.scrollTo(0, 0);
         else document.getElementById(target)?.scrollIntoView();
       });
     };
@@ -189,8 +188,7 @@ export default function Home() {
         <div className="content">
           {view === "portfolio" && <Portfolio />}
           {view === "analytics" && <Analytics />}
-          {view === "positions" && <Operations />}
-          <div hidden={view === "portfolio" || view === "analytics" || view === "positions"}>
+          <div hidden={view === "portfolio" || view === "analytics"}>
           <section className="welcome" id="overview">
             <div><p className="date-line">Mercoledì, 28 ottobre</p><h1>Buongiorno, Luca.</h1><p>Il portafoglio è stabile. Il rischio è sotto controllo.</p></div>
             <div className="range-switch" aria-label="Periodo">
