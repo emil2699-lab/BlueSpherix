@@ -346,16 +346,22 @@ function TradeInspector({ trade, focusTab, setFocusTab, journalNote, setJournalN
   screenshot?: string;
   setScreenshot: (name: string) => void;
 }) {
+  const [tabHasMoved, setTabHasMoved] = useState(false);
   const levels = levelsFor(trade);
   const toggleTag = (tag: string) => setTags(tags.includes(tag) ? tags.filter((item) => item !== tag) : [...tags, tag]);
+  const selectFocusTab = (tab: FocusTab) => {
+    if (tab === focusTab) return;
+    setTabHasMoved(true);
+    setFocusTab(tab);
+  };
   const closedAt = trade.closedAt ? new Date(trade.closedAt).toLocaleString("it-IT", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) : "In corso";
   return <>
     <div className="inspector-head">
       <span className="inspector-symbol">{trade.symbol.slice(0, 2)}</span>
       <div><p>{trade.id} · {trade.status}</p><h2>{trade.symbol}</h2><span className={trade.side === "Long" ? "long" : "short"}>{trade.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{trade.side} · {trade.volumeLabel} lot</span></div>
     </div>
-    <div className="focus-tabs" role="tablist" aria-label="Dettaglio del trade">
-      {(["Dettagli", "Diario"] as FocusTab[]).map((tab) => <button key={tab} role="tab" aria-selected={focusTab === tab} onClick={() => setFocusTab(tab)}>{tab === "Dettagli" ? <Target size={14} /> : <BookOpen size={14} />}{tab}</button>)}
+    <div className={`focus-tabs ${focusTab === "Diario" ? "show-journal" : "show-details"} ${tabHasMoved ? "is-switching" : ""}`} role="tablist" aria-label="Dettaglio del trade">
+      {(["Dettagli", "Diario"] as FocusTab[]).map((tab) => <button key={tab} role="tab" aria-selected={focusTab === tab} onClick={() => selectFocusTab(tab)}>{tab === "Dettagli" ? <Target size={14} /> : <BookOpen size={14} />}{tab}</button>)}
     </div>
     {focusTab === "Dettagli" ? <>
       <div className="inspector-result"><span>Risultato netto</span><strong className={trade.result >= 0 ? "up" : "down"}>{signedMoney(trade.result)}</strong><small>{trade.r > 0 ? "+" : ""}{trade.r}R · {trade.duration} · rischio {money(trade.riskUsd)}</small></div>

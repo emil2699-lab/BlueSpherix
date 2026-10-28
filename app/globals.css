@@ -474,9 +474,18 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
 .inspector-head p { margin: 0 0 4px; color: #687582; font-size: 8px; }
 .inspector-head h2 { margin: 0 0 5px; font-size: 17px; }
 .inspector-head .long, .inspector-head .short { font-size: 9px; }
-.focus-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin: 20px 0 0; padding: 4px; border: 1px solid var(--stroke); border-radius: 10px; background: rgba(5,9,14,.42); }
-.focus-tabs button { height: 32px; display: flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: 7px; color: var(--muted); background: transparent; font-size: 9px; cursor: pointer; }
-.focus-tabs button[aria-selected="true"] { color: #eafffb; background: rgba(86,217,202,.1); box-shadow: inset 0 0 0 1px rgba(86,217,202,.17); }
+.focus-tabs { position: relative; isolation: isolate; display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin: 20px 0 0; padding: 4px; border: 1px solid var(--stroke); border-radius: 10px; background: rgba(5,9,14,.48); }
+.focus-tabs::before { content: ""; position: absolute; z-index: 0; top: 4px; left: 4px; width: calc((100% - 13px)/2); height: 32px; border: 1px solid rgba(177,163,255,.3); border-radius: 7px; background: linear-gradient(145deg,rgba(157,139,255,.27),rgba(104,87,213,.16)); box-shadow: inset 0 1px rgba(255,255,255,.08),0 5px 15px rgba(36,25,103,.2); transform: translateX(0); }
+.focus-tabs.show-journal::before { transform: translateX(calc(100% + 5px)); }
+.focus-tabs.is-switching.show-journal::before { animation: focus-pill-right .44s cubic-bezier(.22,.8,.25,1) both; }
+.focus-tabs.is-switching.show-details::before { animation: focus-pill-left .44s cubic-bezier(.22,.8,.25,1) both; }
+.focus-tabs button { position: relative; z-index: 1; height: 32px; display: flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: 7px; color: var(--muted); background: transparent; font-size: 9px; cursor: pointer; transition: color .2s ease; }
+.focus-tabs button svg { transition: color .2s ease; }
+.focus-tabs button[aria-selected="true"] { color: #f4f0ff; }
+.focus-tabs button[aria-selected="true"] svg { color: #c2b8ff; }
+.focus-tabs.is-switching button[aria-selected="true"] { animation: focus-tab-pop .44s cubic-bezier(.22,.8,.25,1); }
+.negative-surface .focus-tabs { border-color: rgba(189,169,255,.17); background: rgba(8,6,14,.58); }
+.negative-surface .focus-tabs::before { border-color: rgba(197,184,255,.38); background: linear-gradient(145deg,rgba(171,151,255,.32),rgba(112,91,222,.2)); box-shadow: inset 0 1px rgba(255,255,255,.1),0 6px 18px rgba(28,18,91,.28); }
 .inspector-result { margin: 25px 0 22px; padding: 20px 0; border-top: 1px solid var(--stroke); border-bottom: 1px solid var(--stroke); }
 .inspector-result > span, .inspector-result > small { display: block; color: var(--muted); font-size: 9px; }
 .inspector-result > strong { display: block; margin: 8px 0; font-size: 30px; letter-spacing: -1px; }
@@ -546,6 +555,9 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
 .pattern-bars .negative { background: linear-gradient(var(--red),rgba(255,111,125,.25)); }
 @keyframes surface-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes flow-in { from { opacity: 0; scale: 1 .25; } to { opacity: 1; scale: 1 1; } }
+@keyframes focus-pill-right { 0% { transform: translateX(0) scale(1); } 20% { transform: translateX(0) scale(1.055); } 72% { transform: translateX(calc(100% + 5px)) scale(1.055); } 100% { transform: translateX(calc(100% + 5px)) scale(1); } }
+@keyframes focus-pill-left { 0% { transform: translateX(calc(100% + 5px)) scale(1); } 20% { transform: translateX(calc(100% + 5px)) scale(1.055); } 72% { transform: translateX(0) scale(1.055); } 100% { transform: translateX(0) scale(1); } }
+@keyframes focus-tab-pop { 0%,100% { transform: scale(1); } 24%,70% { transform: scale(1.04); } }
 .operations-kpis, .flow-card, .ledger-card, .focus-kpis, .focus-workspace, .focus-pattern, .hybrid-overview, .hybrid-ledger { animation: surface-in .38s cubic-bezier(.2,.8,.2,1) both; }
 .flow-card, .focus-workspace { animation-delay: .035s; }
 .ledger-card, .focus-pattern { animation-delay: .07s; }
