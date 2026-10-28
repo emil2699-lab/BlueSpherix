@@ -18,6 +18,23 @@ export type DemoTrade = LedgerTrade & {
   duration: string;
 };
 
+export type DemoPendingOrder = {
+  id: string;
+  createdAt: string;
+  expiry: string;
+  symbol: string;
+  type: "Buy Limit" | "Sell Limit" | "Buy Stop" | "Sell Stop";
+  side: "Long" | "Short";
+  volume: number;
+  trigger: number;
+  current: number;
+  stopLoss: number;
+  takeProfit: number;
+  riskUsd: number;
+  setup: string;
+  account: string;
+};
+
 export type PeriodStats = {
   net: number;
   trades: number;
@@ -104,6 +121,11 @@ function toDemoTrade(trade: LedgerTrade): DemoTrade {
 }
 
 export const DEMO_TRADES = LEDGER_TRADES.map(toDemoTrade);
+export const DEMO_PENDING_ORDERS: DemoPendingOrder[] = [
+  { id: "P-2041", createdAt: "2026-10-28T10:18:00.000Z", expiry: "2026-10-28T16:00:00.000Z", symbol: "EURUSD", type: "Buy Limit", side: "Long", volume: .8, trigger: 1.0802, current: 1.08491, stopLoss: 1.0778, takeProfit: 1.0853, riskUsd: 192, setup: "London pullback", account: "Alpha Momentum" },
+  { id: "P-2042", createdAt: "2026-10-28T10:32:00.000Z", expiry: "2026-10-29T15:30:00.000Z", symbol: "XAUUSD", type: "Sell Limit", side: "Short", volume: .2, trigger: 2750.2, current: 2741.62, stopLoss: 2758.4, takeProfit: 2731.6, riskUsd: 164, setup: "NY reversal", account: "Alpha Momentum" },
+  { id: "P-2043", createdAt: "2026-10-28T11:05:00.000Z", expiry: "2026-10-30T12:00:00.000Z", symbol: "GBPJPY", type: "Sell Stop", side: "Short", volume: .4, trigger: 198.05, current: 198.471, stopLoss: 198.51, takeProfit: 197.12, riskUsd: 184, setup: "Range breakdown", account: "Alpha Momentum" },
+];
 export const OPEN_TRADES = DEMO_TRADES.filter((trade) => trade.status === "Aperta");
 export const CLOSED_TRADES = DEMO_TRADES.filter((trade) => trade.status === "Chiusa");
 export const OPEN_PNL = round(sum(OPEN_TRADES.map((trade) => trade.netPnl)));
