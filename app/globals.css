@@ -164,6 +164,58 @@ nav button b { margin-left: auto; font-size: 8px; color: #091110; background: va
 .event-pills button { border: 0; background: transparent; color: var(--amber); display: flex; align-items: center; gap: 5px; font-size: 8px; cursor: pointer; }
 .scrim { display: none; }
 
+button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--aqua); outline-offset: 4px; }
+.portfolio-export { display: flex; gap: 8px; align-items: center; background: rgba(86,217,202,.1); border: 1px solid rgba(86,217,202,.25); border-radius: 10px; padding: 11px 14px; color: var(--aqua); cursor: pointer; font-size: 12px; }
+.demo-notice { display: flex; gap: 10px; align-items: center; padding: 13px 16px; border: 1px solid rgba(157,139,255,.2); border-radius: 12px; color: #bdb4e7; background: rgba(157,139,255,.06); font-size: 12px; line-height: 1.6; }
+.demo-notice svg { flex-shrink: 0; }
+.portfolio-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 24px 0 16px; }
+.portfolio-toolbar > span, .portfolio-caption { color: var(--muted); font-size: 11px; line-height: 1.6; }
+.portfolio-toolbar .range-switch button { min-width: 65px; font-size: 12px; height: 32px; }
+.portfolio-totals { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 15px; }
+.portfolio-totals article { padding: 22px; }
+.portfolio-totals strong { font-size: clamp(22px, 2.5vw, 31px); letter-spacing: -1px; }
+.portfolio-totals p:last-child { font-size: 11px; color: var(--muted); margin-bottom: 0; line-height: 1.6; }
+.portfolio-main { display: grid; grid-template-columns: minmax(0, 1.9fr) minmax(270px, 1fr); gap: 15px; margin-top: 16px; }
+.comparison-card, .allocation-card { padding: 24px; min-width: 0; }
+.comparison-chart { width: 100%; display: block; margin: 22px 0 12px; }
+.chart-slider { display: flex; flex-direction: column; gap: 10px; color: var(--muted); font-size: 11px; }
+.chart-slider input { width: 100%; accent-color: var(--aqua); cursor: pointer; }
+.comparison-values { display: flex; gap: 18px; flex-wrap: wrap; margin: 18px 0; font-size: 11px; }
+.comparison-values strong { display: block; margin-top: 6px; font-size: 17px; }
+.comparison-choices { display: flex; flex-wrap: wrap; gap: 15px; padding-top: 15px; border-top: 1px solid var(--stroke); }
+.comparison-choices label { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--muted); cursor: pointer; min-height: 30px; }
+.comparison-choices input { accent-color: var(--aqua); }
+.comparison-choices i, .allocation-row i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.comparison-empty { display: grid; place-items: center; min-height: 250px; text-align: center; color: var(--muted); font-size: 13px; }
+.allocation-card h2 { font-size: 18px; line-height: 1.4; margin: 0; }
+.allocation-bar { display: flex; height: 18px; gap: 4px; border-radius: 6px; overflow: hidden; margin: 30px 0 20px; }
+.allocation-row { display: flex; justify-content: space-between; gap: 10px; margin: 20px 0; font-size: 12px; }
+.allocation-row span { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.allocation-note, .connection-note p { color: var(--muted); font-size: 11px; line-height: 1.8; }
+.connection-note { display: flex; gap: 12px; border-top: 1px solid var(--stroke); padding-top: 20px; margin-top: 25px; }
+.connection-note svg { color: var(--aqua); flex-shrink: 0; }
+.connection-note strong { font-size: 12px; }
+.account-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 15px; margin-top: 16px; }
+.account-card { padding: 22px; }
+.account-card .section-head { flex-wrap: wrap; gap: 12px; }
+.account-identity { display: flex; align-items: center; gap: 10px; }
+.account-identity > span { border: 1px solid; border-radius: 10px; padding: 10px; font-size: 11px; }
+.account-identity h2 { font-size: 14px; }
+.account-identity p { color: var(--muted); font-size: 10px; margin: 6px 0 0; }
+.account-type { color: var(--muted); font-size: 10px; background: rgba(255,255,255,.04); border-radius: 5px; padding: 5px 7px; }
+.account-equity { display: flex; flex-direction: column; gap: 8px; margin: 25px 0; }
+.account-equity strong { font-size: 25px; letter-spacing: -.7px; }
+.account-equity span { font-size: 12px; }
+.account-card dl { margin: 18px 0; }
+.account-card dl > div { display: flex; justify-content: space-between; gap: 10px; margin: 12px 0; font-size: 11px; }
+.account-card dt { color: var(--muted); }
+.account-card dd { margin: 0; }
+.account-card .text-action { min-height: 32px; font-size: 12px; }
+.account-details { border-top: 1px solid var(--stroke); margin-top: 12px; }
+.account-details p { color: var(--muted); font-size: 10px; line-height: 1.6; }
+@media (max-width: 1150px) { .portfolio-main { grid-template-columns: 1fr; } .account-grid { grid-template-columns: 1fr; } }
+@media (max-width: 800px) { .portfolio-totals { grid-template-columns: 1fr; } .portfolio-toolbar { align-items: flex-start; flex-direction: column; } .comparison-card, .allocation-card { padding: 18px; } }
+
 @media (max-width: 1040px) {
   .app-shell { grid-template-columns: 205px minmax(0,1fr); }
   .sidebar { width: 205px; }

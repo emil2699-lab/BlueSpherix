@@ -25,7 +25,8 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Portfolio from "./portfolio";
 
 type Range = "1W" | "1M" | "3M" | "1Y";
 
@@ -118,12 +119,33 @@ function MetricCard({ label, value, detail, values, tone = "aqua" }: { label: st
 }
 
 export default function Home() {
+  const [view, setView] = useState("overview");
+  useEffect(() => {
+    const sync = () => {
+      const target = window.location.hash.slice(1) || "overview";
+      setView(target);
+      requestAnimationFrame(() => {
+        if (target === "portfolio") window.scrollTo(0, 0);
+        else document.getElementById(target)?.scrollIntoView();
+      });
+    };
+    sync();
+    window.addEventListener("hashchange", sync);
+    window.addEventListener("popstate", sync);
+    return () => {
+      window.removeEventListener("hashchange", sync);
+      window.removeEventListener("popstate", sync);
+    };
+  }, []);
   const [range, setRange] = useState<Range>("1M");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [privateMode, setPrivateMode] = useState(true);
   const performance = useMemo(() => range === "1W" ? "+4.74%" : range === "1M" ? "+10.17%" : range === "3M" ? "+26.53%" : "+72.70%", [range]);
 
   const goTo = (target: string) => {
+    setView(target);
+    window.history.pushState(null, "", `#${target}`);
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
     document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "start" });
     setSidebarOpen(false);
   };
@@ -133,11 +155,11 @@ export default function Home() {
       <div className="ambient ambient-one" /><div className="ambient ambient-two" />
       <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
         <div className="brand"><div className="brand-mark"><Orbit size={21} /></div><span>BlueSpherix</span><button className="mobile-close" onClick={() => setSidebarOpen(false)} aria-label="Chiudi menu"><X size={18} /></button></div>
-        <div className="account-pill"><div className="avatar">AM</div><div><strong>Alpha Momentum</strong><span><i /> MT5 connesso</span></div><ChevronDown size={15} /></div>
+        <div className="account-pill"><div className="avatar">AM</div><div><strong>Alpha Momentum</strong><span><i /> Dati dimostrativi</span></div><ChevronDown size={15} /></div>
         <nav aria-label="Navigazione principale">
           <p className="nav-label">Workspace</p>
-          {navItems.map(({ label, icon: Icon, target }, index) => (
-            <button className={index === 0 ? "active" : ""} key={label} onClick={() => goTo(target)}><Icon size={18} /><span>{label}</span>{label === "Lab" && <em>Beta</em>}</button>
+          {navItems.map(({ label, icon: Icon, target }) => (
+            <button className={view === target ? "active" : ""} aria-current={view === target ? "page" : undefined} key={label} onClick={() => goTo(target)}><Icon size={18} /><span>{label}</span>{label === "Lab" && <em>Beta</em>}</button>
           ))}
           <p className="nav-label spaced">Strumenti</p>
           <button onClick={() => goTo("story")}><BookOpen size={18} /><span>Diario</span></button>
@@ -145,7 +167,7 @@ export default function Home() {
         </nav>
         <div className="sidebar-bottom">
           <button><Settings size={18} /><span>Impostazioni</span></button>
-          <div className="sync-status"><span><Zap size={13} /> Live</span><small>Aggiornato 8 sec fa</small></div>
+          <div className="sync-status"><span><Zap size={13} /> Anteprima</span><small>MT5 non collegato</small></div>
         </div>
       </aside>
 
@@ -163,6 +185,8 @@ export default function Home() {
         </header>
 
         <div className="content">
+          {view === "portfolio" && <Portfolio />}
+          <div hidden={view === "portfolio"}>
           <section className="welcome" id="overview">
             <div><p className="date-line">Martedì, 27 ottobre</p><h1>Buongiorno, Luca.</h1><p>Il portafoglio è stabile. Il rischio è sotto controllo.</p></div>
             <div className="range-switch" aria-label="Periodo">
@@ -170,7 +194,7 @@ export default function Home() {
             </div>
           </section>
 
-          <section className="hero-grid" id="portfolio">
+          <section className="hero-grid">
             <article className="equity-card glass-card">
               <div className="card-head">
                 <div><p className="eyebrow">Equity totale</p><div className="equity-value"><strong>$127,842.60</strong><span><ArrowUpRight size={14} /> $864.20 oggi</span></div></div>
@@ -214,6 +238,7 @@ export default function Home() {
           </section>
 
           <section className="calendar-strip" id="calendar"><div><CalendarDays size={19} /><span><strong>3 eventi ad alto impatto</strong> nelle prossime 24 ore</span></div><div className="event-pills"><span>14:30 · USD GDP</span><span>16:00 · USD Consumer Confidence</span><button>Apri calendario <ArrowRight size={14} /></button></div></section>
+          </div>
         </div>
       </section>
     </main>
