@@ -4,11 +4,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import {
   ArrowDownRight,
   ArrowUpRight,
-  ChevronDown,
-  Clock3,
   Download,
-  Focus,
-  LayoutList,
   Search,
   ShieldCheck,
   Sparkles,
@@ -18,7 +14,6 @@ import { ALPHA_ACCOUNT, DEMO_PERIOD_STATS, DEMO_TRADES, OPEN_PNL, RECENT_PLAN_CO
 
 type Period = DemoPeriod;
 type TradeFilter = "Tutte" | "Aperte" | "Chiuse" | "In profitto" | "In perdita";
-type Proposal = "classic" | "focus";
 
 const periodStats = DEMO_PERIOD_STATS;
 const trades = DEMO_TRADES;
@@ -28,12 +23,9 @@ const signedMoney = (value: number) => `${value > 0 ? "+" : ""}${money(value)}`;
 const groupedTradeDays = (items: DemoTrade[]) => [...new Map(items.map((trade) => [trade.day, trade.day])).keys()].map((day) => ({ day, trades: items.filter((trade) => trade.day === day) }));
 
 export default function Operations() {
-  const [proposal, setProposal] = useState<Proposal>("focus");
   const [period, setPeriod] = useState<Period>("30G");
   const [filter, setFilter] = useState<TradeFilter>("Tutte");
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useState("Recenti");
-  const [expanded, setExpanded] = useState<string | null>(null);
   const [selected, setSelected] = useState("T-1048");
   const stats = periodStats[period];
   const periodTrades = useMemo(() => tradesForPeriod(period), [period]);
@@ -47,10 +39,8 @@ export default function Operations() {
       if (filter === "In perdita" && trade.result >= 0) return false;
       return !normalized || `${trade.symbol} ${trade.setup} ${trade.id}`.toLowerCase().includes(normalized);
     });
-    if (sort === "Migliori") return [...matching].sort((a, b) => b.result - a.result);
-    if (sort === "Peggiori") return [...matching].sort((a, b) => a.result - b.result);
     return matching;
-  }, [filter, periodTrades, query, sort]);
+  }, [filter, periodTrades, query]);
 
   const selectedTrade = visible.find((trade) => trade.id === selected) ?? visible[0] ?? periodTrades[0] ?? trades[0];
   const maxFlow = Math.max(...stats.flow.map((value) => Math.abs(value)));
@@ -76,7 +66,7 @@ export default function Operations() {
         <div>
           <p className="date-line">Ogni esecuzione, nel suo contesto</p>
           <h1>Operazioni.</h1>
-          <p>Monitora ogni esecuzione e passa alla tabella completa quando serve più dettaglio.</p>
+          <p>Monitora ogni esecuzione e analizza il contesto del trade selezionato.</p>
         </div>
         <div className="operations-actions">
           <div className="range-switch" aria-label="Periodo operazioni">
@@ -89,51 +79,9 @@ export default function Operations() {
 
       <div className="demo-notice"><ShieldCheck size={16} /><span><strong>Registro dimostrativo.</strong> Operazioni e risultati sono simulati; il registro verrà popolato automaticamente dal collegamento MT5.</span></div>
 
-      <div className="proposal-picker view-picker operations-view-picker" aria-label="Scegli come visualizzare le operazioni">
-        <button className={proposal === "focus" ? "active" : ""} aria-pressed={proposal === "focus"} onClick={() => setProposal("focus")}>
-          <span className="proposal-icon"><Focus size={18} /></span>
-          <span><small>Vista operativa</small><strong>Trade Stream + Focus</strong><em>Cronologia scorrevole e dettaglio del trade sempre visibile.</em></span>
-        </button>
-        <button className={proposal === "classic" ? "active" : ""} aria-pressed={proposal === "classic"} onClick={() => setProposal("classic")}>
-          <span className="proposal-icon"><LayoutList size={18} /></span>
-          <span><small>Vista dati</small><strong>Tabella completa</strong><em>Tutte le operazioni e i campi essenziali in un unico registro.</em></span>
-        </button>
-      </div>
-
       <HybridOverview stats={stats} period={period} maxFlow={maxFlow} />
 
-      {proposal === "classic" && (
-          <section className="glass-card ledger-card">
-            <div className="ledger-head">
-              <div><p className="eyebrow">Tabella completa</p><h2>{visible.length} operazioni visualizzate</h2></div>
-              <TradeTools query={query} setQuery={setQuery} sort={sort} setSort={setSort} />
-            </div>
-            <TradeFilters filter={filter} setFilter={setFilter} />
-            <div className="ledger-table">
-              <div className="ledger-row ledger-header"><span>Data</span><span>Strumento</span><span>Direzione</span><span>Setup</span><span>Durata</span><span>Risultato</span><span>Stato</span><span /></div>
-              {visible.map((trade) => (
-                <div className={`trade-group ${trade.result < 0 ? "loss-group" : ""}`} key={trade.id}>
-                  <div className="ledger-row">
-                    <span className="trade-date">{trade.date}<small>{trade.id}</small></span>
-                    <span className="symbol"><i>{trade.symbol.slice(0, 2)}</i><strong>{trade.symbol}</strong></span>
-                    <span className={trade.side === "Long" ? "long" : "short"}>{trade.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{trade.side}<small>{trade.volume} lot</small></span>
-                    <span className="setup-tag">{trade.setup}</span>
-                    <span className="trade-duration"><Clock3 size={13} />{trade.duration}</span>
-                    <strong className={trade.result >= 0 ? "up" : "down"}>{signedMoney(trade.result)}</strong>
-                    <span className={`trade-status ${trade.status === "Aperta" ? "open" : ""}`}>{trade.status}</span>
-                    <button className="operation-expand" aria-label={`${expanded === trade.id ? "Chiudi" : "Apri"} dettagli ${trade.id}`} aria-expanded={expanded === trade.id} onClick={() => setExpanded(expanded === trade.id ? null : trade.id)}><ChevronDown size={15} /></button>
-                  </div>
-                  {expanded === trade.id && <TradeDetail trade={trade} />}
-                </div>
-              ))}
-            </div>
-            {!visible.length && <div className="ledger-empty">Nessuna operazione corrisponde ai filtri selezionati.</div>}
-          </section>
-      )}
-
-      {proposal === "focus" &&
-        <TimelineWorkspace contained visible={visible} selectedTrade={selectedTrade} setSelected={setSelected} query={query} setQuery={setQuery} filter={filter} setFilter={setFilter} />
-      }
+      <TimelineWorkspace contained visible={visible} selectedTrade={selectedTrade} setSelected={setSelected} query={query} setQuery={setQuery} filter={filter} setFilter={setFilter} />
 
       <FocusPattern />
     </div>
@@ -254,18 +202,4 @@ function FocusPattern() {
 
 function TradeFilters({ filter, setFilter }: { filter: TradeFilter; setFilter: (filter: TradeFilter) => void }) {
   return <div className="trade-filters" aria-label="Filtra operazioni">{(["Tutte", "Aperte", "Chiuse", "In profitto", "In perdita"] as TradeFilter[]).map((item) => <button key={item} aria-pressed={filter === item} className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>{item}</button>)}</div>;
-}
-
-function TradeTools({ query, setQuery, sort, setSort }: { query: string; setQuery: (query: string) => void; sort: string; setSort: (sort: string) => void }) {
-  return <div className="ledger-tools">
-    <label className="trade-search"><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cerca simbolo o setup" aria-label="Cerca operazioni" /></label>
-    <label className="trade-sort"><span>Ordina</span><select value={sort} onChange={(event) => setSort(event.target.value)} aria-label="Ordina operazioni"><option>Recenti</option><option>Migliori</option><option>Peggiori</option></select><ChevronDown size={14} /></label>
-  </div>;
-}
-
-function TradeDetail({ trade }: { trade: typeof trades[number] }) {
-  return <div className="trade-detail">
-    <div className="trade-detail-values"><span>Ingresso<strong>{trade.entryLabel}</strong></span><span>{trade.status === "Aperta" ? "Corrente" : "Uscita"}<strong>{trade.status === "Aperta" ? trade.currentLabel : trade.exitLabel}</strong></span><span>MFE<strong className="up">+{money(trade.mfe)}</strong></span><span>MAE<strong className="down">{money(trade.mae)}</strong></span><span>Risultato in R<strong className={trade.r >= 0 ? "up" : "down"}>{trade.r > 0 ? "+" : ""}{trade.r}R</strong></span></div>
-    <div className="trade-note"><Sparkles size={16} /><div><strong>Nota del trade</strong><p>{trade.note}</p></div></div>
-  </div>;
 }
