@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import Portfolio from "./portfolio";
+import Analytics from "./analytics";
 
 type Range = "1W" | "1M" | "3M" | "1Y";
 
@@ -125,7 +126,7 @@ export default function Home() {
       const target = window.location.hash.slice(1) || "overview";
       setView(target);
       requestAnimationFrame(() => {
-        if (target === "portfolio") window.scrollTo(0, 0);
+        if (target === "portfolio" || target === "analytics") window.scrollTo(0, 0);
         else document.getElementById(target)?.scrollIntoView();
       });
     };
@@ -186,9 +187,10 @@ export default function Home() {
 
         <div className="content">
           {view === "portfolio" && <Portfolio />}
-          <div hidden={view === "portfolio"}>
+          {view === "analytics" && <Analytics />}
+          <div hidden={view === "portfolio" || view === "analytics"}>
           <section className="welcome" id="overview">
-            <div><p className="date-line">Martedì, 27 ottobre</p><h1>Buongiorno, Luca.</h1><p>Il portafoglio è stabile. Il rischio è sotto controllo.</p></div>
+            <div><p className="date-line">Mercoledì, 28 ottobre</p><h1>Buongiorno, Luca.</h1><p>Il portafoglio è stabile. Il rischio è sotto controllo.</p></div>
             <div className="range-switch" aria-label="Periodo">
               {(["1W", "1M", "3M", "1Y"] as Range[]).map((item) => <button key={item} className={range === item ? "active" : ""} onClick={() => setRange(item)}>{item}</button>)}
             </div>
@@ -212,7 +214,7 @@ export default function Home() {
             </article>
           </section>
 
-          <section className="metrics" id="analytics">
+          <section className="metrics">
             <MetricCard label="Profitto mensile" value="+$11,782" detail="↑ 18.4% sul mese scorso" values={[10,18,16,27,23,35,31,49,44,58]} />
             <MetricCard label="Drawdown massimo" value="6.24%" detail="2.1% sotto la tua media" values={[42,38,33,35,28,31,24,21,18,15]} tone="violet" />
             <MetricCard label="Profit factor" value="1.86" detail="Edge stabile · 142 trade" values={[18,23,21,29,34,31,38,41,46,49]} tone="amber" />
