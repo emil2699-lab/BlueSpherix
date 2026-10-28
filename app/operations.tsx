@@ -361,6 +361,7 @@ function TradeInspector({ trade, focusTab, setFocusTab, journalNote, setJournalN
       <div><p>{trade.id} · {trade.status}</p><h2>{trade.symbol}</h2><span className={trade.side === "Long" ? "long" : "short"}>{trade.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{trade.side} · {trade.volumeLabel} lot</span></div>
     </div>
     <div className={`focus-tabs ${focusTab === "Diario" ? "show-journal" : "show-details"} ${tabHasMoved ? "is-switching" : ""}`} role="tablist" aria-label="Dettaglio del trade">
+      <span className="focus-tab-indicator" aria-hidden="true" />
       {(["Dettagli", "Diario"] as FocusTab[]).map((tab) => <button key={tab} role="tab" aria-selected={focusTab === tab} onClick={() => selectFocusTab(tab)}>{tab === "Dettagli" ? <Target size={14} /> : <BookOpen size={14} />}{tab}</button>)}
     </div>
     {focusTab === "Dettagli" ? <>
