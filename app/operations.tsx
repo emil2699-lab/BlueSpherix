@@ -97,7 +97,7 @@ export default function Operations() {
         </button>
         <button className={layout === "mixed" ? "active" : ""} aria-pressed={layout === "mixed"} onClick={() => setLayout("mixed")}>
           <span className="proposal-icon"><Layers3 size={18} /></span>
-          <span><small>Tutto in un flusso</small><strong>Registro evoluto</strong><em>Tutte le informazioni, organizzate in righe espandibili.</em></span>
+          <span><small>Tutto in un flusso</small><strong>Registro evoluto</strong><em>Panoramica completa, Trade Stream e Focus nello stesso spazio.</em></span>
         </button>
       </div>
 
@@ -175,7 +175,7 @@ export default function Operations() {
 
       {layout === "mixed" && <>
         <HybridOverview stats={stats} period={period} maxFlow={maxFlow} />
-        <HybridLedger visible={visible} selectedTrade={selectedTrade} setSelected={setSelected} query={query} setQuery={setQuery} sort={sort} setSort={setSort} filter={filter} setFilter={setFilter} />
+        <TimelineWorkspace contained visible={visible} selectedTrade={selectedTrade} setSelected={setSelected} query={query} setQuery={setQuery} filter={filter} setFilter={setFilter} />
         <FocusPattern />
       </>}
     </div>
@@ -208,65 +208,8 @@ function HybridOverview({ stats, period, maxFlow }: { stats: (typeof periodStats
   </section>;
 }
 
-function HybridLedger({ visible, selectedTrade, setSelected, query, setQuery, sort, setSort, filter, setFilter }: {
-  visible: typeof trades;
-  selectedTrade: typeof trades[number];
-  setSelected: (id: string) => void;
-  query: string;
-  setQuery: (query: string) => void;
-  sort: string;
-  setSort: (sort: string) => void;
-  filter: TradeFilter;
-  setFilter: (filter: TradeFilter) => void;
-}) {
-  return <section className="glass-card hybrid-ledger">
-    <div className="ledger-head">
-      <div><p className="eyebrow">Registro evoluto</p><h2>{visible.length} operazioni · seleziona una riga per il contesto</h2></div>
-      <TradeTools query={query} setQuery={setQuery} sort={sort} setSort={setSort} />
-    </div>
-    <TradeFilters filter={filter} setFilter={setFilter} />
-    <div className="hybrid-table">
-      <div className="hybrid-row hybrid-header"><span>Data</span><span>Strumento</span><span>Direzione</span><span>Setup</span><span>Durata</span><span>Risultato</span><span>Stato</span><span /></div>
-      {groupedTradeDays(visible).map(({ day, trades: dayTrades }) => {
-        const total = dayTrades.reduce((sum, trade) => sum + trade.result, 0);
-        return <div className="hybrid-day" key={day}>
-          <div className="hybrid-day-head"><span>{day}</span><strong className={total >= 0 ? "up" : "down"}>{signedMoney(total)}</strong></div>
-          {dayTrades.map((trade) => {
-            const isSelected = selectedTrade.id === trade.id;
-            return <div className={`hybrid-trade ${trade.result < 0 ? (Math.abs(trade.result) >= 200 ? "loss severe" : "loss") : ""} ${isSelected ? "selected" : ""}`} key={trade.id}>
-              <button className="hybrid-row" aria-expanded={isSelected} onClick={() => setSelected(trade.id)}>
-                <span className="trade-date">{trade.time}<small>{trade.id}</small></span>
-                <span className="symbol"><i>{trade.symbol.slice(0, 2)}</i><strong>{trade.symbol}</strong></span>
-                <span className={trade.side === "Long" ? "long" : "short"}>{trade.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{trade.side}<small>{trade.volume} lot</small></span>
-                <span className="setup-tag">{trade.setup}</span>
-                <span className="trade-duration"><Clock3 size={13} />{trade.duration}</span>
-                <strong className={trade.result >= 0 ? "up" : "down"}>{signedMoney(trade.result)}</strong>
-                <span className={`trade-status ${trade.status === "Aperta" ? "open" : ""}`}>{trade.status}</span>
-                <ChevronDown size={15} />
-              </button>
-              {isSelected && <div className="hybrid-detail">
-                <div className="hybrid-journey">
-                  <div><p className="eyebrow">Trade journey</p><strong>Dal rischio al risultato</strong></div>
-                  <div className="journey-track"><i className="mae" style={{ width: `${Math.min(38, 12 + Math.abs(trade.mae) / 12)}%` }} /><i className="mfe" style={{ width: `${Math.min(55, 16 + trade.mfe / 25)}%` }} /><span /></div>
-                  <div className="journey-labels"><span>MAE<strong className="down">{money(trade.mae)}</strong></span><span>MFE<strong className="up">+{money(trade.mfe)}</strong></span></div>
-                </div>
-                <dl className="hybrid-values">
-                  <div><dt>Ingresso</dt><dd>{trade.entryLabel}</dd></div>
-                  <div><dt>{trade.status === "Aperta" ? "Prezzo corrente" : "Uscita"}</dt><dd>{trade.status === "Aperta" ? trade.currentLabel : trade.exitLabel}</dd></div>
-                  <div><dt>Risultato in R</dt><dd className={trade.r >= 0 ? "up" : "down"}>{trade.r > 0 ? "+" : ""}{trade.r}R</dd></div>
-                </dl>
-                <div className="hybrid-note"><Sparkles size={16} /><div><strong>Lettura operativa</strong><p>{trade.note}</p></div></div>
-              </div>}
-            </div>;
-          })}
-        </div>;
-      })}
-      {!visible.length && <div className="ledger-empty">Nessuna operazione corrisponde ai filtri selezionati.</div>}
-    </div>
-  </section>;
-}
-
-function TimelineWorkspace({ visible, selectedTrade, setSelected, query, setQuery, filter, setFilter }: {
+function TimelineWorkspace({ contained = false, visible, selectedTrade, setSelected, query, setQuery, filter, setFilter }: {
+  contained?: boolean;
   visible: typeof trades;
   selectedTrade: typeof trades[number];
   setSelected: (id: string) => void;
@@ -275,7 +218,7 @@ function TimelineWorkspace({ visible, selectedTrade, setSelected, query, setQuer
   filter: TradeFilter;
   setFilter: (filter: TradeFilter) => void;
 }) {
-  return <section className="focus-workspace">
+  return <section className={`focus-workspace ${contained ? "contained-stream" : ""}`}>
     <article className="glass-card timeline-card">
       <div className="focus-toolbar">
         <div><p className="eyebrow">Trade stream</p><h2>{visible.length} esecuzioni nel contesto</h2></div>
