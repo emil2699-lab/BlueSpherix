@@ -29,6 +29,11 @@ npm run start
 - Dark visual system and installable web-app metadata
 - Demo data kept inside the UI until the MT5 bridge contract is defined
 
+## Visual language
+
+- Negative financial results tint their entire containing surface red. The tint grows with severity, while positive results use aqua.
+- Risk measures stay neutral until a threshold is breached, so risk and realized loss are not confused.
+
 ## Product direction
 
 The first backend milestone will ingest account snapshots, positions, orders, and deal history from a read-only MT5 bridge. It will not expose trade execution or position-modification commands.

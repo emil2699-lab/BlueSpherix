@@ -225,7 +225,7 @@ export default function Home() {
               <div className="section-head"><div><p className="eyebrow">Posizioni aperte</p><h2>3 posizioni · +$531.00</h2></div><button className="quiet-button">Vedi tutte <ArrowRight size={14} /></button></div>
               <div className="position-table">
                 <div className="table-row table-header"><span>Strumento</span><span>Direzione</span><span>Volume</span><span>Apertura</span><span>Corrente</span><span>P&amp;L</span></div>
-                {positions.map((position) => <div className="table-row" key={position.symbol}><span className="symbol"><i>{position.symbol.slice(0, 2)}</i><strong>{position.symbol}</strong></span><span className={position.side === "Long" ? "long" : "short"}>{position.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{position.side}</span><span>{position.volume}</span><span>{position.open}</span><span>{position.current}</span><strong className={position.trend}>{position.pnl}</strong></div>)}
+                {positions.map((position) => <div className={`table-row ${position.trend === "down" ? "negative-row" : ""}`} key={position.symbol}><span className="symbol"><i>{position.symbol.slice(0, 2)}</i><strong>{position.symbol}</strong></span><span className={position.side === "Long" ? "long" : "short"}>{position.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{position.side}</span><span>{position.volume}</span><span>{position.open}</span><span>{position.current}</span><strong className={position.trend}>{position.pnl}</strong></div>)}
               </div>
             </article>
 
