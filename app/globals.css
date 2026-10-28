@@ -475,11 +475,11 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
 .inspector-head h2 { margin: 0 0 5px; font-size: 17px; }
 .inspector-head .long, .inspector-head .short { font-size: 9px; }
 .focus-tabs { position: relative; isolation: isolate; overflow: hidden; display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin: 20px 0 0; padding: 4px; border: 1px solid var(--stroke); border-radius: 10px; background: rgba(5,9,14,.48); }
-.focus-tabs::before { content: ""; position: absolute; z-index: 0; top: 4px; left: 4px; width: calc((100% - 13px)/2); height: 32px; border: 1px solid rgba(255,132,148,.36); border-radius: 7px; background: linear-gradient(145deg,rgba(218,74,96,.32),rgba(130,37,61,.22)); box-shadow: inset 0 1px rgba(255,255,255,.09),0 5px 15px rgba(117,21,42,.22); transform: translateX(0); transform-origin: center; }
+.focus-tabs::before { content: ""; position: absolute; z-index: 0; top: 5px; left: 4px; width: calc((100% - 13px)/2); height: 32px; border: 1px solid rgba(255,132,148,.36); border-radius: 7px; background: linear-gradient(145deg,rgba(218,74,96,.32),rgba(130,37,61,.22)); box-shadow: inset 0 1px rgba(255,255,255,.09),0 5px 15px rgba(117,21,42,.22); transform: translateX(0); transform-origin: center; }
 .focus-tabs.show-journal::before { transform: translateX(calc(100% + 5px)); }
 .focus-tabs.is-switching.show-journal::before { animation: focus-pill-right .44s cubic-bezier(.22,.8,.25,1) both; }
 .focus-tabs.is-switching.show-details::before { animation: focus-pill-left .44s cubic-bezier(.22,.8,.25,1) both; }
-.focus-tabs button { position: relative; z-index: 1; height: 32px; display: flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: 7px; color: var(--muted); background: transparent; font-size: 9px; cursor: pointer; transition: color .2s ease; }
+.focus-tabs button { position: relative; z-index: 1; height: 32px; display: flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: 7px; color: var(--muted); background: transparent; font-size: 9px; line-height: 1; cursor: pointer; transition: color .2s ease; }
 .focus-tabs button svg { transition: color .2s ease; }
 .focus-tabs button[aria-selected="true"] { color: #fff1f3; }
 .focus-tabs button[aria-selected="true"] svg { color: #ff9eab; }
