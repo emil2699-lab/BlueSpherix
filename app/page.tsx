@@ -225,7 +225,13 @@ export default function Home() {
               <div className="section-head"><div><p className="eyebrow">Posizioni aperte</p><h2>3 posizioni · +$531.00</h2></div><button className="quiet-button">Vedi tutte <ArrowRight size={14} /></button></div>
               <div className="position-table">
                 <div className="table-row table-header"><span>Strumento</span><span>Direzione</span><span>Volume</span><span>Apertura</span><span>Corrente</span><span>P&amp;L</span></div>
-                {positions.map((position) => <div className={`table-row ${position.trend === "down" ? "negative-row" : ""}`} key={position.symbol}><span className="symbol"><i>{position.symbol.slice(0, 2)}</i><strong>{position.symbol}</strong></span><span className={position.side === "Long" ? "long" : "short"}>{position.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{position.side}</span><span>{position.volume}</span><span>{position.open}</span><span>{position.current}</span><strong className={position.trend}>{position.pnl}</strong></div>)}
+                {positions.map((position) => <div className={`table-row ${position.trend === "down" ? "negative-row" : ""}`} key={position.symbol}>
+                  <span className="symbol">
+                    {position.trend === "down" ? <span className="loss-bubble" aria-hidden="true"><svg viewBox="0 0 92 124"><line x1="3" y1="2" x2="3" y2="122" /><path d="M3 14 C10 27 20 34 39 40 C69 49 84 59 84 72 C84 87 68 95 42 101 C22 106 10 114 3 122 Z" /><text x="34" y="72">{position.symbol.slice(0, 2)}</text></svg></span> : <i>{position.symbol.slice(0, 2)}</i>}
+                    <strong>{position.symbol}</strong>
+                  </span>
+                  <span className={position.side === "Long" ? "long" : "short"}>{position.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{position.side}</span><span>{position.volume}</span><span>{position.open}</span><span>{position.current}</span><strong className={position.trend}>{position.pnl}</strong>
+                </div>)}
               </div>
             </article>
 
