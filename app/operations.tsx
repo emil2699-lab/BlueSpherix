@@ -183,6 +183,7 @@ export default function Operations() {
 }
 
 function HybridOverview({ stats, period, maxFlow }: { stats: (typeof periodStats)[Period]; period: Period; maxFlow: number }) {
+  const stackedFlow = Math.abs(stats.net) > 99998;
   const metrics = [
     { label: "Operazioni", value: stats.trades.toString(), detail: `${stats.closedTrades} chiuse · ${stats.trades - stats.closedTrades} aperte` },
     { label: "Win rate", value: `${stats.win.toLocaleString("it-IT")}%`, detail: `${stats.wins} vincenti su ${stats.closedTrades} chiuse` },
@@ -192,13 +193,15 @@ function HybridOverview({ stats, period, maxFlow }: { stats: (typeof periodStats
     { label: "Rischio", value: `${ALPHA_ACCOUNT.activeRisk.toLocaleString("it-IT")}%`, detail: `zona abituale · limite ${ALPHA_ACCOUNT.riskLimit.toLocaleString("it-IT", { minimumFractionDigits: 2 })}%` },
   ];
   return <section className="hybrid-overview">
-    <article className="glass-card hybrid-flow-card">
-      <div className="hybrid-flow-head">
-        <div><p className="eyebrow">Risultato netto · {period}</p><strong className="up">{money(stats.net)}</strong></div>
-        <span>Ultimi 12 blocchi</span>
-      </div>
-      <div className="hybrid-flow" aria-label={`Sequenza risultati del periodo ${period}`}>
-        {stats.flow.map((value, index) => <i key={`${period}-hybrid-${index}`} className={value >= 0 ? "gain" : "loss"} style={{ height: `${20 + Math.abs(value) / maxFlow * 80}%` }} title={signedMoney(value)} />)}
+    <article className={`glass-card hybrid-flow-card ${stackedFlow ? "is-stacked" : ""}`}>
+      <div className="hybrid-flow-layout">
+        <div className="hybrid-flow-balance"><p className="eyebrow">Risultato netto · {period}</p><strong className={stats.net >= 0 ? "up" : "down"}>{money(stats.net)}</strong></div>
+        <div className="hybrid-flow-visual">
+          <span>Ultimi 12 blocchi</span>
+          <div className="hybrid-flow" aria-label={`Sequenza risultati del periodo ${period}`}>
+            {stats.flow.map((value, index) => <i key={`${period}-hybrid-${index}`} className={value >= 0 ? "gain" : "loss"} style={{ height: `${28 + Math.abs(value) / maxFlow * 72}%` }} title={signedMoney(value)} />)}
+          </div>
+        </div>
       </div>
       <div className="hybrid-insight"><Sparkles size={15} /><span>Rapporto medio guadagno/perdita: {stats.averageWinLoss.toLocaleString("it-IT")}.</span></div>
     </article>
