@@ -185,10 +185,11 @@ function HybridOverview({ stats, period, maxFlow, periodTrades }: { stats: (type
       <div className="hybrid-flow-layout">
         <div className="hybrid-flow-balance"><p className="eyebrow">Risultato netto · {period}</p><strong className={stats.net >= 0 ? "up" : "down"}>{money(stats.net)}</strong></div>
         <div className="hybrid-flow-visual">
-          <span>Ultimi 12 blocchi</span>
+          <span>Andamento nei 12 blocchi</span>
           <div className="hybrid-flow" aria-label={`Sequenza risultati del periodo ${period}`}>
             {stats.flow.map((value, index) => <i key={`${period}-hybrid-${index}`} className={value >= 0 ? "gain" : "loss"} style={{ height: `${28 + Math.abs(value) / maxFlow * 72}%` }} title={signedMoney(value)} />)}
           </div>
+          <div className="hybrid-flow-scale" aria-hidden="true"><span>Inizio periodo</span><span>Più recente</span></div>
         </div>
       </div>
       <dl className="net-breakdown" aria-label="Composizione del risultato netto">

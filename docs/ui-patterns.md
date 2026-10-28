@@ -16,6 +16,7 @@ Pattern approvato per visualizzare un risultato economico insieme alla sua seque
 
 - Il valore principale occupa solo la larghezza necessaria; il grafico usa tutto lo spazio rimanente a destra.
 - Il grafico si restringe senza sovrapporsi al valore.
+- L'area del grafico resta abbastanza alta da distinguere facilmente i 12 blocchi e mostra i riferimenti "Inizio periodo" e "Più recente".
 - Se il valore assoluto supera `99.998,00`, il valore viene centrato nella parte alta del riquadro e il grafico passa sotto.
 - Su schermi fino a `560px` viene sempre usata la disposizione verticale.
 - Il numero di barre di riferimento è 12, una per ciascun blocco del periodo selezionato.
