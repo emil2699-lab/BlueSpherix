@@ -28,9 +28,9 @@ const periodStats: Record<Period, { net: number; trades: number; win: number; av
 };
 
 const trades = [
-  { id: "T-1048", day: "Oggi", date: "28 ott · 09:14", time: "09:14", symbol: "EURUSD", side: "Long", volume: "1.20", entry: "1.08142", exit: "—", result: 418.8, status: "Aperta", setup: "London breakout", duration: "2h 18m", r: .64, mfe: 512, mae: -96, note: "Breakout confermato sopra il massimo asiatico. Rischio ridotto dopo il primo impulso." },
-  { id: "T-1047", day: "Oggi", date: "28 ott · 08:42", time: "08:42", symbol: "XAUUSD", side: "Long", volume: "0.35", entry: "2.734,18", exit: "—", result: 260.4, status: "Aperta", setup: "Trend continuation", duration: "2h 50m", r: .48, mfe: 344, mae: -72, note: "Entrata su pullback dopo la conferma del trend intraday." },
-  { id: "T-1046", day: "Oggi", date: "28 ott · 07:56", time: "07:56", symbol: "GBPJPY", side: "Short", volume: "0.60", entry: "198.224", exit: "—", result: -148.2, status: "Aperta", setup: "Range rejection", duration: "3h 36m", r: -.31, mfe: 88, mae: -214, note: "Il prezzo è rientrato nel range. Setup ancora valido, ma vicino al livello di invalidazione." },
+  { id: "T-1048", day: "Oggi", date: "28 ott · 09:14", time: "09:14", symbol: "EURUSD", side: "Long", volume: "1.20", entry: "1.08142", current: "1.08491", exit: "—", result: 418.8, status: "Aperta", setup: "London breakout", duration: "2h 18m", r: .64, mfe: 512, mae: -96, note: "Breakout confermato sopra il massimo asiatico. Rischio ridotto dopo il primo impulso." },
+  { id: "T-1047", day: "Oggi", date: "28 ott · 08:42", time: "08:42", symbol: "XAUUSD", side: "Long", volume: "0.35", entry: "2.734,18", current: "2.741,62", exit: "—", result: 260.4, status: "Aperta", setup: "Trend continuation", duration: "2h 50m", r: .48, mfe: 344, mae: -72, note: "Entrata su pullback dopo la conferma del trend intraday." },
+  { id: "T-1046", day: "Oggi", date: "28 ott · 07:56", time: "07:56", symbol: "GBPJPY", side: "Short", volume: "0.60", entry: "198.224", current: "198.471", exit: "—", result: -148.2, status: "Aperta", setup: "Range rejection", duration: "3h 36m", r: -.31, mfe: 88, mae: -214, note: "Il prezzo è rientrato nel range. Setup ancora valido, ma vicino al livello di invalidazione." },
   { id: "T-1045", day: "Ieri", date: "27 ott · 15:38", time: "15:38", symbol: "US500", side: "Long", volume: "0.80", entry: "5.827,40", exit: "5.838,52", result: 890, status: "Chiusa", setup: "NY momentum", duration: "1h 12m", r: 1.42, mfe: 1012, mae: -140, note: "Momentum forte dopo l’apertura USA. Uscita sul secondo target pianificato." },
   { id: "T-1044", day: "Ieri", date: "27 ott · 10:06", time: "10:06", symbol: "EURUSD", side: "Long", volume: "1.00", entry: "1.07890", exit: "1.08510", result: 620, status: "Chiusa", setup: "London breakout", duration: "2h 41m", r: 1.18, mfe: 744, mae: -82, note: "Esecuzione coerente con il piano. Stop portato a pareggio dopo 1R." },
   { id: "T-1043", day: "26 ottobre", date: "26 ott · 14:51", time: "14:51", symbol: "XAUUSD", side: "Short", volume: "0.25", entry: "2.742,80", exit: "2.751,40", result: -215, status: "Chiusa", setup: "Failed breakout", duration: "46m", r: -.72, mfe: 61, mae: -228, note: "Ingresso anticipato prima della conferma. Da rivedere nel diario." },
@@ -72,8 +72,8 @@ export default function Operations() {
   const download = () => {
     const rows = [
       ["Dati dimostrativi — nessun conto collegato"],
-      ["ID", "Data", "Strumento", "Direzione", "Volume", "Ingresso", "Uscita", "Risultato USD", "Stato", "Setup"],
-      ...visible.map((trade) => [trade.id, trade.date, trade.symbol, trade.side, trade.volume, trade.entry, trade.exit, trade.result, trade.status, trade.setup]),
+      ["ID", "Data", "Strumento", "Direzione", "Volume", "Ingresso", "Corrente", "Uscita", "Risultato USD", "Stato", "Setup"],
+      ...visible.map((trade) => [trade.id, trade.date, trade.symbol, trade.side, trade.volume, trade.entry, trade.current ?? "", trade.exit, trade.result, trade.status, trade.setup]),
     ];
     const blob = new Blob(["\uFEFF" + rows.map((row) => row.join(";")).join("\r\n")], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -107,7 +107,7 @@ export default function Operations() {
         </button>
         <button className={layout === "mixed" ? "active" : ""} aria-pressed={layout === "mixed"} onClick={() => setLayout("mixed")}>
           <span className="proposal-icon"><Layers3 size={18} /></span>
-          <span><small>Una sola esperienza</small><strong>Vista unificata</strong><em>Flusso, operazioni e dettaglio senza informazioni ripetute.</em></span>
+          <span><small>Tutto in un flusso</small><strong>Registro evoluto</strong><em>Tutte le informazioni, organizzate in righe espandibili.</em></span>
         </button>
       </div>
 
@@ -184,30 +184,99 @@ export default function Operations() {
       )}
 
       {layout === "mixed" && <>
-        <MixedPulse stats={stats} period={period} maxFlow={maxFlow} />
-        <TimelineWorkspace visible={visible} selectedTrade={selectedTrade} setSelected={setSelected} query={query} setQuery={setQuery} filter={filter} setFilter={setFilter} />
+        <HybridOverview stats={stats} period={period} maxFlow={maxFlow} />
+        <HybridLedger visible={visible} selectedTrade={selectedTrade} setSelected={setSelected} query={query} setQuery={setQuery} sort={sort} setSort={setSort} filter={filter} setFilter={setFilter} />
         <FocusPattern />
       </>}
     </div>
   );
 }
 
-function MixedPulse({ stats, period, maxFlow }: { stats: (typeof periodStats)[Period]; period: Period; maxFlow: number }) {
-  return <article className="glass-card mixed-pulse">
-    <div className="mixed-result">
-      <p className="eyebrow">Risultato netto · {period}</p>
-      <strong className="up">{money(stats.net)}</strong>
-      <span><ArrowUpRight size={14} /> Curva positiva e perdite contenute</span>
+function HybridOverview({ stats, period, maxFlow }: { stats: (typeof periodStats)[Period]; period: Period; maxFlow: number }) {
+  const dayCount = period === "30G" ? 30 : period === "90G" ? 90 : 365;
+  const metrics = [
+    { label: "Operazioni", value: stats.trades.toString(), detail: `media ${(stats.trades / dayCount).toLocaleString("it-IT", { maximumFractionDigits: 1 })} al giorno` },
+    { label: "Win rate", value: `${stats.win.toLocaleString("it-IT")}%`, detail: "chiusure positive" },
+    { label: "R medio", value: `${stats.averageR.toLocaleString("it-IT", { minimumFractionDigits: 2 })}R`, detail: "corretto per rischio" },
+    { label: "Oggi", value: "+$531", detail: "3 posizioni aperte", tone: "up" },
+    { label: "Qualità", value: "88/100", detail: "sopra la media" },
+    { label: "Rischio", value: "0,84%", detail: "zona abituale · limite 1,50%" },
+  ];
+  return <section className="hybrid-overview">
+    <article className="glass-card hybrid-flow-card">
+      <div className="hybrid-flow-head">
+        <div><p className="eyebrow">Risultato netto · {period}</p><strong className="up">{money(stats.net)}</strong></div>
+        <span>Ultimi 12 blocchi</span>
+      </div>
+      <div className="hybrid-flow" aria-label={`Sequenza risultati del periodo ${period}`}>
+        {stats.flow.map((value, index) => <i key={`${period}-hybrid-${index}`} className={value >= 0 ? "gain" : "loss"} style={{ height: `${20 + Math.abs(value) / maxFlow * 80}%` }} title={signedMoney(value)} />)}
+      </div>
+      <div className="hybrid-insight"><Sparkles size={15} /><span>Le perdite restano contenute: rapporto medio guadagno/perdita 1,73.</span></div>
+    </article>
+    <div className="hybrid-metrics">
+      {metrics.map((metric) => <article className="glass-card" key={metric.label}><p>{metric.label}</p><strong className={metric.tone}>{metric.value}</strong><small>{metric.detail}</small></article>)}
     </div>
-    <div className="mixed-flow" aria-label={`Sequenza risultati del periodo ${period}`}>
-      {stats.flow.map((value, index) => <i key={`${period}-mixed-${index}`} className={value >= 0 ? "gain" : "loss"} style={{ height: `${20 + Math.abs(value) / maxFlow * 80}%` }} title={signedMoney(value)} />)}
+  </section>;
+}
+
+function HybridLedger({ visible, selectedTrade, setSelected, query, setQuery, sort, setSort, filter, setFilter }: {
+  visible: typeof trades;
+  selectedTrade: typeof trades[number];
+  setSelected: (id: string) => void;
+  query: string;
+  setQuery: (query: string) => void;
+  sort: string;
+  setSort: (sort: string) => void;
+  filter: TradeFilter;
+  setFilter: (filter: TradeFilter) => void;
+}) {
+  return <section className="glass-card hybrid-ledger">
+    <div className="ledger-head">
+      <div><p className="eyebrow">Registro evoluto</p><h2>{visible.length} operazioni · seleziona una riga per il contesto</h2></div>
+      <TradeTools query={query} setQuery={setQuery} sort={sort} setSort={setSort} />
     </div>
-    <div className="mixed-stats">
-      <span>Operazioni<strong>{stats.trades}</strong></span>
-      <span>Win rate<strong>{stats.win.toLocaleString("it-IT")}%</strong></span>
-      <span>R medio<strong>{stats.averageR.toLocaleString("it-IT", { minimumFractionDigits: 2 })}R</strong></span>
+    <TradeFilters filter={filter} setFilter={setFilter} />
+    <div className="hybrid-table">
+      <div className="hybrid-row hybrid-header"><span>Data</span><span>Strumento</span><span>Direzione</span><span>Setup</span><span>Durata</span><span>Risultato</span><span>Stato</span><span /></div>
+      {[{ key: "Oggi", label: "Oggi · 28 ottobre" }, { key: "Ieri", label: "Ieri · 27 ottobre" }, { key: "26 ottobre", label: "26 ottobre" }, { key: "25 ottobre", label: "25 ottobre" }].map((day) => {
+        const dayTrades = visible.filter((trade) => trade.day === day.key);
+        if (!dayTrades.length) return null;
+        const total = dayTrades.reduce((sum, trade) => sum + trade.result, 0);
+        return <div className="hybrid-day" key={day.key}>
+          <div className="hybrid-day-head"><span>{day.label}</span><strong className={total >= 0 ? "up" : "down"}>{signedMoney(total)}</strong></div>
+          {dayTrades.map((trade) => {
+            const isSelected = selectedTrade.id === trade.id;
+            return <div className={`hybrid-trade ${trade.result < 0 ? (Math.abs(trade.result) >= 200 ? "loss severe" : "loss") : ""} ${isSelected ? "selected" : ""}`} key={trade.id}>
+              <button className="hybrid-row" aria-expanded={isSelected} onClick={() => setSelected(trade.id)}>
+                <span className="trade-date">{trade.time}<small>{trade.id}</small></span>
+                <span className="symbol"><i>{trade.symbol.slice(0, 2)}</i><strong>{trade.symbol}</strong></span>
+                <span className={trade.side === "Long" ? "long" : "short"}>{trade.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{trade.side}<small>{trade.volume} lot</small></span>
+                <span className="setup-tag">{trade.setup}</span>
+                <span className="trade-duration"><Clock3 size={13} />{trade.duration}</span>
+                <strong className={trade.result >= 0 ? "up" : "down"}>{signedMoney(trade.result)}</strong>
+                <span className={`trade-status ${trade.status === "Aperta" ? "open" : ""}`}>{trade.status}</span>
+                <ChevronDown size={15} />
+              </button>
+              {isSelected && <div className="hybrid-detail">
+                <div className="hybrid-journey">
+                  <div><p className="eyebrow">Trade journey</p><strong>Dal rischio al risultato</strong></div>
+                  <div className="journey-track"><i className="mae" style={{ width: `${Math.min(38, 12 + Math.abs(trade.mae) / 12)}%` }} /><i className="mfe" style={{ width: `${Math.min(55, 16 + trade.mfe / 25)}%` }} /><span /></div>
+                  <div className="journey-labels"><span>MAE<strong className="down">{money(trade.mae)}</strong></span><span>MFE<strong className="up">+{money(trade.mfe)}</strong></span></div>
+                </div>
+                <dl className="hybrid-values">
+                  <div><dt>Ingresso</dt><dd>{trade.entry}</dd></div>
+                  <div><dt>{trade.status === "Aperta" ? "Prezzo corrente" : "Uscita"}</dt><dd>{trade.status === "Aperta" ? trade.current : trade.exit}</dd></div>
+                  <div><dt>Risultato in R</dt><dd className={trade.r >= 0 ? "up" : "down"}>{trade.r > 0 ? "+" : ""}{trade.r}R</dd></div>
+                </dl>
+                <div className="hybrid-note"><Sparkles size={16} /><div><strong>Lettura operativa</strong><p>{trade.note}</p></div></div>
+              </div>}
+            </div>;
+          })}
+        </div>;
+      })}
+      {!visible.length && <div className="ledger-empty">Nessuna operazione corrisponde ai filtri selezionati.</div>}
     </div>
-  </article>;
+  </section>;
 }
 
 function TimelineWorkspace({ visible, selectedTrade, setSelected, query, setQuery, filter, setFilter }: {
@@ -259,7 +328,7 @@ function TimelineWorkspace({ visible, selectedTrade, setSelected, query, setQuer
       </div>
       <dl className="inspector-values">
         <div><dt>Ingresso</dt><dd>{selectedTrade.entry}</dd></div>
-        <div><dt>{selectedTrade.status === "Aperta" ? "Prezzo corrente" : "Uscita"}</dt><dd>{selectedTrade.exit}</dd></div>
+        <div><dt>{selectedTrade.status === "Aperta" ? "Prezzo corrente" : "Uscita"}</dt><dd>{selectedTrade.status === "Aperta" ? selectedTrade.current : selectedTrade.exit}</dd></div>
         <div><dt>Setup</dt><dd>{selectedTrade.setup}</dd></div>
         <div><dt>Apertura</dt><dd>{selectedTrade.date}</dd></div>
       </dl>
