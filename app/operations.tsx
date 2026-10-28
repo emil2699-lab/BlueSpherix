@@ -9,7 +9,6 @@ import {
   Download,
   Focus,
   LayoutList,
-  Layers3,
   Search,
   ShieldCheck,
   Sparkles,
@@ -20,7 +19,6 @@ import { ALPHA_ACCOUNT, DEMO_PERIOD_STATS, DEMO_TRADES, OPEN_PNL, RECENT_PLAN_CO
 type Period = DemoPeriod;
 type TradeFilter = "Tutte" | "Aperte" | "Chiuse" | "In profitto" | "In perdita";
 type Proposal = "classic" | "focus";
-type Layout = "separate" | "mixed";
 
 const periodStats = DEMO_PERIOD_STATS;
 const trades = DEMO_TRADES;
@@ -30,7 +28,6 @@ const signedMoney = (value: number) => `${value > 0 ? "+" : ""}${money(value)}`;
 const groupedTradeDays = (items: DemoTrade[]) => [...new Map(items.map((trade) => [trade.day, trade.day])).keys()].map((day) => ({ day, trades: items.filter((trade) => trade.day === day) }));
 
 export default function Operations() {
-  const [layout, setLayout] = useState<Layout>("separate");
   const [proposal, setProposal] = useState<Proposal>("focus");
   const [period, setPeriod] = useState<Period>("30G");
   const [filter, setFilter] = useState<TradeFilter>("Tutte");
@@ -79,7 +76,7 @@ export default function Operations() {
         <div>
           <p className="date-line">Ogni esecuzione, nel suo contesto</p>
           <h1>Operazioni.</h1>
-          <p>Scegli due viste specializzate oppure un unico spazio operativo.</p>
+          <p>Monitora ogni esecuzione e passa alla tabella completa quando serve più dettaglio.</p>
         </div>
         <div className="operations-actions">
           <div className="range-switch" aria-label="Periodo operazioni">
@@ -90,50 +87,25 @@ export default function Operations() {
         </div>
       </section>
 
-      <div className="proposal-picker layout-picker" aria-label="Scegli la struttura della sezione Operazioni">
-        <button className={layout === "separate" ? "active" : ""} aria-pressed={layout === "separate"} onClick={() => setLayout("separate")}>
-          <span className="proposal-icon"><LayoutList size={18} /></span>
-          <span><small>Due prospettive</small><strong>Viste separate</strong><em>Scegli tra il registro completo e la lettura contestuale.</em></span>
+      <div className="demo-notice"><ShieldCheck size={16} /><span><strong>Registro dimostrativo.</strong> Operazioni e risultati sono simulati; il registro verrà popolato automaticamente dal collegamento MT5.</span></div>
+
+      <div className="proposal-picker view-picker operations-view-picker" aria-label="Scegli come visualizzare le operazioni">
+        <button className={proposal === "focus" ? "active" : ""} aria-pressed={proposal === "focus"} onClick={() => setProposal("focus")}>
+          <span className="proposal-icon"><Focus size={18} /></span>
+          <span><small>Vista operativa</small><strong>Trade Stream + Focus</strong><em>Cronologia scorrevole e dettaglio del trade sempre visibile.</em></span>
         </button>
-        <button className={layout === "mixed" ? "active" : ""} aria-pressed={layout === "mixed"} onClick={() => setLayout("mixed")}>
-          <span className="proposal-icon"><Layers3 size={18} /></span>
-          <span><small>Tutto in un flusso</small><strong>Registro evoluto</strong><em>Panoramica completa, Trade Stream e Focus nello stesso spazio.</em></span>
+        <button className={proposal === "classic" ? "active" : ""} aria-pressed={proposal === "classic"} onClick={() => setProposal("classic")}>
+          <span className="proposal-icon"><LayoutList size={18} /></span>
+          <span><small>Vista dati</small><strong>Tabella completa</strong><em>Tutte le operazioni e i campi essenziali in un unico registro.</em></span>
         </button>
       </div>
 
-      <div className="demo-notice"><ShieldCheck size={16} /><span><strong>Registro dimostrativo.</strong> Operazioni e risultati sono simulati; il registro verrà popolato automaticamente dal collegamento MT5.</span></div>
+      <HybridOverview stats={stats} period={period} maxFlow={maxFlow} />
 
-      {layout === "separate" && <div className="proposal-picker view-picker" aria-label="Scegli quale vista separata mostrare">
-        <button className={proposal === "classic" ? "active" : ""} aria-pressed={proposal === "classic"} onClick={() => setProposal("classic")}>
-          <span className="proposal-icon"><LayoutList size={18} /></span>
-          <span><small>Vista tabellare</small><strong>Registro completo</strong><em>Più dati insieme, tabella estesa e Result flow.</em></span>
-        </button>
-        <button className={proposal === "focus" ? "active" : ""} aria-pressed={proposal === "focus"} onClick={() => setProposal("focus")}>
-          <span className="proposal-icon"><Focus size={18} /></span>
-          <span><small>Vista contestuale</small><strong>Timeline + Focus</strong><em>Scansione più rapida e dettaglio sempre visibile.</em></span>
-        </button>
-      </div>}
-
-      {layout === "separate" && proposal === "classic" && (
-        <>
-          <section className="operations-kpis">
-            <article className="glass-card"><p className="eyebrow">Risultato netto</p><strong className="up">{money(stats.net)}</strong><small>Nel periodo selezionato</small></article>
-            <article className="glass-card"><p className="eyebrow">Operazioni</p><strong>{stats.trades}</strong><small>{stats.closedTrades} chiuse · {stats.trades - stats.closedTrades} aperte</small></article>
-            <article className="glass-card"><p className="eyebrow">Win rate</p><strong>{stats.win.toLocaleString("it-IT")}%</strong><small>{stats.wins} vincenti su {stats.closedTrades} chiuse</small></article>
-            <article className="glass-card"><p className="eyebrow">R medio</p><strong>{stats.averageR.toLocaleString("it-IT", { minimumFractionDigits: 2 })}R</strong><small>Rendimento corretto per il rischio</small></article>
-          </section>
-
-          <article className="glass-card flow-card">
-            <div className="section-head"><div><p className="eyebrow">Result flow</p><h2>La sequenza conta quanto il totale.</h2></div><span className="portfolio-caption">Ultimi 12 blocchi · {period}</span></div>
-            <div className="flow-chart" aria-label="Sequenza di risultati positivi e negativi">
-              {stats.flow.map((value, index) => <div className="flow-column" key={`${period}-${index}`}><span className={value >= 0 ? "gain" : "loss"} style={{ height: `${20 + Math.abs(value) / maxFlow * 70}%` }} title={signedMoney(value)} /><small>{index + 1}</small></div>)}
-            </div>
-            <div className="flow-insight"><Sparkles size={17} /><span>Il rapporto medio guadagno/perdita calcolato nel periodo è {stats.averageWinLoss.toLocaleString("it-IT")}.</span></div>
-          </article>
-
+      {proposal === "classic" && (
           <section className="glass-card ledger-card">
             <div className="ledger-head">
-              <div><p className="eyebrow">Registro operazioni</p><h2>{visible.length} operazioni visualizzate</h2></div>
+              <div><p className="eyebrow">Tabella completa</p><h2>{visible.length} operazioni visualizzate</h2></div>
               <TradeTools query={query} setQuery={setQuery} sort={sort} setSort={setSort} />
             </div>
             <TradeFilters filter={filter} setFilter={setFilter} />
@@ -157,27 +129,13 @@ export default function Operations() {
             </div>
             {!visible.length && <div className="ledger-empty">Nessuna operazione corrisponde ai filtri selezionati.</div>}
           </section>
-        </>
       )}
 
-      {layout === "separate" && proposal === "focus" && (
-        <>
-          <section className="focus-kpis">
-            <article className="glass-card focus-result"><p className="eyebrow">Oggi, in tempo reale</p><strong className="up">{signedMoney(OPEN_PNL)}</strong><span><ArrowUpRight size={14} /> {trades.filter(trade => trade.status === "Aperta").length} posizioni aperte</span></article>
-            <article className="glass-card"><p className="eyebrow">Qualità esecutiva</p><strong>{ALPHA_ACCOUNT.executionQuality}<span>/100</span></strong><small>Disciplina sopra la tua media</small></article>
-            <article className="glass-card"><p className="eyebrow">Rischio attivo</p><strong>{ALPHA_ACCOUNT.activeRisk.toLocaleString("it-IT")}%</strong><small>Zona abituale · limite {ALPHA_ACCOUNT.riskLimit.toLocaleString("it-IT", { minimumFractionDigits: 2 })}%</small></article>
-          </section>
-
-          <TimelineWorkspace visible={visible} selectedTrade={selectedTrade} setSelected={setSelected} query={query} setQuery={setQuery} filter={filter} setFilter={setFilter} />
-          <FocusPattern />
-        </>
-      )}
-
-      {layout === "mixed" && <>
-        <HybridOverview stats={stats} period={period} maxFlow={maxFlow} />
+      {proposal === "focus" &&
         <TimelineWorkspace contained visible={visible} selectedTrade={selectedTrade} setSelected={setSelected} query={query} setQuery={setQuery} filter={filter} setFilter={setFilter} />
-        <FocusPattern />
-      </>}
+      }
+
+      <FocusPattern />
     </div>
   );
 }
