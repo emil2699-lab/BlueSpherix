@@ -168,7 +168,7 @@ export default function Operations() {
             <article className="glass-card"><p className="eyebrow">Rischio attivo</p><strong>{ALPHA_ACCOUNT.activeRisk.toLocaleString("it-IT")}%</strong><small>Zona abituale · limite {ALPHA_ACCOUNT.riskLimit.toLocaleString("it-IT", { minimumFractionDigits: 2 })}%</small></article>
           </section>
 
-          <TimelineWorkspace visible={visible} selectedTrade={selectedTrade} setSelected={setSelected} query={query} setQuery={setQuery} filter={filter} setFilter={setFilter} />
+          <TimelineWorkspace contained visible={visible} selectedTrade={selectedTrade} setSelected={setSelected} query={query} setQuery={setQuery} filter={filter} setFilter={setFilter} />
           <FocusPattern />
         </>
       )}
