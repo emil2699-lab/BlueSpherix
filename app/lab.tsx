@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Beaker, Check, CircleGauge, FlaskConical, Layers3, Play, ShieldCheck, Sparkles, Split, WandSparkles } from "lucide-react";
+import { Beaker, BookmarkCheck, Check, CircleGauge, FlaskConical, Layers3, Play, Save, ShieldCheck, Sparkles, Split, Trash2, WandSparkles } from "lucide-react";
 import { DEMO_AS_OF, DEMO_OPENING_BALANCE } from "./demo-ledger";
 import { CLOSED_TRADES, type DemoTrade } from "./demo-data";
 import { valueSign } from "./value-sign";
@@ -9,27 +9,36 @@ import { valueSign } from "./value-sign";
 type ExperimentId = "session" | "discipline" | "exit";
 type Sample = "90G" | "1A";
 type Risk = 0.25 | 0.5 | 1;
+type SessionFocus = DemoTrade["session"];
+type QualityGate = "plan" | "mae" | "both";
+type Capture = 10 | 22 | 35;
+type SavedExperiment = { id: number; title: string; parameter: string; net: number; factor: number; verdict: string };
 
 const experiments = [
-  { id: "session" as const, icon: Layers3, title: "Solo Londra", caption: "Isola la sessione con l’edge più stabile.", rule: "Mantieni soltanto le operazioni aperte durante Londra." },
-  { id: "discipline" as const, icon: ShieldCheck, title: "Piano rispettato", caption: "Misura il costo delle deviazioni operative.", rule: "Escludi i trade non coerenti con il piano dichiarato." },
-  { id: "exit" as const, icon: WandSparkles, title: "Uscita adattiva", caption: "Recupera parte del movimento lasciato al mercato.", rule: "Simula la cattura del 22% del MFE non monetizzato." },
+  { id: "session" as const, icon: Layers3, title: "Session focus", caption: "Isola una sessione e misura il suo edge." },
+  { id: "discipline" as const, icon: ShieldCheck, title: "Quality gate", caption: "Misura il costo delle deviazioni operative." },
+  { id: "exit" as const, icon: WandSparkles, title: "Uscita adattiva", caption: "Recupera parte del movimento lasciato al mercato." },
 ];
 
 const money = (value: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
 
-function scenarioResult(trade: DemoTrade, experiment: ExperimentId, includeCosts: boolean) {
+function scenarioResult(trade: DemoTrade, experiment: ExperimentId, includeCosts: boolean, capture: Capture) {
   let result = trade.netPnl;
   if (!includeCosts) result -= trade.commission + trade.swap;
-  if (experiment === "exit" && result > 0) result += Math.max(0, trade.mfeUsd - trade.netPnl) * .22;
+  if (experiment === "exit" && result > 0) result += Math.max(0, trade.mfeUsd - trade.netPnl) * capture / 100;
   return result;
 }
 
-function selectedTrades(trades: DemoTrade[], experiment: ExperimentId) {
-  if (experiment === "session") return trades.filter(trade => trade.session === "Londra");
-  if (experiment === "discipline") return trades.filter(trade => trade.planAligned);
+function selectedTrades(trades: DemoTrade[], experiment: ExperimentId, session: SessionFocus, quality: QualityGate) {
+  if (experiment === "session") return trades.filter(trade => trade.session === session);
+  if (experiment === "discipline") return trades.filter(trade => {
+    const controlledMae = Math.abs(trade.maeUsd) <= trade.riskUsd * .75;
+    if (quality === "plan") return trade.planAligned;
+    if (quality === "mae") return controlledMae;
+    return trade.planAligned && controlledMae;
+  });
   return trades;
 }
 
@@ -73,7 +82,13 @@ export default function Lab() {
   const [sample, setSample] = useState<Sample>("1A");
   const [risk, setRisk] = useState<Risk>(0.5);
   const [includeCosts, setIncludeCosts] = useState(true);
+  const [sessionFocus, setSessionFocus] = useState<SessionFocus>("Londra");
+  const [qualityGate, setQualityGate] = useState<QualityGate>("plan");
+  const [capture, setCapture] = useState<Capture>(22);
+  const [savedExperiments, setSavedExperiments] = useState<SavedExperiment[]>([]);
   const current = experiments.find(item => item.id === experiment) ?? experiments[2];
+  const parameterLabel = experiment === "session" ? sessionFocus : experiment === "discipline" ? ({ plan: "Piano", mae: "MAE ≤ 0,75R", both: "Entrambi" } as const)[qualityGate] : `${capture}% MFE`;
+  const rule = experiment === "session" ? `Mantieni soltanto le operazioni aperte durante la sessione ${sessionFocus}.` : experiment === "discipline" ? qualityGate === "plan" ? "Escludi i trade non coerenti con il piano dichiarato." : qualityGate === "mae" ? "Mantieni i trade con escursione avversa entro 0,75R." : "Richiedi rispetto del piano e MAE entro 0,75R." : `Simula la cattura del ${capture}% del MFE non monetizzato.`;
 
   const analysis = useMemo(() => {
     const asOf = new Date(DEMO_AS_OF).getTime();
@@ -81,28 +96,30 @@ export default function Lab() {
     const baseTrades = [...CLOSED_TRADES]
       .filter(trade => asOf - new Date(trade.openedAt).getTime() <= days * 86400000)
       .sort((a, b) => a.openedAt.localeCompare(b.openedAt));
-    const simulatedTrades = selectedTrades(baseTrades, experiment);
+    const simulatedTrades = selectedTrades(baseTrades, experiment, sessionFocus, qualityGate);
     const scale = risk / .5;
     const baselineResults = baseTrades.map(trade => trade.netPnl * scale);
-    const simulatedResults = simulatedTrades.map(trade => scenarioResult(trade, experiment, includeCosts) * scale);
+    const simulatedResults = simulatedTrades.map(trade => scenarioResult(trade, experiment, includeCosts, capture) * scale);
     const baseline = stats(baseTrades, baselineResults);
     const simulation = stats(simulatedTrades, simulatedResults);
     const folds = Array.from({ length: 5 }, (_, index) => {
       const start = Math.floor(index * baseTrades.length / 5);
       const end = Math.floor((index + 1) * baseTrades.length / 5);
       const foldBase = baseTrades.slice(start, end);
-      const foldScenario = selectedTrades(foldBase, experiment);
+      const foldScenario = selectedTrades(foldBase, experiment, sessionFocus, qualityGate);
       const baseNet = sum(foldBase.map(trade => trade.netPnl * scale));
-      const scenarioNet = sum(foldScenario.map(trade => scenarioResult(trade, experiment, includeCosts) * scale));
+      const scenarioNet = sum(foldScenario.map(trade => scenarioResult(trade, experiment, includeCosts, capture) * scale));
       return { label: `F${index + 1}`, delta: scenarioNet - baseNet, positive: scenarioNet > 0 };
     });
     return { baseline, simulation, baselineResults, simulatedResults, folds, coverage: simulatedTrades.length / Math.max(1, baseTrades.length) * 100 };
-  }, [experiment, includeCosts, risk, sample]);
+  }, [capture, experiment, includeCosts, qualityGate, risk, sample, sessionFocus]);
 
   const netDelta = analysis.simulation.net - analysis.baseline.net;
   const robustFolds = analysis.folds.filter(fold => fold.positive).length;
   const verdict = robustFolds >= 4 && analysis.simulation.factor > analysis.baseline.factor ? "Promettente" : robustFolds >= 3 ? "Da validare" : "Fragile";
   const verdictTone = verdict === "Promettente" ? "positive" : verdict === "Fragile" ? "negative" : "warning";
+  const sensitivityOptions = experiment === "session" ? (["Asia", "Londra", "New York"] as SessionFocus[]) : experiment === "discipline" ? (["plan", "mae", "both"] as QualityGate[]) : ([10, 22, 35] as Capture[]);
+  const saveExperiment = () => setSavedExperiments(items => [{ id: Date.now(), title: current.title, parameter: `${parameterLabel} · ${sample} · rischio ${risk.toLocaleString("it-IT")}%`, net: analysis.simulation.net, factor: analysis.simulation.factor, verdict }, ...items].slice(0, 4));
 
   return <div className="lab-view">
     <section className="welcome"><div><p className="date-line">Dall’intuizione alla prova</p><h1>Strategy Lab.</h1><p>Modifica una regola, confronta il risultato e verifica se regge fuori dal campione.</p></div><span className="lab-beta"><FlaskConical size={15} /> Beta · simulazione locale</span></section>
@@ -111,7 +128,7 @@ export default function Lab() {
     <section className="lab-canvas glass-card">
       <div className="lab-canvas-head"><div><p className="eyebrow">Experiment canvas</p><h2>Scegli una sola ipotesi da mettere sotto stress.</h2></div><div className="lab-run-state"><i /><span>Ricalcolo istantaneo</span></div></div>
       <div className="lab-experiments" role="tablist" aria-label="Ipotesi di strategia">{experiments.map(item => { const Icon = item.icon; return <button role="tab" aria-selected={experiment === item.id} className={experiment === item.id ? "active" : ""} key={item.id} onClick={() => setExperiment(item.id)}><span><Icon size={18} /></span><strong>{item.title}</strong><small>{item.caption}</small>{experiment === item.id && <Check size={14} />}</button>; })}</div>
-      <div className="lab-rule"><Beaker size={17} /><div><span>Regola simulata</span><strong>{current.rule}</strong></div></div>
+      <div className="lab-rule"><Beaker size={17} /><div><span>Regola simulata</span><strong>{rule}</strong></div><div className="lab-parameter" role="group" aria-label="Parametro esperimento">{sensitivityOptions.map(option => { const active = experiment === "session" ? option === sessionFocus : experiment === "discipline" ? option === qualityGate : option === capture; const label = experiment === "discipline" ? ({ plan: "Piano", mae: "MAE", both: "Entrambi" } as const)[option as QualityGate] : experiment === "exit" ? `${option}%` : option; return <button className={active ? "active" : ""} key={String(option)} onClick={() => { if (experiment === "session") setSessionFocus(option as SessionFocus); else if (experiment === "discipline") setQualityGate(option as QualityGate); else setCapture(option as Capture); }}>{label}</button>; })}</div></div>
       <div className="lab-controls">
         <div><span>Campione</span><div className="range-switch">{(["90G", "1A"] as Sample[]).map(item => <button className={sample === item ? "active" : ""} key={item} onClick={() => setSample(item)}>{item}</button>)}</div></div>
         <div><span>Rischio per trade</span><div className="range-switch">{([.25, .5, 1] as Risk[]).map(item => <button className={risk === item ? "active" : ""} key={item} onClick={() => setRisk(item)}>{item.toLocaleString("it-IT")}%</button>)}</div></div>
@@ -141,6 +158,17 @@ export default function Lab() {
       </aside>
     </section>
 
-    <section className="glass-card lab-next"><div><Play size={18} /><div><p className="eyebrow">Passo successivo</p><h2>Salva l’ipotesi come benchmark osservabile.</h2><p>Quando MT5 sarà collegato, il Lab confronterà i nuovi trade con questa regola senza modificarne l’esecuzione.</p></div></div><button><FlaskConical size={15} /> Salva esperimento</button></section>
+    <section className="lab-sensitivity glass-card">
+      <div className="section-head"><div><p className="eyebrow">Parameter space</p><h2>Esplora senza perdere il contesto.</h2></div><span>{parameterLabel}</span></div>
+      <p>Le varianti modificano un solo parametro alla volta. Il grafico principale, il walk-forward e il verdetto si aggiornano insieme.</p>
+      <div>{sensitivityOptions.map(option => { const active = experiment === "session" ? option === sessionFocus : experiment === "discipline" ? option === qualityGate : option === capture; const label = experiment === "discipline" ? ({ plan: "Solo piano", mae: "MAE ≤ 0,75R", both: "Filtro combinato" } as const)[option as QualityGate] : experiment === "exit" ? `Cattura ${option}%` : option; return <button className={active ? "active" : ""} key={String(option)} onClick={() => { if (experiment === "session") setSessionFocus(option as SessionFocus); else if (experiment === "discipline") setQualityGate(option as QualityGate); else setCapture(option as Capture); }}><span>{label}</span><i /><strong>{active ? money(analysis.simulation.net) : "Prova"}</strong></button>; })}</div>
+    </section>
+
+    <section className="glass-card lab-next"><div><Play size={18} /><div><p className="eyebrow">Passo successivo</p><h2>Salva l’ipotesi come benchmark osservabile.</h2><p>Quando MT5 sarà collegato, il Lab confronterà i nuovi trade con questa regola senza modificarne l’esecuzione.</p></div></div><button onClick={saveExperiment}><Save size={15} /> Salva esperimento</button></section>
+
+    <section className="lab-vault glass-card">
+      <div className="section-head"><div><p className="eyebrow">Experiment vault</p><h2>Benchmark salvati in questa sessione.</h2></div><BookmarkCheck size={18} /></div>
+      {savedExperiments.length === 0 ? <div className="lab-vault-empty"><FlaskConical size={20} /><strong>Nessun benchmark salvato</strong><p>Configura l’ipotesi e usa “Salva esperimento” per fissarne risultato e parametri.</p></div> : <div className="lab-vault-list">{savedExperiments.map(item => <article key={item.id}><div><span>{item.verdict}</span><strong>{item.title}</strong><small>{item.parameter}</small></div><dl><div><dt>Netto</dt><dd data-sign={valueSign(item.net)}>{money(item.net)}</dd></div><div><dt>PF</dt><dd>{item.factor.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd></div></dl><button aria-label={`Elimina ${item.title}`} onClick={() => setSavedExperiments(items => items.filter(saved => saved.id !== item.id))}><Trash2 size={14} /></button></article>)}</div>}
+    </section>
   </div>;
 }
