@@ -26,7 +26,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import Portfolio from "./portfolio";
 import Analytics from "./analytics";
 import Operations from "./operations";
@@ -36,6 +36,7 @@ import { ALPHA_ACCOUNT, BEST_RECENT_TRADE, BEST_SESSION_30D, DASHBOARD_RANGE_STA
 import { valueSign } from "./value-sign";
 
 type Range = DashboardRange;
+const TODAY_LIGHT_TARGETS = ".glass-card, .range-switch, .quiet-button, .insight-card button, .event-pills button, .table-row:not(.table-header)";
 const equitySeries = DEMO_EQUITY_SERIES;
 const balanceSeries = DEMO_BALANCE_SERIES;
 
@@ -125,6 +126,7 @@ function MetricCard({ label, value, detail, values, tone = "aqua", signValue, ic
 
 export default function Home() {
   const [view, setView] = useState("overview");
+  const activeLightTarget = useRef<HTMLElement | null>(null);
   useEffect(() => {
     const applyHash = (behavior: ScrollBehavior) => {
       const target = window.location.hash.slice(1) || "overview";
@@ -158,6 +160,25 @@ export default function Home() {
     window.history.pushState(null, "", `#${target}`);
     window.dispatchEvent(new HashChangeEvent("hashchange"));
     setSidebarOpen(false);
+  };
+
+  const updateTodayBorderLight = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const target = (event.target as HTMLElement).closest<HTMLElement>(TODAY_LIGHT_TARGETS);
+    if (activeLightTarget.current && activeLightTarget.current !== target) activeLightTarget.current.style.setProperty("--cursor-reflect-opacity", "0");
+    if (!target) {
+      activeLightTarget.current = null;
+      return;
+    }
+    const bounds = target.getBoundingClientRect();
+    target.style.setProperty("--cursor-reflect-x", `${event.clientX - bounds.left}px`);
+    target.style.setProperty("--cursor-reflect-y", `${event.clientY - bounds.top}px`);
+    target.style.setProperty("--cursor-reflect-opacity", "1");
+    activeLightTarget.current = target;
+  };
+
+  const clearTodayBorderLight = () => {
+    activeLightTarget.current?.style.setProperty("--cursor-reflect-opacity", "0");
+    activeLightTarget.current = null;
   };
 
   return (
@@ -200,7 +221,7 @@ export default function Home() {
           {view === "positions" && <Operations />}
           {view === "risk" && <Risk />}
           {view === "lab" && <Lab />}
-          <div hidden={view === "portfolio" || view === "analytics" || view === "positions" || view === "risk" || view === "lab"}>
+          <div className="today-dashboard" onPointerMove={updateTodayBorderLight} onPointerLeave={clearTodayBorderLight} hidden={view === "portfolio" || view === "analytics" || view === "positions" || view === "risk" || view === "lab"}>
           <section className="welcome today-welcome" id="overview">
             <div><p className="date-line">Mercoledì, 28 ottobre</p><h1>Buongiorno, Luca.</h1><p>Il portafoglio è stabile. Il rischio è sotto controllo.</p></div>
             <span className={`risk-live-status ${riskUsed < 80 ? "calm" : riskUsed < 100 ? "warning" : "critical"}`}><i /> Dati aggiornati · 28 ott, 18:42</span>

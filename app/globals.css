@@ -131,6 +131,32 @@ nav button b { margin-left: auto; font-size: 8px; color: #091110; background: va
 .mini-chart { width: 95px; height: 38px; opacity: .9; }
 .today-welcome { margin-bottom: 20px; }
 .today-notice { color: #aebbc2; border-color: rgba(86,217,202,.16); background: linear-gradient(90deg,rgba(86,217,202,.065),rgba(86,217,202,.018)); }
+.today-dashboard .glass-card,
+.today-dashboard .range-switch,
+.today-dashboard .quiet-button,
+.today-dashboard .insight-card button,
+.today-dashboard .event-pills button,
+.today-dashboard .table-row:not(.table-header) { position: relative; isolation: isolate; }
+.today-dashboard .glass-card::before,
+.today-dashboard .range-switch::before,
+.today-dashboard .quiet-button::before,
+.today-dashboard .insight-card button::before,
+.today-dashboard .event-pills button::before,
+.today-dashboard .table-row:not(.table-header)::before {
+  content: "";
+  position: absolute;
+  z-index: 4;
+  pointer-events: none;
+  inset: -1px;
+  padding: 1px;
+  border-radius: inherit;
+  opacity: var(--cursor-reflect-opacity, 0);
+  background: radial-gradient(132px circle at var(--cursor-reflect-x, 50%) var(--cursor-reflect-y, 50%), rgba(223,255,251,.72), rgba(86,217,202,.28) 24%, transparent 68%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  transition: opacity .34s var(--ease-apple-fade);
+}
 .today-notice svg { color: var(--aqua); }
 .today-hero { grid-template-columns: minmax(0,1.75fr) minmax(310px,.75fr); margin-top: 15px; }
 .today-chart-controls { display: flex; flex-direction: column; align-items: flex-end; gap: 13px; }
