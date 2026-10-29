@@ -138,7 +138,7 @@ nav button b { margin-left: auto; font-size: 8px; color: #091110; background: va
 .today-risk-orbit.orbit-outer { width: 176px; height: 176px; box-shadow: inset 0 0 48px rgba(86,217,202,.025),0 0 34px rgba(86,217,202,.025); }
 .today-risk-orbit.orbit-middle { width: 138px; height: 138px; border-color: rgba(157,139,255,.18); border-style: dashed; }
 .today-risk-orbit.orbit-inner { width: 100px; height: 100px; border-color: rgba(117,167,255,.16); }
-.today-risk-core { width: 76px; height: 76px; display: grid; place-items: center; position: absolute; left: 50%; top: 50%; z-index: 2; border-radius: 50%; transform: translate(-50%,-50%); background: conic-gradient(var(--aqua) 0 var(--today-risk-score),rgba(255,255,255,.055) var(--today-risk-score) 360deg); box-shadow: 0 0 34px rgba(86,217,202,.1); }
+.today-risk-core { width: 76px; height: 76px; display: grid; place-items: center; position: absolute; left: 50%; top: 50%; z-index: 2; border: 1px solid rgba(86,217,202,.12); border-radius: 50%; transform: translate(-50%,-50%); background: rgba(86,217,202,.025); }
 .today-risk-core::before { content: ""; position: absolute; inset: 7px; border: 1px solid rgba(86,217,202,.14); border-radius: inherit; background: radial-gradient(circle at 35% 25%,rgba(86,217,202,.16),rgba(12,18,22,.98) 66%); }
 .today-risk-core > div { position: relative; z-index: 1; text-align: center; }
 .today-risk-core strong, .today-risk-core span { display: block; }

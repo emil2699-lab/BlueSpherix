@@ -220,7 +220,7 @@ export default function Home() {
 
             <article className="today-risk-card glass-card">
               <div className="section-head"><div><p className="eyebrow">Stato del rischio</p><h2>{riskState}</h2></div><span className={`status-badge ${riskUsed >= 80 ? "warning" : ""}`}><i /> {riskUsed >= 80 ? "Budget quasi pieno" : "Sotto controllo"}</span></div>
-              <div className="today-risk-sphere" style={{ "--today-risk-score": `${ALPHA_ACCOUNT.riskScore * 3.6}deg` } as CSSProperties} aria-label={`Indice di rischio ${ALPHA_ACCOUNT.riskScore} su 100`}>
+              <div className="today-risk-sphere" aria-label={`Indice di rischio ${ALPHA_ACCOUNT.riskScore} su 100`}>
                 <div className="today-risk-orbit orbit-outer" /><div className="today-risk-orbit orbit-middle" /><div className="today-risk-orbit orbit-inner" />
                 <div className="today-risk-core"><div><strong>{ALPHA_ACCOUNT.riskScore}</strong><span>su 100</span></div></div>
                 <i className="today-risk-node node-margin" style={orbitalNodeStyle(marginPressure, 205, 42, 88)} aria-hidden="true" />
