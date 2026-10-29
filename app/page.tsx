@@ -11,7 +11,6 @@ import {
   CalendarDays,
   Command,
   FlaskConical,
-  Gauge,
   LayoutDashboard,
   LineChart,
   LockKeyhole,
@@ -27,7 +26,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import Portfolio from "./portfolio";
 import Analytics from "./analytics";
 import Operations from "./operations";
@@ -64,6 +63,18 @@ function pathFor(values: number[], width: number, height: number, padding = 4) {
       return `${index === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
     })
     .join(" ");
+}
+
+function orbitalNodeStyle(pressure: number, startAngle: number, sweep: number, radius = 88) {
+  const normalized = Math.min(1, Math.max(0, pressure));
+  const angle = (startAngle + sweep * normalized) * Math.PI / 180;
+  return {
+    "--node-x": `${(Math.cos(angle) * radius).toFixed(1)}px`,
+    "--node-y": `${(Math.sin(angle) * radius).toFixed(1)}px`,
+    "--node-strength": normalized.toFixed(3),
+    "--node-scale": (0.88 + normalized * 0.28).toFixed(3),
+    "--node-glow": `${(5 + normalized * 12).toFixed(1)}px`,
+  } as CSSProperties;
 }
 
 function MiniChart({ values, color = "#56d9ca" }: { values: number[]; color?: string }) {
@@ -140,7 +151,8 @@ export default function Home() {
   const rangeProfit = DASHBOARD_RANGE_STATS[range].net;
   const riskState = ALPHA_ACCOUNT.riskScore < 35 ? "Calmo" : ALPHA_ACCOUNT.riskScore < 65 ? "Moderato" : "Elevato";
   const riskUsed = ALPHA_ACCOUNT.activeRisk / ALPHA_ACCOUNT.riskLimit * 100;
-  const riskBuffer = Math.max(0, ALPHA_ACCOUNT.riskLimit - ALPHA_ACCOUNT.activeRisk);
+  const marginPressure = ALPHA_ACCOUNT.marginUsage / 20;
+  const drawdownPressure = ALPHA_ACCOUNT.currentDrawdown / 8;
 
   const goTo = (target: string) => {
     setView(target);
@@ -207,13 +219,16 @@ export default function Home() {
               <div className="chart-summary"><div><span>Rendimento</span><strong data-sign={valueSign(DASHBOARD_RANGE_STATS[range].returnPct)}>{performance}</strong></div><div><span>Profitto netto</span><strong data-sign={valueSign(rangeProfit)}>{money(rangeProfit)}</strong></div><div><span>Data confidence</span><strong className="confidence"><ShieldCheck size={15} /> {DASHBOARD_RANGE_STATS[range].confidence}%</strong></div></div>
             </article>
 
-            <article className={`today-status-card glass-card ${riskUsed >= 80 ? "warning" : ""}`}>
-              <div className="section-head"><div><p className="eyebrow">Controllo operativo</p><h2>{riskState} · {positions.length} posizioni</h2></div><span className="today-status-icon"><Gauge size={19} /></span></div>
-              <p className="today-status-copy">Il budget è vicino al limite, ma nessuna protezione è stata attivata.</p>
-              <div className="today-budget-head"><span>Budget di rischio</span><strong>{riskUsed.toLocaleString("it-IT", { maximumFractionDigits: 1 })}% usato</strong></div>
-              <div className="today-budget-track"><i style={{ width: `${Math.min(100, riskUsed)}%` }} /></div>
-              <div className="today-budget-scale"><span>0%</span><span>Limite {ALPHA_ACCOUNT.riskLimit.toLocaleString("it-IT")}%</span></div>
-              <dl className="today-status-values"><div><dt>Rischio aperto</dt><dd>{ALPHA_ACCOUNT.activeRisk.toLocaleString("it-IT")}%</dd></div><div><dt>Buffer</dt><dd>{riskBuffer.toLocaleString("it-IT", { maximumFractionDigits: 2 })}%</dd></div><div><dt>Uso margine</dt><dd>{ALPHA_ACCOUNT.marginUsage.toLocaleString("it-IT")}%</dd></div></dl>
+            <article className="today-risk-card glass-card">
+              <div className="section-head"><div><p className="eyebrow">Stato del rischio</p><h2>{riskState}</h2></div><span className={`status-badge ${riskUsed >= 80 ? "warning" : ""}`}><i /> {riskUsed >= 80 ? "Budget quasi pieno" : "Sotto controllo"}</span></div>
+              <div className="today-risk-sphere" style={{ "--today-risk-score": `${ALPHA_ACCOUNT.riskScore * 3.6}deg` } as CSSProperties} aria-label={`Indice di rischio ${ALPHA_ACCOUNT.riskScore} su 100`}>
+                <div className="today-risk-orbit orbit-outer" /><div className="today-risk-orbit orbit-inner" />
+                <div className="today-risk-core"><div><strong>{ALPHA_ACCOUNT.riskScore}</strong><span>su 100</span></div></div>
+                <span className="today-risk-node node-margin" style={orbitalNodeStyle(marginPressure, 205, 42)} aria-label={`Margine utilizzato ${ALPHA_ACCOUNT.marginUsage.toLocaleString("it-IT")} percento su una soglia del 20 percento`}><i /><span><b>Margine</b><small>{ALPHA_ACCOUNT.marginUsage.toLocaleString("it-IT")}% / 20%</small></span></span>
+                <span className="today-risk-node node-open-risk" style={orbitalNodeStyle(riskUsed / 100, 305, 42)} aria-label={`Rischio aperto ${ALPHA_ACCOUNT.activeRisk.toLocaleString("it-IT")} percento su un limite di ${ALPHA_ACCOUNT.riskLimit.toLocaleString("it-IT")} percento`}><i /><span><b>Rischio aperto</b><small>{ALPHA_ACCOUNT.activeRisk.toLocaleString("it-IT")}% / {ALPHA_ACCOUNT.riskLimit.toLocaleString("it-IT")}%</small></span></span>
+                <span className="today-risk-node node-drawdown" style={orbitalNodeStyle(drawdownPressure, 108, 42)} aria-label={`Drawdown corrente ${ALPHA_ACCOUNT.currentDrawdown.toLocaleString("it-IT")} percento su una soglia dell’8 percento`}><i /><span><b>Drawdown</b><small>{ALPHA_ACCOUNT.currentDrawdown.toLocaleString("it-IT")}% / 8%</small></span></span>
+              </div>
+              <p className="today-risk-copy">Ogni punto avanza nel proprio tratto d’orbita e aumenta il bagliore mentre si avvicina alla soglia. Il rischio aperto è ora il fattore dominante.</p>
               <button className="text-action" onClick={() => goTo("risk")}>Apri Risk Center <ArrowRight size={15} /></button>
             </article>
           </section>
