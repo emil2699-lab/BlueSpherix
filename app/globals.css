@@ -157,6 +157,14 @@ nav button b { margin-left: auto; font-size: 8px; color: #091110; background: va
   mask-composite: exclude;
   transition: opacity .34s var(--ease-apple-fade);
 }
+.today-dashboard .glass-card::before {
+  inset: 0;
+  padding: 0;
+  background: radial-gradient(560px circle at var(--cursor-reflect-x, 50%) var(--cursor-reflect-y, 50%), rgba(223,255,251,.12), rgba(86,217,202,.06) 42%, transparent 92%);
+  -webkit-mask: none;
+  mask: none;
+}
+.today-dashboard .glass-card > * { position: relative; z-index: 1; }
 .today-dashboard .glass-card {
   transform: perspective(1200px) rotateX(var(--cursor-tilt-x, 0deg)) rotateY(var(--cursor-tilt-y, 0deg)) translateY(var(--cursor-depth, 0px));
   transform-style: preserve-3d;
