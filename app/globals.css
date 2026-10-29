@@ -137,8 +137,10 @@ nav button b { margin-left: auto; font-size: 8px; color: #091110; background: va
 .symbol i { width: 25px; height: 25px; border-radius: 7px; display: grid; place-items: center; font-style: normal; font-size: 7px; color: #97fff3; background: rgba(86,217,202,.08); border: 1px solid rgba(86,217,202,.09); }
 .symbol strong { color: #dfe8ed; }
 .long, .short { display: flex; gap: 3px; align-items: center; }
-.long, .up { color: var(--aqua); }
-.short, .down { color: var(--red); }
+.long, .up, [data-sign="positive"] { color: var(--aqua); }
+.short { color: var(--red); }
+.down, [data-sign="negative"] { color: var(--red) !important; }
+[data-sign="neutral"] { color: inherit; }
 .insight-card { padding: 20px; position: relative; overflow: hidden; background: radial-gradient(circle at 100% 0%, rgba(157,139,255,.17), transparent 43%), linear-gradient(145deg, rgba(22,25,40,.9), rgba(13,17,25,.75)); }
 .insight-card::after { content: ""; width: 180px; height: 180px; border: 1px solid rgba(157,139,255,.12); border-radius: 50%; position: absolute; right: -120px; bottom: -90px; box-shadow: 0 0 0 25px rgba(157,139,255,.025), 0 0 0 50px rgba(157,139,255,.018); }
 .insight-icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; color: #c3b9ff; background: rgba(157,139,255,.11); border: 1px solid rgba(157,139,255,.14); margin-bottom: 16px; }

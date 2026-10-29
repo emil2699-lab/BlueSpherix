@@ -3,6 +3,7 @@
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, Crosshair, Gauge, Layers3, ShieldCheck, Sparkles, Target, TrendingDown } from "lucide-react";
 import { ALPHA_ACCOUNT, OPEN_TRADES, type DemoTrade } from "./demo-data";
+import { valueSign } from "./value-sign";
 
 type StressScenario = "stop" | "volatility" | "gap";
 
@@ -68,15 +69,15 @@ export default function Risk() {
         <div className="exposure-list">
           {OPEN_TRADES.map((trade) => <ExposureRow key={trade.id} trade={trade} totalRisk={openRisk} selected={trade.id === selectedTrade?.id} onSelect={() => setSelectedId(trade.id)} />)}
         </div>
-        {selectedTrade && <div className="exposure-focus" aria-live="polite"><div><span>Posizione selezionata</span><strong>{selectedTrade.symbol} · {selectedTrade.side}</strong></div><dl><div><dt>Rischio</dt><dd>{money(selectedTrade.riskUsd)}</dd></div><div><dt>Risultato aperto</dt><dd className={selectedTrade.netPnl >= 0 ? "up" : "down"}>{signedMoney(selectedTrade.netPnl)}</dd></div><div><dt>MAE</dt><dd className="down">{money(selectedTrade.maeUsd)}</dd></div><div><dt>R corrente</dt><dd>{selectedTrade.rMultiple.toLocaleString("it-IT")}R</dd></div></dl></div>}
+        {selectedTrade && <div className="exposure-focus" aria-live="polite"><div><span>Posizione selezionata</span><strong>{selectedTrade.symbol} · {selectedTrade.side}</strong></div><dl><div><dt>Rischio</dt><dd>{money(selectedTrade.riskUsd)}</dd></div><div><dt>Risultato aperto</dt><dd data-sign={valueSign(selectedTrade.netPnl)}>{signedMoney(selectedTrade.netPnl)}</dd></div><div><dt>MAE</dt><dd data-sign={valueSign(selectedTrade.maeUsd)}>{money(selectedTrade.maeUsd)}</dd></div><div><dt>R corrente</dt><dd data-sign={valueSign(selectedTrade.rMultiple)}>{selectedTrade.rMultiple.toLocaleString("it-IT")}R</dd></div></dl></div>}
       </article>
 
       <article className={`glass-card stress-card stress-${scenario}`}>
         <div className="section-head"><div><p className="eyebrow">Stress lab</p><h2>Se il mercato accelera.</h2></div><AlertTriangle size={20} /></div>
         <div className="stress-tabs" role="tablist" aria-label="Scenari di stress">{(Object.keys(scenarios) as StressScenario[]).map(key => <button role="tab" aria-selected={scenario === key} key={key} onClick={() => setScenario(key)}>{scenarios[key].label}</button>)}</div>
-        <div className="stress-result"><span>Perdita teorica</span><strong>-{money(stressLoss)}</strong><small>-{percent(stressPct)} dell’equity</small></div>
+        <div className="stress-result"><span>Perdita teorica</span><strong data-sign="negative">-{money(stressLoss)}</strong><small data-sign="negative">-{percent(stressPct)} dell’equity</small></div>
         <p>{scenarioData.detail}</p>
-        <dl className="stress-values"><div><dt>Equity proiettata</dt><dd>{money(projectedEquity)}</dd></div><div><dt>Drawdown proiettato</dt><dd>{percent(projectedDrawdown)}</dd></div></dl>
+        <dl className="stress-values"><div><dt>Equity proiettata</dt><dd data-sign={valueSign(projectedEquity)}>{money(projectedEquity)}</dd></div><div><dt>Drawdown proiettato</dt><dd>{percent(projectedDrawdown)}</dd></div></dl>
       </article>
     </section>
 

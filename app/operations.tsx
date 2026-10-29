@@ -20,6 +20,7 @@ import {
   Target,
 } from "lucide-react";
 import { ALPHA_ACCOUNT, DEMO_PENDING_ORDERS, DEMO_PERIOD_STATS, DEMO_TRADES, OPEN_PNL, RECENT_PLAN_COUNT, tradesForPeriod, type DemoPendingOrder, type DemoPeriod, type DemoTrade } from "./demo-data";
+import { valueSign } from "./value-sign";
 
 type Period = DemoPeriod;
 type TradeFilter = "Tutte" | "Aperte" | "Pendenti" | "Chiuse" | "In profitto" | "In perdita";
@@ -192,15 +193,15 @@ function HybridOverview({ stats, period, maxFlow, periodTrades }: { stats: (type
   const metrics = [
     { label: "Operazioni", value: stats.trades.toString(), detail: `${stats.closedTrades} chiuse · ${stats.trades - stats.closedTrades} aperte` },
     { label: "Win rate", value: `${stats.win.toLocaleString("it-IT")}%`, detail: `${stats.wins} vincenti su ${stats.closedTrades} chiuse` },
-    { label: "R medio", value: `${stats.averageR.toLocaleString("it-IT", { minimumFractionDigits: 2 })}R`, detail: "sulle operazioni chiuse" },
-    { label: "Oggi", value: signedMoney(OPEN_PNL), detail: `${trades.filter(trade => trade.status === "Aperta").length} posizioni aperte`, tone: "up" },
+    { label: "R medio", value: `${stats.averageR.toLocaleString("it-IT", { minimumFractionDigits: 2 })}R`, detail: "sulle operazioni chiuse", signValue: stats.averageR },
+    { label: "Oggi", value: signedMoney(OPEN_PNL), detail: `${trades.filter(trade => trade.status === "Aperta").length} posizioni aperte`, signValue: OPEN_PNL },
     { label: "Qualità", value: `${ALPHA_ACCOUNT.executionQuality}/100`, detail: "sopra la media" },
     { label: "Rischio", value: `${ALPHA_ACCOUNT.activeRisk.toLocaleString("it-IT")}%`, detail: `zona abituale · limite ${ALPHA_ACCOUNT.riskLimit.toLocaleString("it-IT", { minimumFractionDigits: 2 })}%` },
   ];
   return <section className="hybrid-overview">
     <article className={`glass-card hybrid-flow-card ${stackedFlow ? "is-stacked" : ""}`}>
       <div className="hybrid-flow-layout">
-        <div className="hybrid-flow-balance"><p className="eyebrow">Risultato netto · {period}</p><strong className={stats.net >= 0 ? "up" : "down"}>{money(stats.net)}</strong></div>
+        <div className="hybrid-flow-balance"><p className="eyebrow">Risultato netto · {period}</p><strong data-sign={valueSign(stats.net)}>{money(stats.net)}</strong></div>
         <div className="hybrid-flow-visual">
           <span>Andamento nei 12 blocchi</span>
           <div className="hybrid-flow" aria-label={`Sequenza risultati del periodo ${period}`}>
@@ -210,15 +211,15 @@ function HybridOverview({ stats, period, maxFlow, periodTrades }: { stats: (type
         </div>
       </div>
       <dl className="net-breakdown" aria-label="Composizione del risultato netto">
-        <div><dt>Lordo</dt><dd className={gross >= 0 ? "up" : "down"}>{signedMoney(gross)}</dd></div>
-        <div><dt>Commissioni</dt><dd className="down">{money(commissions)}</dd></div>
-        <div><dt>Swap</dt><dd className={swaps < 0 ? "down" : ""}>{money(swaps)}</dd></div>
-        <div><dt>Netto reale</dt><dd className={stats.net >= 0 ? "up" : "down"}>{signedMoney(stats.net)}</dd></div>
+        <div><dt>Lordo</dt><dd data-sign={valueSign(gross)}>{signedMoney(gross)}</dd></div>
+        <div><dt>Commissioni</dt><dd data-sign={valueSign(commissions)}>{money(commissions)}</dd></div>
+        <div><dt>Swap</dt><dd data-sign={valueSign(swaps)}>{money(swaps)}</dd></div>
+        <div><dt>Netto reale</dt><dd data-sign={valueSign(stats.net)}>{signedMoney(stats.net)}</dd></div>
       </dl>
       <div className="hybrid-insight"><Sparkles size={15} /><span>Il netto include commissioni e swap · rapporto medio guadagno/perdita {stats.averageWinLoss.toLocaleString("it-IT")}.</span></div>
     </article>
     <div className="hybrid-metrics">
-      {metrics.map((metric) => <article className="glass-card" key={metric.label}><p>{metric.label}</p><strong className={metric.tone}>{metric.value}</strong><small>{metric.detail}</small></article>)}
+      {metrics.map((metric) => <article className="glass-card" key={metric.label}><p>{metric.label}</p><strong data-sign={metric.signValue === undefined ? undefined : valueSign(metric.signValue)}>{metric.value}</strong><small>{metric.detail}</small></article>)}
     </div>
   </section>;
 }
@@ -297,13 +298,13 @@ function TimelineWorkspace({ contained = false, visible, pendingOrders, selected
         {pendingMode ? <PendingStream orders={pendingOrders} selected={selectedPending} setSelected={setSelectedPending} /> : groupedTradeDays(visible).map(({ day, trades: dayTrades }) => {
           const total = dayTrades.reduce((sum, trade) => sum + trade.result, 0);
           return <div className="timeline-day" key={day}>
-            <div className="timeline-day-head"><span>{day}</span><strong className={total >= 0 ? "up" : "down"}>{signedMoney(total)}</strong></div>
+            <div className="timeline-day-head"><span>{day}</span><strong data-sign={valueSign(total)}>{signedMoney(total)}</strong></div>
             {dayTrades.map((trade) => <button key={trade.id} className={`timeline-trade ${selectedTrade.id === trade.id ? "selected" : ""} ${trade.result < 0 ? (Math.abs(trade.result) >= 200 ? "loss severe" : "loss") : ""}`} onClick={() => setSelected(trade.id)}>
               <time>{trade.time}<small>{trade.id}</small></time>
               <span className="timeline-symbol"><i>{trade.symbol.slice(0, 2)}</i><span><strong>{trade.symbol}</strong><small>{trade.setup}</small></span></span>
               <span className={trade.side === "Long" ? "long" : "short"}>{trade.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{trade.side}<small>{trade.volumeLabel} lot</small></span>
               <span className="timeline-status">{trade.status}</span>
-              <strong className={trade.result >= 0 ? "up" : "down"}>{signedMoney(trade.result)}</strong>
+              <strong data-sign={valueSign(trade.result)}>{signedMoney(trade.result)}</strong>
             </button>)}
           </div>;
         })}
@@ -528,11 +529,11 @@ function TradeInspector({ trade, focusTab, setFocusTab, journalNote, setJournalN
       {(["Dettagli", "Diario"] as FocusTab[]).map((tab) => <button key={tab} role="tab" aria-selected={focusTab === tab} onClick={() => selectFocusTab(tab)}>{tab === "Dettagli" ? <Target size={14} /> : <BookOpen size={14} />}{tab}</button>)}
     </div>
     {focusTab === "Dettagli" ? <>
-      <div className="inspector-result"><span>Risultato netto</span><strong className={trade.result >= 0 ? "up" : "down"}>{signedMoney(trade.result)}</strong><small>{trade.r > 0 ? "+" : ""}{trade.r}R · {trade.duration} · rischio {money(trade.riskUsd)}</small></div>
+      <div className="inspector-result"><span>Risultato netto</span><strong data-sign={valueSign(trade.result)}>{signedMoney(trade.result)}</strong><small><span data-sign={valueSign(trade.r)}>{trade.r > 0 ? "+" : ""}{trade.r}R</span> · {trade.duration} · rischio {money(trade.riskUsd)}</small></div>
       <div className="trade-journey">
         <div className="section-head"><div><p className="eyebrow">Trade journey</p><h3>Dal rischio al risultato</h3></div><Target size={18} /></div>
         <div className="journey-track"><i className="mae" style={{ width: `${Math.min(38, 12 + Math.abs(trade.mae) / 12)}%` }} /><i className="mfe" style={{ width: `${Math.min(55, 16 + trade.mfe / 25)}%` }} /><span /></div>
-        <div className="journey-labels"><span>MAE<strong className="down">{money(trade.mae)}</strong></span><span>MFE<strong className="up">+{money(trade.mfe)}</strong></span></div>
+        <div className="journey-labels"><span>MAE<strong data-sign={valueSign(trade.mae)}>{money(trade.mae)}</strong></span><span>MFE<strong data-sign={valueSign(trade.mfe)}>+{money(trade.mfe)}</strong></span></div>
       </div>
       <dl className="inspector-values inspector-values-full">
         <div><dt>Ingresso</dt><dd>{trade.entryLabel}</dd></div>
@@ -544,7 +545,7 @@ function TradeInspector({ trade, focusTab, setFocusTab, journalNote, setJournalN
         <div><dt>Setup</dt><dd>{trade.setup}</dd></div>
         <div><dt>Ticket MT5</dt><dd>{trade.id}</dd></div>
       </dl>
-      <dl className="trade-costs"><div><dt>Lordo</dt><dd>{signedMoney(trade.grossPnl)}</dd></div><div><dt>Commissioni</dt><dd className="down">{money(trade.commission)}</dd></div><div><dt>Swap</dt><dd className={trade.swap < 0 ? "down" : ""}>{money(trade.swap)}</dd></div></dl>
+      <dl className="trade-costs"><div><dt>Lordo</dt><dd data-sign={valueSign(trade.grossPnl)}>{signedMoney(trade.grossPnl)}</dd></div><div><dt>Commissioni</dt><dd data-sign={valueSign(trade.commission)}>{money(trade.commission)}</dd></div><div><dt>Swap</dt><dd data-sign={valueSign(trade.swap)}>{money(trade.swap)}</dd></div></dl>
       <div className="inspector-note"><Sparkles size={16} /><div><strong>Lettura operativa</strong><p>{trade.note}</p></div></div>
     </> : <div className="journal-panel">
       <div className={trade.planAligned ? "plan-status aligned" : "plan-status caution"}>{trade.planAligned ? <Check size={15} /> : <Sparkles size={15} />}<span><strong>{trade.planAligned ? "Piano rispettato" : "Da rivedere"}</strong><small>Valutazione dimostrativa dell’esecuzione</small></span></div>

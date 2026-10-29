@@ -22,3 +22,11 @@ Pattern approvato per visualizzare un risultato economico insieme alla sua seque
 - Il numero di barre di riferimento è 12, una per ciascun blocco del periodo selezionato.
 
 Questo formato va mantenuto coerente quando viene riutilizzato in Dashboard, Analisi o altre viste finanziarie.
+
+## Colore semantico dei numeri
+
+- Ogni valore numerico dinamico che può cambiare segno espone `data-sign={valueSign(value)}`.
+- `valueSign` in `app/value-sign.ts` è l'unica regola applicativa per distinguere valori negativi, positivi e neutri.
+- Un valore negativo usa sempre il rosso corallo `--red`. La regola globale ha priorità sui colori locali del componente, compresi aqua, colore del conto e colore del grafico.
+- Un valore positivo usa aqua; lo zero eredita il colore neutro del contesto.
+- Colori direzionali come Long/Short e indicatori di rischio restano separati dal segno matematico del numero.

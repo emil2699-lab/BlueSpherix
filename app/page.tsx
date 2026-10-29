@@ -30,6 +30,7 @@ import Analytics from "./analytics";
 import Operations from "./operations";
 import Risk from "./risk";
 import { ALPHA_ACCOUNT, BEST_RECENT_TRADE, BEST_SESSION_30D, DASHBOARD_RANGE_STATS, DEMO_BALANCE_SERIES, DEMO_EQUITY_SERIES, DEMO_PERIOD_STATS, OPEN_PNL, OPEN_TRADES, type DashboardRange } from "./demo-data";
+import { valueSign } from "./value-sign";
 
 type Range = DashboardRange;
 const equitySeries = DEMO_EQUITY_SERIES;
@@ -97,11 +98,11 @@ function EquityChart({ range }: { range: Range }) {
   );
 }
 
-function MetricCard({ label, value, detail, values, tone = "aqua" }: { label: string; value: string; detail: string; values: number[]; tone?: "aqua" | "violet" | "amber" }) {
+function MetricCard({ label, value, detail, values, tone = "aqua", signValue }: { label: string; value: string; detail: string; values: number[]; tone?: "aqua" | "violet" | "amber"; signValue?: number }) {
   const color = tone === "violet" ? "#9f8cff" : tone === "amber" ? "#ffb85c" : "#56d9ca";
   return (
     <article className="metric-card glass-card">
-      <div><p className="eyebrow">{label}</p><strong>{value}</strong><p className="metric-detail">{detail}</p></div>
+      <div><p className="eyebrow">{label}</p><strong data-sign={signValue === undefined ? undefined : valueSign(signValue)}>{value}</strong><p className="metric-detail">{detail}</p></div>
       <MiniChart values={values} color={color} />
     </article>
   );
@@ -191,11 +192,11 @@ export default function Home() {
           <section className="hero-grid">
             <article className="equity-card glass-card">
               <div className="card-head">
-                <div><p className="eyebrow">Equity totale</p><div className="equity-value"><strong>{money(ALPHA_ACCOUNT.equity)}</strong><span><ArrowUpRight size={14} /> {signedMoney(OPEN_PNL)} oggi</span></div></div>
+                <div><p className="eyebrow">Equity totale</p><div className="equity-value"><strong>{money(ALPHA_ACCOUNT.equity)}</strong><span data-sign={valueSign(OPEN_PNL)}>{OPEN_PNL >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />} {signedMoney(OPEN_PNL)} oggi</span></div></div>
                 <div className="legend"><span><i className="equity" /> Equity</span><span><i className="balance" /> Balance</span><button aria-label="Opzioni grafico">•••</button></div>
               </div>
               <EquityChart range={range} />
-              <div className="chart-summary"><div><span>Rendimento</span><strong>{performance}</strong></div><div><span>Profitto netto</span><strong>{money(rangeProfit)}</strong></div><div><span>Data confidence</span><strong className="confidence"><ShieldCheck size={15} /> {DASHBOARD_RANGE_STATS[range].confidence}%</strong></div></div>
+              <div className="chart-summary"><div><span>Rendimento</span><strong data-sign={valueSign(DASHBOARD_RANGE_STATS[range].returnPct)}>{performance}</strong></div><div><span>Profitto netto</span><strong data-sign={valueSign(rangeProfit)}>{money(rangeProfit)}</strong></div><div><span>Data confidence</span><strong className="confidence"><ShieldCheck size={15} /> {DASHBOARD_RANGE_STATS[range].confidence}%</strong></div></div>
             </article>
 
             <article className="risk-card glass-card">
@@ -207,14 +208,14 @@ export default function Home() {
           </section>
 
           <section className="metrics">
-            <MetricCard label="Profitto mensile" value={signedMoney(DEMO_PERIOD_STATS["30G"].net)} detail={`Calcolato su ${DEMO_PERIOD_STATS["30G"].trades} operazioni`} values={DEMO_EQUITY_SERIES["1M"]} />
+            <MetricCard label="Profitto mensile" value={signedMoney(DEMO_PERIOD_STATS["30G"].net)} detail={`Calcolato su ${DEMO_PERIOD_STATS["30G"].trades} operazioni`} values={DEMO_EQUITY_SERIES["1M"]} signValue={DEMO_PERIOD_STATS["30G"].net} />
             <MetricCard label="Drawdown massimo" value={`${ALPHA_ACCOUNT.maxDrawdown.toLocaleString("it-IT")}%`} detail={`Drawdown corrente ${ALPHA_ACCOUNT.currentDrawdown.toLocaleString("it-IT")}%`} values={DEMO_BALANCE_SERIES["1Y"]} tone="violet" />
             <MetricCard label="Profit factor" value={DEMO_PERIOD_STATS["30G"].factor.toLocaleString("it-IT")} detail={`${DEMO_PERIOD_STATS["30G"].wins} vincenti · ${DEMO_PERIOD_STATS["30G"].losses} perdenti`} values={DEMO_PERIOD_STATS["30G"].flow} tone="amber" />
           </section>
 
           <section className="lower-grid">
             <article className="positions-card glass-card" id="positions">
-              <div className="section-head"><div><p className="eyebrow">Posizioni aperte</p><h2>{positions.length} posizioni · {signedMoney(OPEN_PNL)}</h2></div><button className="quiet-button">Vedi tutte <ArrowRight size={14} /></button></div>
+              <div className="section-head"><div><p className="eyebrow">Posizioni aperte</p><h2>{positions.length} posizioni · <span data-sign={valueSign(OPEN_PNL)}>{signedMoney(OPEN_PNL)}</span></h2></div><button className="quiet-button">Vedi tutte <ArrowRight size={14} /></button></div>
               <div className="position-table">
                 <div className="table-row table-header"><span>Strumento</span><span>Direzione</span><span>Volume</span><span>Apertura</span><span>Corrente</span><span>P&amp;L</span></div>
                 {positions.map((position) => <div className={`table-row ${position.trend === "down" ? "negative-row" : ""}`} key={position.symbol}><span className="symbol"><i>{position.symbol.slice(0, 2)}</i><strong>{position.symbol}</strong></span><span className={position.side === "Long" ? "long" : "short"}>{position.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{position.side}</span><span>{position.volumeLabel}</span><span>{position.open}</span><span>{position.currentPrice}</span><strong className={position.trend}>{position.pnl}</strong></div>)}
@@ -228,7 +229,7 @@ export default function Home() {
 
           <section className="story-card glass-card" id="story">
             <div className="section-head"><div><p className="eyebrow">Equity story</p><h2>Gli ultimi 30 giorni, in tre numeri.</h2></div><button className="quiet-button"><Sparkles size={14} /> Genera report</button></div>
-            <div className="story-line"><div className="story-item positive"><span>1</span><div><small>{BEST_RECENT_TRADE.date}</small><strong>{BEST_RECENT_TRADE.setup} · {BEST_RECENT_TRADE.symbol}</strong><p>La migliore operazione del periodo ha aggiunto {money(BEST_RECENT_TRADE.netPnl)} con un risultato di {BEST_RECENT_TRADE.rMultiple.toLocaleString("it-IT")}R.</p></div></div><div className="story-item caution"><span>2</span><div><small>Rischio corrente</small><strong>{positions.length} posizioni aperte</strong><p>Il rischio complessivo è {ALPHA_ACCOUNT.activeRisk.toLocaleString("it-IT")}% dell’equity, contro un limite di {ALPHA_ACCOUNT.riskLimit.toLocaleString("it-IT")}%.</p></div></div><div className="story-item positive"><span>3</span><div><small>Equity riconciliata</small><strong>{money(ALPHA_ACCOUNT.equity)}</strong><p>Balance {money(ALPHA_ACCOUNT.balance)} più P&amp;L aperto {signedMoney(OPEN_PNL)}.</p></div></div></div>
+            <div className="story-line"><div className="story-item positive"><span>1</span><div><small>{BEST_RECENT_TRADE.date}</small><strong>{BEST_RECENT_TRADE.setup} · {BEST_RECENT_TRADE.symbol}</strong><p>La migliore operazione del periodo ha aggiunto <span data-sign={valueSign(BEST_RECENT_TRADE.netPnl)}>{money(BEST_RECENT_TRADE.netPnl)}</span> con un risultato di <span data-sign={valueSign(BEST_RECENT_TRADE.rMultiple)}>{BEST_RECENT_TRADE.rMultiple.toLocaleString("it-IT")}R</span>.</p></div></div><div className="story-item caution"><span>2</span><div><small>Rischio corrente</small><strong>{positions.length} posizioni aperte</strong><p>Il rischio complessivo è {ALPHA_ACCOUNT.activeRisk.toLocaleString("it-IT")}% dell’equity, contro un limite di {ALPHA_ACCOUNT.riskLimit.toLocaleString("it-IT")}%.</p></div></div><div className="story-item positive"><span>3</span><div><small>Equity riconciliata</small><strong>{money(ALPHA_ACCOUNT.equity)}</strong><p>Balance {money(ALPHA_ACCOUNT.balance)} più P&amp;L aperto <span data-sign={valueSign(OPEN_PNL)}>{signedMoney(OPEN_PNL)}</span>.</p></div></div></div>
           </section>
 
           <section className="calendar-strip" id="calendar"><div><CalendarDays size={19} /><span><strong>3 eventi ad alto impatto</strong> nelle prossime 24 ore</span></div><div className="event-pills"><span>14:30 · USD GDP</span><span>16:00 · USD Consumer Confidence</span><button>Apri calendario <ArrowRight size={14} /></button></div></section>
