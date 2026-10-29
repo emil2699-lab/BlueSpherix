@@ -36,7 +36,7 @@ import { ALPHA_ACCOUNT, BEST_RECENT_TRADE, BEST_SESSION_30D, DASHBOARD_RANGE_STA
 import { valueSign } from "./value-sign";
 
 type Range = DashboardRange;
-const TODAY_LIGHT_TARGETS = ".glass-card, .range-switch, .quiet-button, .insight-card button, .event-pills button, .table-row:not(.table-header)";
+const TODAY_LIGHT_TARGETS = ".glass-card, .today-notice, .calendar-strip, .range-switch, .quiet-button, .insight-card button, .event-pills button, .table-row:not(.table-header)";
 const equitySeries = DEMO_EQUITY_SERIES;
 const balanceSeries = DEMO_BALANCE_SERIES;
 
@@ -167,14 +167,14 @@ export default function Home() {
     const card = (event.target as HTMLElement).closest<HTMLElement>(".glass-card");
     const targets = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(TODAY_LIGHT_TARGETS));
     const measuredTargets = targets.map((target) => ({ target, bounds: target.getBoundingClientRect() }));
-    const lightReach = 540;
+    const lightReach = 780;
 
     measuredTargets.forEach(({ target, bounds }) => {
       const distanceX = event.clientX < bounds.left ? bounds.left - event.clientX : event.clientX > bounds.right ? event.clientX - bounds.right : 0;
       const distanceY = event.clientY < bounds.top ? bounds.top - event.clientY : event.clientY > bounds.bottom ? event.clientY - bounds.bottom : 0;
       const distance = Math.hypot(distanceX, distanceY);
       const proximity = Math.max(0, 1 - distance / lightReach);
-      const intensity = distance === 0 ? 1 : Math.pow(proximity, 1.7) * .72;
+      const intensity = distance === 0 ? 1 : Math.pow(proximity, .75) * .82;
 
       target.style.setProperty("--cursor-reflect-x", `${event.clientX - bounds.left}px`);
       target.style.setProperty("--cursor-reflect-y", `${event.clientY - bounds.top}px`);

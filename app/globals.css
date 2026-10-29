@@ -132,6 +132,8 @@ nav button b { margin-left: auto; font-size: 8px; color: #091110; background: va
 .today-welcome { margin-bottom: 20px; }
 .today-notice { color: #aebbc2; border-color: rgba(86,217,202,.16); background: linear-gradient(90deg,rgba(86,217,202,.065),rgba(86,217,202,.018)); }
 .today-dashboard .glass-card,
+.today-dashboard .today-notice,
+.today-dashboard .calendar-strip,
 .today-dashboard .range-switch,
 .today-dashboard .quiet-button,
 .today-dashboard .insight-card button,
@@ -143,6 +145,8 @@ nav button b { margin-left: auto; font-size: 8px; color: #091110; background: va
 .today-dashboard .event-pills button { --cursor-reflect-rgb: 255 184 92; }
 .today-dashboard .position-table .negative-row { --cursor-reflect-rgb: 255 111 125; }
 .today-dashboard .glass-card::before,
+.today-dashboard .today-notice::before,
+.today-dashboard .calendar-strip::before,
 .today-dashboard .range-switch::before,
 .today-dashboard .quiet-button::before,
 .today-dashboard .insight-card button::before,
@@ -156,7 +160,7 @@ nav button b { margin-left: auto; font-size: 8px; color: #091110; background: va
   padding: 3px;
   border-radius: inherit;
   opacity: var(--cursor-reflect-opacity, 0);
-  background: radial-gradient(520px circle at var(--cursor-reflect-x, 50%) var(--cursor-reflect-y, 50%), rgb(var(--cursor-reflect-rgb) / .48), rgb(var(--cursor-reflect-rgb) / .16) 38%, transparent 84%);
+  background: radial-gradient(860px circle at var(--cursor-reflect-x, 50%) var(--cursor-reflect-y, 50%), rgb(var(--cursor-reflect-rgb) / .56), rgb(var(--cursor-reflect-rgb) / .22) 42%, transparent 93%);
   mix-blend-mode: screen;
   filter: blur(.65px);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
