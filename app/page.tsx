@@ -9,7 +9,6 @@ import {
   BookOpen,
   BrainCircuit,
   CalendarDays,
-  ChevronDown,
   Command,
   FlaskConical,
   LayoutDashboard,
@@ -29,6 +28,7 @@ import { useEffect, useMemo, useState } from "react";
 import Portfolio from "./portfolio";
 import Analytics from "./analytics";
 import Operations from "./operations";
+import Risk from "./risk";
 import { ALPHA_ACCOUNT, BEST_RECENT_TRADE, BEST_SESSION_30D, DASHBOARD_RANGE_STATS, DEMO_BALANCE_SERIES, DEMO_EQUITY_SERIES, DEMO_PERIOD_STATS, OPEN_PNL, OPEN_TRADES, type DashboardRange } from "./demo-data";
 
 type Range = DashboardRange;
@@ -110,20 +110,21 @@ function MetricCard({ label, value, detail, values, tone = "aqua" }: { label: st
 export default function Home() {
   const [view, setView] = useState("overview");
   useEffect(() => {
-    const sync = () => {
+    const applyHash = (behavior: ScrollBehavior) => {
       const target = window.location.hash.slice(1) || "overview";
       setView(target);
       requestAnimationFrame(() => {
-        if (target === "portfolio" || target === "analytics" || target === "positions") window.scrollTo(0, 0);
-        else document.getElementById(target)?.scrollIntoView();
+        if (target === "portfolio" || target === "analytics" || target === "positions" || target === "risk") window.scrollTo({ top: 0, behavior });
+        else document.getElementById(target)?.scrollIntoView({ behavior, block: "start" });
       });
     };
-    sync();
-    window.addEventListener("hashchange", sync);
-    window.addEventListener("popstate", sync);
+    const syncNavigation = () => applyHash(window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth");
+    applyHash("auto");
+    window.addEventListener("hashchange", syncNavigation);
+    window.addEventListener("popstate", syncNavigation);
     return () => {
-      window.removeEventListener("hashchange", sync);
-      window.removeEventListener("popstate", sync);
+      window.removeEventListener("hashchange", syncNavigation);
+      window.removeEventListener("popstate", syncNavigation);
     };
   }, []);
   const [range, setRange] = useState<Range>("1M");
@@ -137,7 +138,6 @@ export default function Home() {
     setView(target);
     window.history.pushState(null, "", `#${target}`);
     window.dispatchEvent(new HashChangeEvent("hashchange"));
-    document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "start" });
     setSidebarOpen(false);
   };
 
@@ -146,7 +146,7 @@ export default function Home() {
       <div className="ambient ambient-one" /><div className="ambient ambient-two" />
       <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
         <div className="brand"><div className="brand-mark"><Orbit size={21} /></div><span>BlueSpherix</span><button className="mobile-close" onClick={() => setSidebarOpen(false)} aria-label="Chiudi menu"><X size={18} /></button></div>
-        <div className="account-pill"><div className="avatar">AM</div><div><strong>Alpha Momentum</strong><span><i /> Dati dimostrativi</span></div><ChevronDown size={15} /></div>
+        <div className="account-pill"><div className="avatar">AM</div><div><strong>Alpha Momentum</strong><span><i /> Dati dimostrativi</span></div><ShieldCheck size={15} aria-label="Conto verificato" /></div>
         <nav aria-label="Navigazione principale">
           <p className="nav-label">Workspace</p>
           {navItems.map(({ label, icon: Icon, target }) => (
@@ -179,7 +179,8 @@ export default function Home() {
           {view === "portfolio" && <Portfolio />}
           {view === "analytics" && <Analytics />}
           {view === "positions" && <Operations />}
-          <div hidden={view === "portfolio" || view === "analytics" || view === "positions"}>
+          {view === "risk" && <Risk />}
+          <div hidden={view === "portfolio" || view === "analytics" || view === "positions" || view === "risk"}>
           <section className="welcome" id="overview">
             <div><p className="date-line">Mercoledì, 28 ottobre</p><h1>Buongiorno, Luca.</h1><p>Il portafoglio è stabile. Il rischio è sotto controllo.</p></div>
             <div className="range-switch" aria-label="Periodo">
@@ -197,11 +198,11 @@ export default function Home() {
               <div className="chart-summary"><div><span>Rendimento</span><strong>{performance}</strong></div><div><span>Profitto netto</span><strong>{money(rangeProfit)}</strong></div><div><span>Data confidence</span><strong className="confidence"><ShieldCheck size={15} /> {DASHBOARD_RANGE_STATS[range].confidence}%</strong></div></div>
             </article>
 
-            <article className="risk-card glass-card" id="risk">
-              <div className="card-head"><div><p className="eyebrow">Risk weather</p><h2>{riskState}</h2></div><span className="status-badge"><i /> {ALPHA_ACCOUNT.activeRisk <= ALPHA_ACCOUNT.riskLimit ? "Sotto controllo" : "Limite superato"}</span></div>
-              <div className="risk-orbit"><div className="orbit-ring ring-one" /><div className="orbit-ring ring-two" /><div className="orbit-core"><strong>{ALPHA_ACCOUNT.riskScore}</strong><span>/ 100</span></div><span className="risk-label label-a">Margin<br /><b>{ALPHA_ACCOUNT.marginUsage.toLocaleString("it-IT")}%</b></span><span className="risk-label label-b">Risk<br /><b>{ALPHA_ACCOUNT.activeRisk.toLocaleString("it-IT")}%</b></span><span className="risk-label label-c">Limit<br /><b>{ALPHA_ACCOUNT.riskLimit.toLocaleString("it-IT")}%</b></span></div>
+            <article className="risk-card glass-card">
+              <div className="card-head"><div><p className="eyebrow">Stato del rischio</p><h2>{riskState}</h2></div><span className={`status-badge ${ALPHA_ACCOUNT.activeRisk / ALPHA_ACCOUNT.riskLimit > .8 ? "warning" : ""}`}><i /> {ALPHA_ACCOUNT.activeRisk / ALPHA_ACCOUNT.riskLimit > .8 ? "Budget quasi pieno" : "Sotto controllo"}</span></div>
+              <div className="risk-orbit"><div className="orbit-ring ring-one" /><div className="orbit-ring ring-two" /><div className="orbit-core"><strong>{ALPHA_ACCOUNT.riskScore}</strong><span>/ 100</span></div><span className="risk-label label-a">Margine<br /><b>{ALPHA_ACCOUNT.marginUsage.toLocaleString("it-IT")}%</b></span><span className="risk-label label-b">Rischio<br /><b>{ALPHA_ACCOUNT.activeRisk.toLocaleString("it-IT")}%</b></span><span className="risk-label label-c">Limite<br /><b>{ALPHA_ACCOUNT.riskLimit.toLocaleString("it-IT")}%</b></span></div>
               <p className="risk-copy">Il rischio aperto è calcolato sulle {positions.length} posizioni correnti e resta entro il limite impostato.</p>
-              <button className="text-action">Apri Risk Center <ArrowRight size={15} /></button>
+              <button className="text-action" onClick={() => goTo("risk")}>Apri Risk Center <ArrowRight size={15} /></button>
             </article>
           </section>
 
