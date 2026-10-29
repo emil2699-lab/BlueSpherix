@@ -13,7 +13,7 @@ Web app moderna per analisi di trading, ispirata alle funzioni di Myfxbook ma co
 - Stack: Next.js 16.4.3, React 19.3.1, TypeScript, export statico su GitHub Pages.
 - Sezioni già sviluppate: Dashboard, Portfolio, Analytics, Operazioni, Rischio e Strategy Lab.
 - La sezione Rischio è completa: budget di rischio, stress test, simulatore pre-trade, correlazioni, drawdown, protezioni, Monte Carlo e guardrail.
-- Strategy Lab include tre ipotesi interattive con parametri specifici, confronto Digital Twin, costi reali, rischio variabile, validazione walk-forward, Parameter Space e archivio dei benchmark salvati nella sessione.
+- Strategy Lab include tre ipotesi interattive con parametri specifici, confronto Digital Twin, costi reali, rischio variabile, validazione walk-forward, Out-of-Sample Gate 70/30, Parameter Space con risultati reali e archivio dei benchmark salvati nella sessione.
 
 ## Preferenze UI vincolanti
 

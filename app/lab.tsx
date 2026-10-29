@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Beaker, BookmarkCheck, Check, CircleGauge, FlaskConical, Layers3, Play, Save, ShieldCheck, Sparkles, Split, Trash2, WandSparkles } from "lucide-react";
+import { Beaker, BookmarkCheck, Check, CircleGauge, FlaskConical, GitCompareArrows, Layers3, LockKeyhole, Play, Save, ShieldCheck, Sparkles, Split, Trash2, WandSparkles } from "lucide-react";
 import { DEMO_AS_OF, DEMO_OPENING_BALANCE } from "./demo-ledger";
 import { CLOSED_TRADES, type DemoTrade } from "./demo-data";
 import { valueSign } from "./value-sign";
@@ -102,6 +102,14 @@ export default function Lab() {
     const simulatedResults = simulatedTrades.map(trade => scenarioResult(trade, experiment, includeCosts, capture) * scale);
     const baseline = stats(baseTrades, baselineResults);
     const simulation = stats(simulatedTrades, simulatedResults);
+    const splitIndex = Math.max(1, Math.floor(baseTrades.length * .7));
+    const trainBase = baseTrades.slice(0, splitIndex);
+    const testBase = baseTrades.slice(splitIndex);
+    const validate = (trades: DemoTrade[]) => {
+      const selected = selectedTrades(trades, experiment, sessionFocus, qualityGate);
+      return stats(selected, selected.map(trade => scenarioResult(trade, experiment, includeCosts, capture) * scale));
+    };
+    const validation = { train: validate(trainBase), test: validate(testBase) };
     const folds = Array.from({ length: 5 }, (_, index) => {
       const start = Math.floor(index * baseTrades.length / 5);
       const end = Math.floor((index + 1) * baseTrades.length / 5);
@@ -111,7 +119,7 @@ export default function Lab() {
       const scenarioNet = sum(foldScenario.map(trade => scenarioResult(trade, experiment, includeCosts, capture) * scale));
       return { label: `F${index + 1}`, delta: scenarioNet - baseNet, positive: scenarioNet > 0 };
     });
-    return { baseline, simulation, baselineResults, simulatedResults, folds, coverage: simulatedTrades.length / Math.max(1, baseTrades.length) * 100 };
+    return { baseline, simulation, baselineResults, simulatedResults, folds, validation, coverage: simulatedTrades.length / Math.max(1, baseTrades.length) * 100 };
   }, [capture, experiment, includeCosts, qualityGate, risk, sample, sessionFocus]);
 
   const netDelta = analysis.simulation.net - analysis.baseline.net;
@@ -119,6 +127,18 @@ export default function Lab() {
   const verdict = robustFolds >= 4 && analysis.simulation.factor > analysis.baseline.factor ? "Promettente" : robustFolds >= 3 ? "Da validare" : "Fragile";
   const verdictTone = verdict === "Promettente" ? "positive" : verdict === "Fragile" ? "negative" : "warning";
   const sensitivityOptions = experiment === "session" ? (["Asia", "Londra", "New York"] as SessionFocus[]) : experiment === "discipline" ? (["plan", "mae", "both"] as QualityGate[]) : ([10, 22, 35] as Capture[]);
+  const sampleDays = sample === "90G" ? 90 : 365;
+  const sensitivityBase = [...CLOSED_TRADES].filter(trade => new Date(DEMO_AS_OF).getTime() - new Date(trade.openedAt).getTime() <= sampleDays * 86400000);
+  const sensitivityResults = sensitivityOptions.map(option => {
+    const optionSession = experiment === "session" ? option as SessionFocus : sessionFocus;
+    const optionQuality = experiment === "discipline" ? option as QualityGate : qualityGate;
+    const optionCapture = experiment === "exit" ? option as Capture : capture;
+    const trades = selectedTrades(sensitivityBase, experiment, optionSession, optionQuality);
+    const results = trades.map(trade => scenarioResult(trade, experiment, includeCosts, optionCapture) * risk / .5);
+    return stats(trades, results);
+  });
+  const factorDegradation = analysis.validation.train.factor ? (analysis.validation.test.factor - analysis.validation.train.factor) / analysis.validation.train.factor * 100 : 0;
+  const oosPassed = analysis.validation.test.factor >= 1.2 && factorDegradation >= -35 && analysis.validation.test.trades >= 12;
   const saveExperiment = () => setSavedExperiments(items => [{ id: Date.now(), title: current.title, parameter: `${parameterLabel} · ${sample} · rischio ${risk.toLocaleString("it-IT")}%`, net: analysis.simulation.net, factor: analysis.simulation.factor, verdict }, ...items].slice(0, 4));
 
   return <div className="lab-view">
@@ -158,10 +178,20 @@ export default function Lab() {
       </aside>
     </section>
 
+    <section className={`lab-oos glass-card ${oosPassed ? "passed" : "failed"}`}>
+      <div className="lab-oos-head"><div><p className="eyebrow">Out-of-Sample Gate</p><h2>La regola funziona anche sui dati che non ha “visto”?</h2><p>Il primo 70% costruisce l’ipotesi. L’ultimo 30% resta isolato fino alla verifica finale.</p></div><span><LockKeyhole size={15} /> 30% dati bloccati</span></div>
+      <div className="lab-oos-flow">
+        <article><span>01 · Sviluppo</span><strong>{analysis.validation.train.factor.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PF</strong><small>{analysis.validation.train.trades} trade · {money(analysis.validation.train.net)}</small><i style={{ width: `${clamp(analysis.validation.train.factor / 2.5 * 100, 8, 100)}%` }} /></article>
+        <GitCompareArrows size={20} />
+        <article><span>02 · Dati bloccati</span><strong>{analysis.validation.test.factor.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PF</strong><small>{analysis.validation.test.trades} trade · <b data-sign={valueSign(analysis.validation.test.net)}>{money(analysis.validation.test.net)}</b></small><i style={{ width: `${clamp(analysis.validation.test.factor / 2.5 * 100, 8, 100)}%` }} /></article>
+        <div className="lab-oos-verdict"><span>{oosPassed ? <Check size={17} /> : <CircleGauge size={17} />}</span><div><small>Degrado del profit factor</small><strong data-sign={valueSign(factorDegradation)}>{factorDegradation > 0 ? "+" : ""}{factorDegradation.toLocaleString("it-IT", { maximumFractionDigits: 1 })}%</strong><p>{oosPassed ? "Gate superato: il vantaggio resta utilizzabile sui dati isolati." : "Gate non superato: amplia il campione o riduci la complessità della regola."}</p></div></div>
+      </div>
+    </section>
+
     <section className="lab-sensitivity glass-card">
       <div className="section-head"><div><p className="eyebrow">Parameter space</p><h2>Esplora senza perdere il contesto.</h2></div><span>{parameterLabel}</span></div>
       <p>Le varianti modificano un solo parametro alla volta. Il grafico principale, il walk-forward e il verdetto si aggiornano insieme.</p>
-      <div>{sensitivityOptions.map(option => { const active = experiment === "session" ? option === sessionFocus : experiment === "discipline" ? option === qualityGate : option === capture; const label = experiment === "discipline" ? ({ plan: "Solo piano", mae: "MAE ≤ 0,75R", both: "Filtro combinato" } as const)[option as QualityGate] : experiment === "exit" ? `Cattura ${option}%` : option; return <button className={active ? "active" : ""} key={String(option)} onClick={() => { if (experiment === "session") setSessionFocus(option as SessionFocus); else if (experiment === "discipline") setQualityGate(option as QualityGate); else setCapture(option as Capture); }}><span>{label}</span><i /><strong>{active ? money(analysis.simulation.net) : "Prova"}</strong></button>; })}</div>
+      <div>{sensitivityOptions.map((option, index) => { const active = experiment === "session" ? option === sessionFocus : experiment === "discipline" ? option === qualityGate : option === capture; const label = experiment === "discipline" ? ({ plan: "Solo piano", mae: "MAE ≤ 0,75R", both: "Filtro combinato" } as const)[option as QualityGate] : experiment === "exit" ? `Cattura ${option}%` : option; const preview = sensitivityResults[index]; return <button className={active ? "active" : ""} key={String(option)} onClick={() => { if (experiment === "session") setSessionFocus(option as SessionFocus); else if (experiment === "discipline") setQualityGate(option as QualityGate); else setCapture(option as Capture); }}><span>{label}</span><i /><strong data-sign={valueSign(preview.net)}>{money(preview.net)} · {preview.factor.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PF</strong></button>; })}</div>
     </section>
 
     <section className="glass-card lab-next"><div><Play size={18} /><div><p className="eyebrow">Passo successivo</p><h2>Salva l’ipotesi come benchmark osservabile.</h2><p>Quando MT5 sarà collegato, il Lab confronterà i nuovi trade con questa regola senza modificarne l’esecuzione.</p></div></div><button onClick={saveExperiment}><Save size={15} /> Salva esperimento</button></section>
