@@ -1155,6 +1155,7 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
 @keyframes focus-pill-right { 0% { transform: translateX(0) scale(1); } 20% { transform: translateX(0) scale(1.04); } 72% { transform: translateX(calc(100% + 12px)) scale(1.04); } 100% { transform: translateX(calc(100% + 12px)) scale(1); } }
 @keyframes focus-pill-left { 0% { transform: translateX(calc(100% + 12px)) scale(1); } 20% { transform: translateX(calc(100% + 12px)) scale(1.04); } 72% { transform: translateX(0) scale(1.04); } 100% { transform: translateX(0) scale(1); } }
 @keyframes focus-tab-pop { 0%,100% { transform: scale(1); } 24%,70% { transform: scale(1.025); } }
+@keyframes kpi-chart-drop { from { opacity: .35; transform: translateY(-9px) scale(.94); } to { opacity: .9; transform: translateY(0) scale(1); } }
 .today-notice, .today-hero, .metrics, .lower-grid, .story-card, .calendar-strip, .portfolio-totals, .portfolio-main, .account-grid, .analytics-kpis, .analytics-main, .analytics-secondary, .dna-card, .risk-overview, .risk-kpis, .risk-main-grid, .risk-simulator, .risk-correlation-grid, .drawdown-pulse, .risk-protections-grid, .monte-carlo-lab, .risk-bottom-grid, .operations-kpis, .flow-card, .ledger-card, .focus-kpis, .focus-workspace, .focus-pattern, .hybrid-overview, .hybrid-ledger, .lab-canvas, .lab-results, .lab-main-grid, .lab-oos, .lab-friction, .lab-sensitivity, .lab-next, .lab-vault { animation: surface-in .38s cubic-bezier(.2,.8,.2,1) both; }
 .today-hero { animation-delay: .035s; }
 .metrics, .lower-grid { animation-delay: .07s; }
@@ -1242,9 +1243,10 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
   .lab-vault-list { grid-template-columns: 1fr; }
 }
 
-@media (max-width: 1100px) and (min-width: 901px) {
-  .metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
-  .metrics .today-kpi:last-child { grid-column: 1 / -1; }
+@media (max-width: 1100px) {
+  .metrics { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .metric-card.today-kpi { min-height: 164px; grid-template-columns: 34px minmax(0,1fr); grid-template-rows: auto 42px; align-content: center; row-gap: 10px; padding: 15px; }
+  .today-kpi .mini-chart { grid-column: 1 / -1; grid-row: 2; width: min(112px,76%); justify-self: center; animation: kpi-chart-drop .38s cubic-bezier(.2,.8,.2,1) both; }
 }
 
 @media (max-width: 900px) {
@@ -1261,8 +1263,7 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
   .content { padding: 24px 16px 50px; }
   .hero-grid, .lower-grid { grid-template-columns: 1fr; }
   .risk-card { min-height: 390px; }
-  .metrics { grid-template-columns: 1fr; }
-  .metric-card { min-height: 100px; }
+  .metrics { grid-template-columns: repeat(3,minmax(0,1fr)); }
   .story-line { grid-template-columns: 1fr; gap: 18px; }
   .story-line::before { width: 1px; height: calc(100% - 28px); left: 14px; right: auto; top: 14px; }
   .story-item { padding-right: 0; }
@@ -1313,6 +1314,7 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
 
 @media (max-width: 560px) {
   .date-line, .eyebrow { font-size: 10px; }
+  .metrics { grid-template-columns: 1fr; }
   .range-switch button { min-width: 44px; height: 40px; font-size: 11px; }
   .trade-filters button { min-height: 40px; font-size: 10px; }
   .filter-field input, .filter-select-control, .date-picker-control { height: 40px; font-size: 10px; }
