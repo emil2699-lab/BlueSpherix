@@ -1,0 +1,48 @@
+# BlueSpherix — memoria operativa
+
+Ultimo aggiornamento: 2026-10-29
+
+## Obiettivo
+
+Web app moderna per analisi di trading, ispirata alle funzioni di Myfxbook ma con interfaccia più chiara, grafici migliori e flussi più intuitivi. Target principale: macOS/Safari.
+
+## Stato attuale
+
+- Repository: `emil2699-lab/BlueSpherix`, branch `first`.
+- Anteprima: `https://emil2699-lab.github.io/BlueSpherix/`.
+- Stack: Next.js 16.4.3, React 19.3.1, TypeScript, export statico su GitHub Pages.
+- Sezioni già sviluppate: Dashboard, Portfolio, Analytics, Operazioni e Rischio.
+- La sezione Rischio è completa: budget di rischio, stress test, simulatore pre-trade, correlazioni, drawdown, protezioni, Monte Carlo e guardrail.
+- Ultimo commit pubblicato al momento di questo file: `5cade63 feat: expand monte carlo risk options`.
+
+## Preferenze UI vincolanti
+
+- Qualsiasi valore numerico negativo deve essere rosso; mai verde/acqua.
+- I risultati negativi usano superfici rosse proporzionali alla gravità.
+- I valori positivi usano acqua/turchese; lo zero resta neutro.
+- Animazioni morbide e coerenti; gli switch seguono il comportamento iOS: lieve espansione, scorrimento, assestamento.
+- Controlli mobile alti almeno 40–44 px.
+- Menu e calendari devono essere personalizzati e coerenti, senza tendine native nere e squadrate.
+- Evitare informazioni duplicate tra viste; ogni dato compare dove serve davvero.
+- Mantenere coerenza tra riquadri, spaziature, raggi, hover e transizioni.
+
+## Regole tecniche
+
+- Sistema semantico dei segni: `app/value-sign.ts` e selettori CSS `[data-sign]`.
+- Dati demo: `app/demo-data.ts` e `app/demo-ledger.ts`, data di riferimento 2026-10-28.
+- Non committare `AGENTS.md` o `bluespherix-preview.png`.
+- `next dev` può modificare `next-env.d.ts`: ripristinarlo prima del commit.
+- TypeScript: usare `npx tsc --noEmit --incremental false`.
+- Verifiche standard per un blocco: lint, TypeScript e controllo dati; browser test solo per modifiche visive/interattive rilevanti.
+
+## Metodo per ridurre il consumo di contesto
+
+1. Lavorare per blocchi completi, evitando una modifica, un test e un push per ogni dettaglio.
+2. Dare pochi aggiornamenti intermedi e una risposta finale breve.
+3. Eseguire una sola fase di verifica e una sola pubblicazione per blocco.
+4. Aggiornare questo file soltanto quando cambiano stato, decisioni permanenti o prossimo obiettivo.
+5. Nei nuovi turni rileggere questo file e i soli sorgenti coinvolti, senza ricostruire tutta la cronologia.
+
+## Prossimo passo consigliato
+
+Considerare conclusa la sezione Rischio e sviluppare in un unico blocco la prossima sezione principale. La voce `Lab` non ha ancora una pagina dedicata completa ed è il candidato naturale.
