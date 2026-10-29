@@ -319,8 +319,8 @@ export default function Risk() {
       <div className="monte-carlo-main">
         <div className="section-head monte-carlo-head"><div><p className="eyebrow">Monte Carlo lab</p><h2 id="monte-carlo-title">Cinquecento futuri possibili, partendo dal tuo storico.</h2></div><span className="portfolio-caption">{historicalRMultiples.length} trade chiusi · risultati in R</span></div>
         <div className="monte-carlo-controls">
-          <div><span>Rischio per trade</span><div className="monte-carlo-switch">{[.25, .5, 1].map(value => <button key={value} className={monteCarloRisk === value ? "active" : ""} aria-pressed={monteCarloRisk === value} onClick={() => setMonteCarloRisk(value)}>{percent(value)}</button>)}</div></div>
-          <div><span>Orizzonte</span><div className="monte-carlo-switch">{([20, 40, 80] as MonteCarloHorizon[]).map(value => <button key={value} className={monteCarloHorizon === value ? "active" : ""} aria-pressed={monteCarloHorizon === value} onClick={() => setMonteCarloHorizon(value)}>{value} trade</button>)}</div></div>
+          <div><span>Rischio per trade</span><div className="monte-carlo-switch risk-options">{[.25, .5, 1, 2, 5].map(value => <button key={value} className={monteCarloRisk === value ? "active" : ""} aria-pressed={monteCarloRisk === value} onClick={() => setMonteCarloRisk(value)}>{percent(value)}</button>)}</div></div>
+          <div><span>Orizzonte</span><div className="monte-carlo-switch horizon-options">{([20, 40, 80] as MonteCarloHorizon[]).map(value => <button key={value} className={monteCarloHorizon === value ? "active" : ""} aria-pressed={monteCarloHorizon === value} onClick={() => setMonteCarloHorizon(value)}>{value} trade</button>)}</div></div>
         </div>
         <div className="monte-carlo-chart" aria-label={`Distribuzione di 500 simulazioni su ${monteCarloHorizon} trade`}>
           <svg viewBox="0 0 800 230" role="img">
