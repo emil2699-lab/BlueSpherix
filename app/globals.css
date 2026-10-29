@@ -1039,6 +1039,33 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
 .lab-oos-verdict small { color: var(--muted); font-size: 7px; }
 .lab-oos-verdict strong { display: block; margin-top: 4px; font-size: 15px; }
 .lab-oos-verdict p { margin: 5px 0 0; color: var(--muted); font-size: 8px; line-height: 1.45; }
+.lab-friction { margin-top: 15px; padding: 23px; overflow: hidden; border-color: rgba(86,217,202,.15); background: radial-gradient(circle at 100% 0%,rgba(86,217,202,.07),transparent 38%),var(--panel); }
+.lab-friction.failed { border-color: rgba(255,111,125,.2); background: radial-gradient(circle at 100% 0%,rgba(255,111,125,.09),transparent 40%),var(--panel); }
+.lab-friction-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 22px; }
+.lab-friction-head h2 { margin: 5px 0 7px; font-size: 18px; }
+.lab-friction-head p:last-child { margin: 0; color: var(--muted); font-size: 8px; }
+.lab-friction-head > span { min-width: 150px; display: block; text-align: right; color: var(--aqua); font-size: 16px; font-weight: 700; }
+.lab-friction-head > span small { display: block; margin-top: 5px; color: var(--muted); font-size: 7px; font-weight: 400; }
+.lab-friction-grid { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(260px,.45fr); gap: 12px; margin-top: 20px; }
+.lab-friction-profiles { display: grid; grid-template-columns: repeat(5,1fr); gap: 7px; }
+.lab-friction-profiles button { min-width: 0; min-height: 118px; display: grid; grid-template-rows: 1fr auto auto; gap: 10px; padding: 13px 11px; text-align: left; border: 1px solid var(--stroke); border-radius: 12px; color: var(--text); background: rgba(6,10,15,.44); cursor: pointer; transition: transform .18s ease,border-color .18s ease,background .18s ease; }
+.lab-friction-profiles button > span, .lab-friction-profiles button > span small { display: block; }
+.lab-friction-profiles button > span { font-size: 9px; }
+.lab-friction-profiles button > span small { margin-top: 5px; color: var(--muted); font-size: 7px; line-height: 1.4; }
+.lab-friction-profiles button > strong { align-self: end; font-size: 10px; }
+.lab-friction-profiles button > i { height: 3px; display: block; overflow: hidden; border-radius: 99px; background: rgba(255,255,255,.06); }
+.lab-friction-profiles button > i b { height: 100%; display: block; border-radius: inherit; background: linear-gradient(90deg,var(--violet),var(--aqua)); transition: width .3s ease; }
+.lab-friction-profiles button:has(strong[data-sign="negative"]) > i b { background: linear-gradient(90deg,#8a3141,var(--red)); }
+.lab-friction-profiles button.active { transform: translateY(-2px); border-color: rgba(157,139,255,.35); background: linear-gradient(145deg,rgba(157,139,255,.12),rgba(86,217,202,.035)); }
+.lab-friction-result { padding: 15px; border: 1px solid var(--stroke); border-radius: 12px; background: rgba(6,10,15,.46); }
+.lab-friction-result > div:first-child { width: 36px; height: 36px; display: grid; place-items: center; margin-bottom: 13px; border: 1px solid rgba(86,217,202,.2); border-radius: 10px; color: var(--aqua); background: rgba(86,217,202,.07); }
+.lab-friction-result > div:first-child.negative { color: var(--red); border-color: rgba(255,111,125,.22); background: rgba(255,111,125,.08); }
+.lab-friction-result h3 { margin: 5px 0 13px; font-size: 15px; }
+.lab-friction-result dl { display: grid; grid-template-columns: repeat(3,1fr); gap: 1px; margin: 0; overflow: hidden; border: 1px solid var(--stroke); border-radius: 9px; background: var(--stroke); }
+.lab-friction-result dl div { min-width: 0; padding: 9px; background: rgba(8,13,18,.96); }
+.lab-friction-result dt { color: var(--muted); font-size: 6px; }
+.lab-friction-result dd { margin: 5px 0 0; font-size: 8px; font-weight: 700; white-space: nowrap; }
+.lab-friction-result > p:last-child { margin: 13px 0 0; color: var(--muted); font-size: 8px; line-height: 1.55; }
 .lab-sensitivity { margin-top: 15px; padding: 22px 23px; overflow: hidden; }
 .lab-sensitivity .section-head > span { padding: 7px 10px; border: 1px solid rgba(157,139,255,.18); border-radius: 8px; color: #c4bbfb; background: rgba(157,139,255,.06); font-size: 8px; }
 .lab-sensitivity > p { margin: 12px 0 0; color: var(--muted); font-size: 9px; }
@@ -1080,7 +1107,7 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
 @keyframes focus-pill-right { 0% { transform: translateX(0) scale(1); } 20% { transform: translateX(0) scale(1.04); } 72% { transform: translateX(calc(100% + 12px)) scale(1.04); } 100% { transform: translateX(calc(100% + 12px)) scale(1); } }
 @keyframes focus-pill-left { 0% { transform: translateX(calc(100% + 12px)) scale(1); } 20% { transform: translateX(calc(100% + 12px)) scale(1.04); } 72% { transform: translateX(0) scale(1.04); } 100% { transform: translateX(0) scale(1); } }
 @keyframes focus-tab-pop { 0%,100% { transform: scale(1); } 24%,70% { transform: scale(1.025); } }
-.portfolio-totals, .portfolio-main, .account-grid, .analytics-kpis, .analytics-main, .analytics-secondary, .dna-card, .risk-overview, .risk-kpis, .risk-main-grid, .risk-simulator, .risk-correlation-grid, .drawdown-pulse, .risk-protections-grid, .monte-carlo-lab, .risk-bottom-grid, .operations-kpis, .flow-card, .ledger-card, .focus-kpis, .focus-workspace, .focus-pattern, .hybrid-overview, .hybrid-ledger, .lab-canvas, .lab-results, .lab-main-grid, .lab-oos, .lab-sensitivity, .lab-next, .lab-vault { animation: surface-in .38s cubic-bezier(.2,.8,.2,1) both; }
+.portfolio-totals, .portfolio-main, .account-grid, .analytics-kpis, .analytics-main, .analytics-secondary, .dna-card, .risk-overview, .risk-kpis, .risk-main-grid, .risk-simulator, .risk-correlation-grid, .drawdown-pulse, .risk-protections-grid, .monte-carlo-lab, .risk-bottom-grid, .operations-kpis, .flow-card, .ledger-card, .focus-kpis, .focus-workspace, .focus-pattern, .hybrid-overview, .hybrid-ledger, .lab-canvas, .lab-results, .lab-main-grid, .lab-oos, .lab-friction, .lab-sensitivity, .lab-next, .lab-vault { animation: surface-in .38s cubic-bezier(.2,.8,.2,1) both; }
 .portfolio-main, .analytics-main, .risk-kpis, .focus-workspace { animation-delay: .035s; }
 .account-grid, .analytics-secondary, .dna-card, .risk-main-grid, .risk-bottom-grid { animation-delay: .07s; }
 .flow-card, .focus-workspace { animation-delay: .035s; }
@@ -1121,6 +1148,7 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
   .lab-experiments button.active:hover { transform: translateY(-3px) scale(1.008); }
   .lab-next button:hover { transform: translateY(-1px); border-color: rgba(86,217,202,.4); box-shadow: 0 8px 24px rgba(86,217,202,.07); }
   .lab-parameter button:hover, .lab-sensitivity button:hover { color: var(--text); border-color: rgba(157,139,255,.26); background: rgba(157,139,255,.07); }
+  .lab-friction-profiles button:hover { transform: translateY(-2px); border-color: rgba(157,139,255,.28); background: rgba(157,139,255,.06); }
   .lab-vault-list article > button:hover { color: var(--red); border-color: rgba(255,111,125,.25); background: rgba(255,111,125,.06); }
 }
 .negative-surface { background: radial-gradient(circle at 100% 0%, rgba(255,111,125,.11), transparent 58%), linear-gradient(145deg, rgba(30,21,28,.9), rgba(16,17,24,.8)); border-color: rgba(255,111,125,.22); box-shadow: inset 0 1px rgba(255,170,178,.025), 0 18px 60px rgba(70,6,18,.09); }
@@ -1160,6 +1188,7 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
   .lab-main-grid { grid-template-columns: 1fr; }
   .lab-oos-flow { grid-template-columns: 1fr 26px 1fr; }
   .lab-oos-verdict { grid-column: 1 / -1; }
+  .lab-friction-grid { grid-template-columns: 1fr; }
   .lab-vault-list { grid-template-columns: 1fr; }
 }
 
@@ -1196,6 +1225,7 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
   .lab-experiments { grid-template-columns: 1fr; }
   .lab-experiments button { min-height: 82px; }
   .lab-oos-head { flex-direction: column; }
+  .lab-friction-profiles { grid-template-columns: repeat(3,1fr); }
   .lab-rule { align-items: flex-start; flex-wrap: wrap; }
   .lab-parameter { width: 100%; margin-left: 28px; grid-template-columns: repeat(3,1fr); }
   .lab-controls { grid-template-columns: 1fr 1fr; }
@@ -1356,6 +1386,14 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
   .lab-next button { width: 100%; min-height: 44px; justify-content: center; }
   .lab-sensitivity, .lab-vault { padding: 18px; }
   .lab-oos { padding: 18px; }
+  .lab-friction { padding: 18px; }
+  .lab-friction-head { flex-direction: column; }
+  .lab-friction-head > span { text-align: left; }
+  .lab-friction-profiles { grid-template-columns: 1fr; }
+  .lab-friction-profiles button { min-height: 84px; grid-template-columns: 1fr auto; grid-template-rows: 1fr auto; }
+  .lab-friction-profiles button > strong { grid-column: 2; grid-row: 1; align-self: start; }
+  .lab-friction-profiles button > i { grid-column: 1 / -1; }
+  .lab-friction-result dl { grid-template-columns: 1fr; }
   .lab-oos-flow { grid-template-columns: 1fr; }
   .lab-oos-flow > svg { transform: rotate(90deg); }
   .lab-oos-verdict { grid-column: auto; }

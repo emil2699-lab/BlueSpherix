@@ -12,12 +12,21 @@ type Risk = 0.25 | 0.5 | 1;
 type SessionFocus = DemoTrade["session"];
 type QualityGate = "plan" | "mae" | "both";
 type Capture = 10 | 22 | 35;
+type FrictionId = "normal" | "spread" | "slippage" | "delay" | "combined";
 type SavedExperiment = { id: number; title: string; parameter: string; net: number; factor: number; verdict: string };
 
 const experiments = [
   { id: "session" as const, icon: Layers3, title: "Session focus", caption: "Isola una sessione e misura il suo edge." },
   { id: "discipline" as const, icon: ShieldCheck, title: "Quality gate", caption: "Misura il costo delle deviazioni operative." },
   { id: "exit" as const, icon: WandSparkles, title: "Uscita adattiva", caption: "Recupera parte del movimento lasciato al mercato." },
+];
+
+const frictionProfiles = [
+  { id: "normal" as const, label: "Normale", detail: "Esecuzione storica" },
+  { id: "spread" as const, label: "Spread ×2", detail: "Costo spread raddoppiato" },
+  { id: "slippage" as const, label: "Slippage", detail: "0,05R per ingresso" },
+  { id: "delay" as const, label: "Uscita lenta", detail: "−10% sui trade positivi" },
+  { id: "combined" as const, label: "Stress totale", detail: "Tutte le frizioni insieme" },
 ];
 
 const money = (value: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
@@ -40,6 +49,15 @@ function selectedTrades(trades: DemoTrade[], experiment: ExperimentId, session: 
     return trade.planAligned && controlledMae;
   });
   return trades;
+}
+
+function applyFriction(trade: DemoTrade, result: number, profile: FrictionId) {
+  if (profile === "normal") return result;
+  let stressed = result;
+  if (profile === "spread" || profile === "combined") stressed -= Math.abs(trade.commission);
+  if (profile === "slippage" || profile === "combined") stressed -= trade.riskUsd * .05;
+  if ((profile === "delay" || profile === "combined") && stressed > 0) stressed *= .9;
+  return stressed;
 }
 
 function stats(trades: DemoTrade[], results: number[]) {
@@ -85,6 +103,7 @@ export default function Lab() {
   const [sessionFocus, setSessionFocus] = useState<SessionFocus>("Londra");
   const [qualityGate, setQualityGate] = useState<QualityGate>("plan");
   const [capture, setCapture] = useState<Capture>(22);
+  const [friction, setFriction] = useState<FrictionId>("combined");
   const [savedExperiments, setSavedExperiments] = useState<SavedExperiment[]>([]);
   const current = experiments.find(item => item.id === experiment) ?? experiments[2];
   const parameterLabel = experiment === "session" ? sessionFocus : experiment === "discipline" ? ({ plan: "Piano", mae: "MAE ≤ 0,75R", both: "Entrambi" } as const)[qualityGate] : `${capture}% MFE`;
@@ -102,6 +121,10 @@ export default function Lab() {
     const simulatedResults = simulatedTrades.map(trade => scenarioResult(trade, experiment, includeCosts, capture) * scale);
     const baseline = stats(baseTrades, baselineResults);
     const simulation = stats(simulatedTrades, simulatedResults);
+    const frictionResults = frictionProfiles.map(profile => ({
+      ...profile,
+      stats: stats(simulatedTrades, simulatedResults.map((result, index) => applyFriction(simulatedTrades[index], result, profile.id))),
+    }));
     const splitIndex = Math.max(1, Math.floor(baseTrades.length * .7));
     const trainBase = baseTrades.slice(0, splitIndex);
     const testBase = baseTrades.slice(splitIndex);
@@ -119,7 +142,7 @@ export default function Lab() {
       const scenarioNet = sum(foldScenario.map(trade => scenarioResult(trade, experiment, includeCosts, capture) * scale));
       return { label: `F${index + 1}`, delta: scenarioNet - baseNet, positive: scenarioNet > 0 };
     });
-    return { baseline, simulation, baselineResults, simulatedResults, folds, validation, coverage: simulatedTrades.length / Math.max(1, baseTrades.length) * 100 };
+    return { baseline, simulation, baselineResults, simulatedResults, frictionResults, folds, validation, coverage: simulatedTrades.length / Math.max(1, baseTrades.length) * 100 };
   }, [capture, experiment, includeCosts, qualityGate, risk, sample, sessionFocus]);
 
   const netDelta = analysis.simulation.net - analysis.baseline.net;
@@ -139,6 +162,10 @@ export default function Lab() {
   });
   const factorDegradation = analysis.validation.train.factor ? (analysis.validation.test.factor - analysis.validation.train.factor) / analysis.validation.train.factor * 100 : 0;
   const oosPassed = analysis.validation.test.factor >= 1.2 && factorDegradation >= -35 && analysis.validation.test.trades >= 12;
+  const selectedFriction = analysis.frictionResults.find(item => item.id === friction) ?? analysis.frictionResults[4];
+  const frictionLoss = selectedFriction.stats.net - analysis.simulation.net;
+  const breakEvenCost = analysis.simulation.trades ? analysis.simulation.net / analysis.simulation.trades : 0;
+  const frictionPassed = selectedFriction.stats.factor >= 1.15 && selectedFriction.stats.net > 0;
   const saveExperiment = () => setSavedExperiments(items => [{ id: Date.now(), title: current.title, parameter: `${parameterLabel} · ${sample} · rischio ${risk.toLocaleString("it-IT")}%`, net: analysis.simulation.net, factor: analysis.simulation.factor, verdict }, ...items].slice(0, 4));
 
   return <div className="lab-view">
@@ -185,6 +212,14 @@ export default function Lab() {
         <GitCompareArrows size={20} />
         <article><span>02 · Dati bloccati</span><strong>{analysis.validation.test.factor.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PF</strong><small>{analysis.validation.test.trades} trade · <b data-sign={valueSign(analysis.validation.test.net)}>{money(analysis.validation.test.net)}</b></small><i style={{ width: `${clamp(analysis.validation.test.factor / 2.5 * 100, 8, 100)}%` }} /></article>
         <div className="lab-oos-verdict"><span>{oosPassed ? <Check size={17} /> : <CircleGauge size={17} />}</span><div><small>Degrado del profit factor</small><strong data-sign={valueSign(factorDegradation)}>{factorDegradation > 0 ? "+" : ""}{factorDegradation.toLocaleString("it-IT", { maximumFractionDigits: 1 })}%</strong><p>{oosPassed ? "Gate superato: il vantaggio resta utilizzabile sui dati isolati." : "Gate non superato: amplia il campione o riduci la complessità della regola."}</p></div></div>
+      </div>
+    </section>
+
+    <section className={`lab-friction glass-card ${frictionPassed ? "passed" : "failed"}`}>
+      <div className="lab-friction-head"><div><p className="eyebrow">Execution Friction Test</p><h2>Quanto margine resta quando l’esecuzione peggiora?</h2><p>Applica costi e inefficienze dopo il segnale, senza cambiare la logica dell’ipotesi.</p></div><span>{money(breakEvenCost)}<small>costo extra medio di pareggio</small></span></div>
+      <div className="lab-friction-grid">
+        <div className="lab-friction-profiles" role="tablist" aria-label="Scenario di frizione">{analysis.frictionResults.map(profile => <button role="tab" aria-selected={friction === profile.id} className={friction === profile.id ? "active" : ""} key={profile.id} onClick={() => setFriction(profile.id)}><span>{profile.label}<small>{profile.detail}</small></span><strong data-sign={valueSign(profile.stats.net)}>{money(profile.stats.net)}</strong><i><b style={{ width: `${clamp(Math.abs(profile.stats.net) / Math.max(1, Math.abs(analysis.simulation.net)) * 100, 3, 100)}%` }} /></i></button>)}</div>
+        <aside className="lab-friction-result"><div className={frictionPassed ? "positive" : "negative"}><CircleGauge size={19} /></div><p className="eyebrow">Scenario selezionato</p><h3>{selectedFriction.label}</h3><dl><div><dt>Profit factor</dt><dd>{selectedFriction.stats.factor.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd></div><div><dt>Impatto netto</dt><dd data-sign={valueSign(frictionLoss)}>{frictionLoss > 0 ? "+" : ""}{money(frictionLoss)}</dd></div><div><dt>Drawdown</dt><dd data-sign={valueSign(-selectedFriction.stats.drawdown)}>{selectedFriction.stats.drawdown.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%</dd></div></dl><p>{frictionPassed ? "L’edge resta positivo anche con questa qualità di esecuzione." : "La frizione assorbe troppo margine: l’ipotesi richiede esecuzione più precisa o un edge maggiore."}</p></aside>
       </div>
     </section>
 
