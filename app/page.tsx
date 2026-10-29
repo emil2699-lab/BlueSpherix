@@ -71,7 +71,6 @@ function orbitalNodeStyle(pressure: number, startAngle: number, sweep: number, r
   return {
     "--node-x": `${(Math.cos(angle) * radius).toFixed(1)}px`,
     "--node-y": `${(Math.sin(angle) * radius).toFixed(1)}px`,
-    "--node-strength": normalized.toFixed(3),
     "--node-scale": (0.88 + normalized * 0.28).toFixed(3),
     "--node-glow": `${(5 + normalized * 12).toFixed(1)}px`,
   } as CSSProperties;
@@ -222,13 +221,18 @@ export default function Home() {
             <article className="today-risk-card glass-card">
               <div className="section-head"><div><p className="eyebrow">Stato del rischio</p><h2>{riskState}</h2></div><span className={`status-badge ${riskUsed >= 80 ? "warning" : ""}`}><i /> {riskUsed >= 80 ? "Budget quasi pieno" : "Sotto controllo"}</span></div>
               <div className="today-risk-sphere" style={{ "--today-risk-score": `${ALPHA_ACCOUNT.riskScore * 3.6}deg` } as CSSProperties} aria-label={`Indice di rischio ${ALPHA_ACCOUNT.riskScore} su 100`}>
-                <div className="today-risk-orbit orbit-outer" /><div className="today-risk-orbit orbit-inner" />
+                <div className="today-risk-orbit orbit-outer" /><div className="today-risk-orbit orbit-middle" /><div className="today-risk-orbit orbit-inner" />
                 <div className="today-risk-core"><div><strong>{ALPHA_ACCOUNT.riskScore}</strong><span>su 100</span></div></div>
-                <span className="today-risk-node node-margin" style={orbitalNodeStyle(marginPressure, 205, 42)} aria-label={`Margine utilizzato ${ALPHA_ACCOUNT.marginUsage.toLocaleString("it-IT")} percento su una soglia del 20 percento`}><i /><span><b>Margine</b><small>{ALPHA_ACCOUNT.marginUsage.toLocaleString("it-IT")}% / 20%</small></span></span>
-                <span className="today-risk-node node-open-risk" style={orbitalNodeStyle(riskUsed / 100, 305, 42)} aria-label={`Rischio aperto ${ALPHA_ACCOUNT.activeRisk.toLocaleString("it-IT")} percento su un limite di ${ALPHA_ACCOUNT.riskLimit.toLocaleString("it-IT")} percento`}><i /><span><b>Rischio aperto</b><small>{ALPHA_ACCOUNT.activeRisk.toLocaleString("it-IT")}% / {ALPHA_ACCOUNT.riskLimit.toLocaleString("it-IT")}%</small></span></span>
-                <span className="today-risk-node node-drawdown" style={orbitalNodeStyle(drawdownPressure, 108, 42)} aria-label={`Drawdown corrente ${ALPHA_ACCOUNT.currentDrawdown.toLocaleString("it-IT")} percento su una soglia dell’8 percento`}><i /><span><b>Drawdown</b><small>{ALPHA_ACCOUNT.currentDrawdown.toLocaleString("it-IT")}% / 8%</small></span></span>
+                <i className="today-risk-node node-margin" style={orbitalNodeStyle(marginPressure, 205, 42, 88)} aria-hidden="true" />
+                <i className="today-risk-node node-open-risk" style={orbitalNodeStyle(riskUsed / 100, 305, 42, 69)} aria-hidden="true" />
+                <i className="today-risk-node node-drawdown" style={orbitalNodeStyle(drawdownPressure, 108, 42, 50)} aria-hidden="true" />
               </div>
-              <p className="today-risk-copy">Ogni punto avanza nel proprio tratto d’orbita e aumenta il bagliore mentre si avvicina alla soglia. Il rischio aperto è ora il fattore dominante.</p>
+              <dl className="today-risk-legend" aria-label="Pressioni che compongono lo stato del rischio">
+                <div className="margin"><dt><i /> Margine</dt><dd>{ALPHA_ACCOUNT.marginUsage.toLocaleString("it-IT")}% <span>su 20%</span></dd></div>
+                <div className="open-risk"><dt><i /> Rischio aperto</dt><dd>{ALPHA_ACCOUNT.activeRisk.toLocaleString("it-IT")}% <span>su {ALPHA_ACCOUNT.riskLimit.toLocaleString("it-IT")}%</span></dd></div>
+                <div className="drawdown"><dt><i /> Drawdown</dt><dd>{ALPHA_ACCOUNT.currentDrawdown.toLocaleString("it-IT")}% <span>su 8%</span></dd></div>
+              </dl>
+              <p className="today-risk-copy">I punti avanzano lungo la propria orbita mentre il dato si avvicina alla soglia.</p>
               <button className="text-action" onClick={() => goTo("risk")}>Apri Risk Center <ArrowRight size={15} /></button>
             </article>
           </section>
