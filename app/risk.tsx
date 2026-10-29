@@ -9,10 +9,12 @@ type StressScenario = "stop" | "volatility" | "gap";
 type CorrelationId = "eur-xau" | "eur-gbp" | "xau-gbp";
 type DrawdownRange = "7G" | "30G" | "90G";
 type ProtectionId = "daily-loss" | "loss-streak" | "margin" | "news";
+type MonteCarloHorizon = 20 | 40 | 80;
 
 const money = (value: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value);
 const signedMoney = (value: number) => `${value > 0 ? "+" : ""}${money(value)}`;
 const percent = (value: number, digits = 2) => `${value.toLocaleString("it-IT", { minimumFractionDigits: digits, maximumFractionDigits: digits })}%`;
+const signedPercent = (value: number, digits = 2) => `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(value).toLocaleString("it-IT", { minimumFractionDigits: digits, maximumFractionDigits: digits })}%`;
 
 const scenarios = {
   stop: { label: "Stop simultanei", multiplier: 1, detail: "Tutte le posizioni raggiungono lo stop previsto." },
@@ -32,6 +34,47 @@ const drawdownRanges = {
   "30G": { days: 30, series: DEMO_EQUITY_SERIES["1M"] },
   "90G": { days: 90, series: DEMO_EQUITY_SERIES["3M"] },
 } satisfies Record<DrawdownRange, { days: number; series: number[] }>;
+
+const historicalRMultiples = DEMO_TRADES.filter(trade => trade.status === "Chiusa").map(trade => trade.rMultiple);
+
+function percentile(sorted: number[], position: number) {
+  return sorted[Math.min(sorted.length - 1, Math.max(0, Math.round((sorted.length - 1) * position)))] ?? 0;
+}
+
+function runMonteCarlo(riskPct: number, horizon: MonteCarloHorizon, pathCount = 500) {
+  let seed = 421337;
+  const random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+  const paths: number[][] = [];
+  const maxDrawdowns: number[] = [];
+  for (let pathIndex = 0; pathIndex < pathCount; pathIndex += 1) {
+    let equity = 100;
+    let peak = equity;
+    let maxDrawdown = 0;
+    const path = [equity];
+    for (let tradeIndex = 0; tradeIndex < horizon; tradeIndex += 1) {
+      const sampledR = historicalRMultiples[Math.floor(random() * historicalRMultiples.length)] ?? 0;
+      equity *= Math.max(.01, 1 + sampledR * riskPct / 100);
+      peak = Math.max(peak, equity);
+      maxDrawdown = Math.max(maxDrawdown, (peak - equity) / peak * 100);
+      path.push(equity);
+    }
+    paths.push(path);
+    maxDrawdowns.push(maxDrawdown);
+  }
+  const bands = Array.from({ length: horizon + 1 }, (_, index) => {
+    const values = paths.map(path => path[index]).sort((a, b) => a - b);
+    return { p10: percentile(values, .1), p50: percentile(values, .5), p90: percentile(values, .9) };
+  });
+  const endingReturns = paths.map(path => (path.at(-1) ?? 100) - 100).sort((a, b) => a - b);
+  const sortedDrawdowns = [...maxDrawdowns].sort((a, b) => a - b);
+  return {
+    bands,
+    medianReturn: percentile(endingReturns, .5),
+    negativeProbability: endingReturns.filter(value => value < 0).length / pathCount * 100,
+    severeDrawdownProbability: maxDrawdowns.filter(value => value >= 10).length / pathCount * 100,
+    stressDrawdown: percentile(sortedDrawdowns, .9),
+  };
+}
 
 function drawdownFrom(values: number[]) {
   let peak = values[0] ?? 0;
@@ -56,6 +99,8 @@ export default function Risk() {
   const [drawdownRange, setDrawdownRange] = useState<DrawdownRange>("30G");
   const [drawdownPoint, setDrawdownPoint] = useState(drawdownRanges["30G"].series.length - 1);
   const [protections, setProtections] = useState<Record<ProtectionId, boolean>>({ "daily-loss": true, "loss-streak": true, margin: true, news: true });
+  const [monteCarloRisk, setMonteCarloRisk] = useState(.5);
+  const [monteCarloHorizon, setMonteCarloHorizon] = useState<MonteCarloHorizon>(40);
   const openRisk = useMemo(() => OPEN_TRADES.reduce((total, trade) => total + trade.riskUsd, 0), []);
   const budgetUsd = ALPHA_ACCOUNT.equity * ALPHA_ACCOUNT.riskLimit / 100;
   const budgetUsed = openRisk / budgetUsd * 100;
@@ -109,6 +154,18 @@ export default function Risk() {
   ];
   const activeProtectionCount = protectionRules.filter(rule => protections[rule.id]).length;
   const triggeredProtections = protectionRules.filter(rule => protections[rule.id] && rule.triggered);
+  const monteCarlo = useMemo(() => runMonteCarlo(monteCarloRisk, monteCarloHorizon), [monteCarloRisk, monteCarloHorizon]);
+  const monteCarloMin = Math.min(...monteCarlo.bands.map(point => point.p10));
+  const monteCarloMax = Math.max(...monteCarlo.bands.map(point => point.p90));
+  const monteCarloSpan = Math.max(1, monteCarloMax - monteCarloMin);
+  const monteCarloPoint = (value: number, index: number) => ({ x: 24 + index / monteCarloHorizon * 752, y: 202 - (value - monteCarloMin) / monteCarloSpan * 176 });
+  const monteCarloUpper = monteCarlo.bands.map((point, index) => monteCarloPoint(point.p90, index));
+  const monteCarloMedian = monteCarlo.bands.map((point, index) => monteCarloPoint(point.p50, index));
+  const monteCarloLower = monteCarlo.bands.map((point, index) => monteCarloPoint(point.p10, index));
+  const monteCarloArea = `${monteCarloUpper.map((point, index) => `${index ? "L" : "M"}${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ")} ${[...monteCarloLower].reverse().map(point => `L${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ")} Z`;
+  const monteCarloMedianPath = monteCarloMedian.map((point, index) => `${index ? "L" : "M"}${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
+  const monteCarloBaseY = monteCarloPoint(100, 0).y;
+  const monteCarloTone = monteCarlo.severeDrawdownProbability >= 5 ? "critical" : monteCarlo.severeDrawdownProbability > 0 ? "warning" : "calm";
 
   return <div className="risk-view">
     <section className="welcome">
@@ -255,6 +312,38 @@ export default function Risk() {
         <p>{triggeredProtections.length ? `La regola “${triggeredProtections[0].label}” richiede attenzione prima della prossima operazione.` : "Le protezioni attive non rilevano condizioni critiche in questo momento."}</p>
         <div className={`protection-alert ${triggeredProtections.length ? "critical" : "calm"}`}>{triggeredProtections.length ? <ShieldAlert size={16} /> : <CheckCircle2 size={16} />}<span><strong>{triggeredProtections.length ? triggeredProtections[0].value : "Conto monitorato"}</strong><small>{triggeredProtections.length ? "Valuta una pausa e rivedi le ultime esecuzioni." : "Gli avvisi restano attivi in background."}</small></span></div>
         <small className="read-only-note"><ShieldCheck size={12} /> Modalità sola lettura · nessuna azione automatica su MT5</small>
+      </aside>
+    </section>
+
+    <section className={`glass-card monte-carlo-lab risk-${monteCarloTone}`} aria-labelledby="monte-carlo-title">
+      <div className="monte-carlo-main">
+        <div className="section-head monte-carlo-head"><div><p className="eyebrow">Monte Carlo lab</p><h2 id="monte-carlo-title">Cinquecento futuri possibili, partendo dal tuo storico.</h2></div><span className="portfolio-caption">{historicalRMultiples.length} trade chiusi · risultati in R</span></div>
+        <div className="monte-carlo-controls">
+          <div><span>Rischio per trade</span><div className="monte-carlo-switch">{[.25, .5, 1].map(value => <button key={value} className={monteCarloRisk === value ? "active" : ""} aria-pressed={monteCarloRisk === value} onClick={() => setMonteCarloRisk(value)}>{percent(value)}</button>)}</div></div>
+          <div><span>Orizzonte</span><div className="monte-carlo-switch">{([20, 40, 80] as MonteCarloHorizon[]).map(value => <button key={value} className={monteCarloHorizon === value ? "active" : ""} aria-pressed={monteCarloHorizon === value} onClick={() => setMonteCarloHorizon(value)}>{value} trade</button>)}</div></div>
+        </div>
+        <div className="monte-carlo-chart" aria-label={`Distribuzione di 500 simulazioni su ${monteCarloHorizon} trade`}>
+          <svg viewBox="0 0 800 230" role="img">
+            <defs><linearGradient id="monteCarloFan" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#56d9ca" stopOpacity=".22" /><stop offset="48%" stopColor="#9d8bff" stopOpacity=".12" /><stop offset="100%" stopColor="#ff6f7d" stopOpacity=".2" /></linearGradient></defs>
+            <line x1="24" x2="776" y1={monteCarloBaseY} y2={monteCarloBaseY} className="monte-carlo-baseline" />
+            <path d={monteCarloArea} fill="url(#monteCarloFan)" className="monte-carlo-area" />
+            <path d={monteCarloMedianPath} className="monte-carlo-median" />
+            <circle cx={monteCarloMedian.at(-1)?.x ?? 776} cy={monteCarloMedian.at(-1)?.y ?? monteCarloBaseY} r="5" className="monte-carlo-dot" />
+            <text x="20" y="18" className="monte-carlo-y-label">{signedPercent(monteCarloMax - 100)}</text>
+            <text x="20" y="218" className="monte-carlo-y-label">{signedPercent(monteCarloMin - 100)}</text>
+          </svg>
+          <div className="monte-carlo-axis"><span>Oggi</span><span>{Math.round(monteCarloHorizon / 2)} trade</span><span>{monteCarloHorizon} trade</span></div>
+          <div className="monte-carlo-legend"><span><i className="range" />80% degli scenari</span><span><i className="median" />Percorso mediano</span><strong>Capitale iniziale = 100</strong></div>
+        </div>
+      </div>
+
+      <aside className={`monte-carlo-readout ${monteCarloTone}`} aria-live="polite">
+        <span className="monte-carlo-badge">500 scenari</span>
+        <p>Rendimento mediano</p>
+        <strong data-sign={valueSign(monteCarlo.medianReturn)}>{signedPercent(monteCarlo.medianReturn)}</strong>
+        <dl><div><dt>Chiusura in perdita</dt><dd>{percent(monteCarlo.negativeProbability, 1)}</dd></div><div><dt>Drawdown ≥ 10%</dt><dd>{percent(monteCarlo.severeDrawdownProbability, 1)}</dd></div><div><dt>Drawdown stress · P90</dt><dd>{percent(monteCarlo.stressDrawdown, 2)}</dd></div><div><dt>Rischio per trade</dt><dd>{percent(monteCarloRisk)}</dd></div></dl>
+        <div className="monte-carlo-message"><Sparkles size={16} /><p>{monteCarloTone === "critical" ? "La coda di rischio è significativa. Ridurre la size comprime il ventaglio dei risultati e i drawdown estremi." : monteCarloTone === "warning" ? "Una parte degli scenari supera il 10% di drawdown. Valuta una size inferiore prima di aumentare l’orizzonte." : "Nelle simulazioni la coda di drawdown resta sotto il 10%, ma gli esiti negativi rimangono possibili."}</p></div>
+        <small><ShieldCheck size={12} /> Simulazione statistica dimostrativa: descrive una distribuzione, non una previsione.</small>
       </aside>
     </section>
 
