@@ -1,11 +1,12 @@
 "use client";
 
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
-import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, CheckCircle2, Crosshair, Gauge, Layers3, Plus, ShieldAlert, ShieldCheck, Sparkles, Target, TrendingDown } from "lucide-react";
+import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, CheckCircle2, Crosshair, Gauge, Layers3, Network, Plus, ShieldAlert, ShieldCheck, Sparkles, Target, TrendingDown } from "lucide-react";
 import { ALPHA_ACCOUNT, OPEN_TRADES, type DemoTrade } from "./demo-data";
 import { valueSign } from "./value-sign";
 
 type StressScenario = "stop" | "volatility" | "gap";
+type CorrelationId = "eur-xau" | "eur-gbp" | "xau-gbp";
 
 const money = (value: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value);
 const signedMoney = (value: number) => `${value > 0 ? "+" : ""}${money(value)}`;
@@ -17,10 +18,18 @@ const scenarios = {
   gap: { label: "Gap severo", multiplier: 2.2, detail: "Apertura oltre gli stop con perdita teorica maggiorata." },
 } satisfies Record<StressScenario, { label: string; multiplier: number; detail: string }>;
 
+const correlationSymbols = ["EURUSD", "XAUUSD", "GBPJPY"] as const;
+const correlationPairs = [
+  { id: "eur-xau", left: "EURUSD", right: "XAUUSD", value: .72, label: "Cluster USD", detail: "Le due posizioni tendono a reagire insieme alla debolezza del dollaro. Il rischio nominale separato può quindi comportarsi come un’unica esposizione più grande." },
+  { id: "eur-gbp", left: "EURUSD", right: "GBPJPY", value: .18, label: "Legame debole", detail: "La relazione è contenuta: le due posizioni condividono poco movimento e aggiungono una diversificazione moderata." },
+  { id: "xau-gbp", left: "XAUUSD", right: "GBPJPY", value: -.12, label: "Relazione inversa", detail: "I movimenti recenti sono lievemente opposti. L’effetto diversificante esiste, ma non è abbastanza stabile per compensare un eccesso di rischio." },
+] as const;
+
 export default function Risk() {
   const [scenario, setScenario] = useState<StressScenario>("stop");
   const [selectedId, setSelectedId] = useState(OPEN_TRADES[0]?.id ?? "");
   const [candidateRiskPct, setCandidateRiskPct] = useState(.1);
+  const [correlationId, setCorrelationId] = useState<CorrelationId>("eur-xau");
   const openRisk = useMemo(() => OPEN_TRADES.reduce((total, trade) => total + trade.riskUsd, 0), []);
   const budgetUsd = ALPHA_ACCOUNT.equity * ALPHA_ACCOUNT.riskLimit / 100;
   const budgetUsed = openRisk / budgetUsd * 100;
@@ -41,6 +50,11 @@ export default function Risk() {
   const bufferAfterTrade = budgetUsd - projectedOpenRisk;
   const simulatorTone = projectedBudgetUsed <= 80 ? "calm" : projectedBudgetUsed <= 100 ? "warning" : "critical";
   const tradeFits = bufferAfterTrade >= 0;
+  const selectedCorrelation = correlationPairs.find(pair => pair.id === correlationId) ?? correlationPairs[0];
+  const correlatedTrades = OPEN_TRADES.filter(trade => trade.symbol === selectedCorrelation.left || trade.symbol === selectedCorrelation.right);
+  const correlatedRisk = correlatedTrades.reduce((total, trade) => total + trade.riskUsd, 0);
+  const correlatedShare = correlatedRisk / openRisk * 100;
+  const correlationTone = Math.abs(selectedCorrelation.value) >= .65 ? "critical" : Math.abs(selectedCorrelation.value) >= .35 ? "warning" : "calm";
 
   return <div className="risk-view">
     <section className="welcome">
@@ -119,10 +133,47 @@ export default function Risk() {
       </div>
     </section>
 
+    <section className="risk-correlation-grid">
+      <article className="glass-card correlation-card">
+        <div className="section-head"><div><p className="eyebrow">Correlazioni · 30 giorni</p><h2>Quando tre trade diventano una sola esposizione.</h2></div><Network size={20} /></div>
+        <p className="correlation-intro">Seleziona una relazione. Più il colore è intenso, più i due strumenti tendono a muoversi insieme.</p>
+        <CorrelationMatrix selectedId={correlationId} onSelect={setCorrelationId} />
+        <div className="correlation-legend"><span><i className="inverse" />Inversa</span><span><i className="low" />Debole</span><span><i className="high" />Forte</span></div>
+      </article>
+
+      <aside className={`glass-card correlation-insight ${correlationTone}`} aria-live="polite">
+        <div className="correlation-pair"><span>{selectedCorrelation.left.slice(0, 2)}</span><i /><span>{selectedCorrelation.right.slice(0, 2)}</span></div>
+        <p className="eyebrow">Relazione selezionata</p>
+        <h2>{selectedCorrelation.label}</h2>
+        <div className="correlation-coefficient"><span>Coefficiente</span><strong data-sign={selectedCorrelation.value < 0 ? "negative" : undefined}>{selectedCorrelation.value > 0 ? "+" : "−"}{Math.abs(selectedCorrelation.value).toLocaleString("it-IT", { minimumFractionDigits: 2 })}</strong></div>
+        <dl><div><dt>Rischio combinato</dt><dd>{money(correlatedRisk)}</dd></div><div><dt>Peso sul rischio aperto</dt><dd>{percent(correlatedShare, 1)}</dd></div><div><dt>Posizioni coinvolte</dt><dd>{correlatedTrades.length}</dd></div></dl>
+        <p>{selectedCorrelation.detail}</p>
+        <small><ShieldAlert size={13} /> La correlazione descrive il comportamento recente, non garantisce quello futuro.</small>
+      </aside>
+    </section>
+
     <section className="risk-bottom-grid">
       <article className="glass-card limits-card"><div className="section-head"><div><p className="eyebrow">Guardrail</p><h2>Limiti operativi.</h2></div><Target size={19} /></div><div className="limit-list"><LimitRow label="Rischio complessivo" current={ALPHA_ACCOUNT.activeRisk} limit={ALPHA_ACCOUNT.riskLimit} /><LimitRow label="Drawdown corrente" current={ALPHA_ACCOUNT.currentDrawdown} limit={8} /><LimitRow label="Margine utilizzato" current={ALPHA_ACCOUNT.marginUsage} limit={20} /></div></article>
       <article className="glass-card risk-insight"><Sparkles size={20} /><div><p className="eyebrow">Spherix guard</p><h2>Il rischio è moderato, ma il {percent(budgetUsed, 0)} del budget è già impegnato.</h2><p>Una nuova posizione delle dimensioni medie attuali supererebbe il limite di {percent(ALPHA_ACCOUNT.riskLimit, 1)}. Riduci prima l’esposizione o attendi la chiusura di un trade.</p><small><ShieldCheck size={12} /> Basato su {OPEN_TRADES.length} posizioni e {money(openRisk)} di rischio previsto</small></div></article>
     </section>
+  </div>;
+}
+
+function CorrelationMatrix({ selectedId, onSelect }: { selectedId: CorrelationId; onSelect: (id: CorrelationId) => void }) {
+  const pairFor = (left: string, right: string) => correlationPairs.find(pair => (pair.left === left && pair.right === right) || (pair.left === right && pair.right === left));
+  return <div className="correlation-matrix" role="grid" aria-label="Matrice di correlazione tra posizioni aperte">
+    <span />{correlationSymbols.map(symbol => <span className="correlation-axis" key={`head-${symbol}`}>{symbol}</span>)}
+    {correlationSymbols.flatMap(row => [
+      <span className="correlation-axis" key={`row-${row}`}>{row}</span>,
+      ...correlationSymbols.map(column => {
+        if (row === column) return <span className="correlation-cell diagonal" key={`${row}-${column}`}>1,00</span>;
+        const pair = pairFor(row, column);
+        if (!pair) return <span className="correlation-cell" key={`${row}-${column}`}>—</span>;
+        const strength = Math.abs(pair.value);
+        const relation = pair.value < 0 ? "inverse" : strength >= .65 ? "high" : strength >= .35 ? "medium" : "low";
+        return <button role="gridcell" aria-selected={selectedId === pair.id} aria-label={`${row} e ${column}: correlazione ${pair.value.toLocaleString("it-IT")}`} className={`correlation-cell ${relation} ${selectedId === pair.id ? "selected" : ""}`} key={`${row}-${column}`} style={{ "--correlation-strength": strength } as CSSProperties} onClick={() => onSelect(pair.id)} data-sign={pair.value < 0 ? "negative" : undefined}>{pair.value > 0 ? "+" : "−"}{strength.toLocaleString("it-IT", { minimumFractionDigits: 2 })}</button>;
+      }),
+    ])}
   </div>;
 }
 
