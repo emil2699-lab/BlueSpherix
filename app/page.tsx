@@ -181,6 +181,18 @@ export default function Home() {
     target.style.setProperty("--cursor-reflect-opacity", "1");
     activeLightTarget.current = target;
 
+    event.currentTarget.querySelectorAll<HTMLElement>(".glass-card").forEach((nearbyCard) => {
+      if (nearbyCard === target) return;
+      const nearbyBounds = nearbyCard.getBoundingClientRect();
+      const horizontalDistance = Math.max(nearbyBounds.left - event.clientX, 0, event.clientX - nearbyBounds.right);
+      const verticalDistance = Math.max(nearbyBounds.top - event.clientY, 0, event.clientY - nearbyBounds.bottom);
+      const distance = Math.hypot(horizontalDistance, verticalDistance);
+      const strength = Math.max(0, 1 - distance / 460);
+      nearbyCard.style.setProperty("--cursor-reflect-x", `${event.clientX - nearbyBounds.left}px`);
+      nearbyCard.style.setProperty("--cursor-reflect-y", `${event.clientY - nearbyBounds.top}px`);
+      nearbyCard.style.setProperty("--cursor-reflect-opacity", (strength * .52).toFixed(3));
+    });
+
     if (activeDepthTarget.current && activeDepthTarget.current !== card) {
       activeDepthTarget.current.style.setProperty("--cursor-tilt-x", "0deg");
       activeDepthTarget.current.style.setProperty("--cursor-tilt-y", "0deg");
@@ -199,6 +211,7 @@ export default function Home() {
 
   const clearTodayBorderLight = () => {
     activeLightTarget.current?.style.setProperty("--cursor-reflect-opacity", "0");
+    document.querySelectorAll<HTMLElement>(".today-dashboard .glass-card").forEach((card) => card.style.setProperty("--cursor-reflect-opacity", "0"));
     activeDepthTarget.current?.style.setProperty("--cursor-tilt-x", "0deg");
     activeDepthTarget.current?.style.setProperty("--cursor-tilt-y", "0deg");
     activeDepthTarget.current?.style.setProperty("--cursor-depth", "0px");
