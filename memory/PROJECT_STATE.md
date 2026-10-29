@@ -12,6 +12,7 @@ Web app moderna per analisi di trading, ispirata alle funzioni di Myfxbook ma co
 - Anteprima: `https://emil2699-lab.github.io/BlueSpherix/`.
 - Stack: Next.js 16.4.3, React 19.3.1, TypeScript, export statico su GitHub Pages.
 - Sezioni già sviluppate: Dashboard, Portfolio, Analytics, Operazioni, Rischio e Strategy Lab.
+- La sezione Oggi usa ora lo stesso linguaggio visivo delle sezioni recenti: stato live, avviso demo, periodo integrato nel grafico, controllo operativo con budget di rischio e KPI strutturati.
 - La sezione Rischio è completa: budget di rischio, stress test, simulatore pre-trade, correlazioni, drawdown, protezioni, Monte Carlo e guardrail.
 - Strategy Lab include tre ipotesi interattive con parametri specifici, confronto Digital Twin, costi reali, rischio variabile, validazione walk-forward, Out-of-Sample Gate 70/30, Execution Friction Test, Parameter Space con risultati reali e archivio dei benchmark salvati nella sessione.
 

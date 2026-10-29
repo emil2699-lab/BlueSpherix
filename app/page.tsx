@@ -11,6 +11,7 @@ import {
   CalendarDays,
   Command,
   FlaskConical,
+  Gauge,
   LayoutDashboard,
   LineChart,
   LockKeyhole,
@@ -20,11 +21,13 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
+  Target,
+  TrendingUp,
   WalletCards,
   X,
   Zap,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Portfolio from "./portfolio";
 import Analytics from "./analytics";
 import Operations from "./operations";
@@ -99,11 +102,12 @@ function EquityChart({ range }: { range: Range }) {
   );
 }
 
-function MetricCard({ label, value, detail, values, tone = "aqua", signValue }: { label: string; value: string; detail: string; values: number[]; tone?: "aqua" | "violet" | "amber"; signValue?: number }) {
+function MetricCard({ label, value, detail, values, tone = "aqua", signValue, icon }: { label: string; value: string; detail: string; values: number[]; tone?: "aqua" | "violet" | "amber"; signValue?: number; icon: ReactNode }) {
   const color = tone === "violet" ? "#9f8cff" : tone === "amber" ? "#ffb85c" : "#56d9ca";
   return (
-    <article className="metric-card glass-card">
-      <div><p className="eyebrow">{label}</p><strong data-sign={signValue === undefined ? undefined : valueSign(signValue)}>{value}</strong><p className="metric-detail">{detail}</p></div>
+    <article className={`metric-card today-kpi glass-card ${tone}`}>
+      <span className="today-kpi-icon">{icon}</span>
+      <div><p>{label}</p><strong data-sign={signValue === undefined ? undefined : valueSign(signValue)}>{value}</strong><small>{detail}</small></div>
       <MiniChart values={values} color={color} />
     </article>
   );
@@ -135,6 +139,8 @@ export default function Home() {
   const performance = useMemo(() => `${DASHBOARD_RANGE_STATS[range].returnPct >= 0 ? "+" : ""}${DASHBOARD_RANGE_STATS[range].returnPct.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`, [range]);
   const rangeProfit = DASHBOARD_RANGE_STATS[range].net;
   const riskState = ALPHA_ACCOUNT.riskScore < 35 ? "Calmo" : ALPHA_ACCOUNT.riskScore < 65 ? "Moderato" : "Elevato";
+  const riskUsed = ALPHA_ACCOUNT.activeRisk / ALPHA_ACCOUNT.riskLimit * 100;
+  const riskBuffer = Math.max(0, ALPHA_ACCOUNT.riskLimit - ALPHA_ACCOUNT.activeRisk);
 
   const goTo = (target: string) => {
     setView(target);
@@ -184,35 +190,38 @@ export default function Home() {
           {view === "risk" && <Risk />}
           {view === "lab" && <Lab />}
           <div hidden={view === "portfolio" || view === "analytics" || view === "positions" || view === "risk" || view === "lab"}>
-          <section className="welcome" id="overview">
+          <section className="welcome today-welcome" id="overview">
             <div><p className="date-line">Mercoledì, 28 ottobre</p><h1>Buongiorno, Luca.</h1><p>Il portafoglio è stabile. Il rischio è sotto controllo.</p></div>
-            <div className="range-switch" aria-label="Periodo">
-              {(["1W", "1M", "3M", "1Y"] as Range[]).map((item) => <button key={item} className={range === item ? "active" : ""} onClick={() => setRange(item)}>{item}</button>)}
-            </div>
+            <span className={`risk-live-status ${riskUsed < 80 ? "calm" : riskUsed < 100 ? "warning" : "critical"}`}><i /> Dati aggiornati · 28 ott, 18:42</span>
           </section>
 
-          <section className="hero-grid">
+          <div className="demo-notice today-notice"><ShieldCheck size={16} /><span><strong>Riepilogo dimostrativo.</strong> Metriche, posizioni e segnali usano il ledger simulato; il collegamento MT5 aggiornerà questa vista in tempo reale.</span></div>
+
+          <section className="hero-grid today-hero">
             <article className="equity-card glass-card">
-              <div className="card-head">
+              <div className="card-head today-chart-head">
                 <div><p className="eyebrow">Equity totale</p><div className="equity-value"><strong>{money(ALPHA_ACCOUNT.equity)}</strong><span data-sign={valueSign(OPEN_PNL)}>{OPEN_PNL >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />} {signedMoney(OPEN_PNL)} oggi</span></div></div>
-                <div className="legend"><span><i className="equity" /> Equity</span><span><i className="balance" /> Balance</span><button aria-label="Opzioni grafico">•••</button></div>
+                <div className="today-chart-controls"><div className="range-switch" aria-label="Periodo grafico">{(["1W", "1M", "3M", "1Y"] as Range[]).map((item) => <button key={item} aria-pressed={range === item} className={range === item ? "active" : ""} onClick={() => setRange(item)}>{item}</button>)}</div><div className="legend"><span><i className="equity" /> Equity</span><span><i className="balance" /> Balance</span></div></div>
               </div>
               <EquityChart range={range} />
               <div className="chart-summary"><div><span>Rendimento</span><strong data-sign={valueSign(DASHBOARD_RANGE_STATS[range].returnPct)}>{performance}</strong></div><div><span>Profitto netto</span><strong data-sign={valueSign(rangeProfit)}>{money(rangeProfit)}</strong></div><div><span>Data confidence</span><strong className="confidence"><ShieldCheck size={15} /> {DASHBOARD_RANGE_STATS[range].confidence}%</strong></div></div>
             </article>
 
-            <article className="risk-card glass-card">
-              <div className="card-head"><div><p className="eyebrow">Stato del rischio</p><h2>{riskState}</h2></div><span className={`status-badge ${ALPHA_ACCOUNT.activeRisk / ALPHA_ACCOUNT.riskLimit > .8 ? "warning" : ""}`}><i /> {ALPHA_ACCOUNT.activeRisk / ALPHA_ACCOUNT.riskLimit > .8 ? "Budget quasi pieno" : "Sotto controllo"}</span></div>
-              <div className="risk-orbit"><div className="orbit-ring ring-one" /><div className="orbit-ring ring-two" /><div className="orbit-core"><strong>{ALPHA_ACCOUNT.riskScore}</strong><span>/ 100</span></div><span className="risk-label label-a">Margine<br /><b>{ALPHA_ACCOUNT.marginUsage.toLocaleString("it-IT")}%</b></span><span className="risk-label label-b">Rischio<br /><b>{ALPHA_ACCOUNT.activeRisk.toLocaleString("it-IT")}%</b></span><span className="risk-label label-c">Limite<br /><b>{ALPHA_ACCOUNT.riskLimit.toLocaleString("it-IT")}%</b></span></div>
-              <p className="risk-copy">Il rischio aperto è calcolato sulle {positions.length} posizioni correnti e resta entro il limite impostato.</p>
+            <article className={`today-status-card glass-card ${riskUsed >= 80 ? "warning" : ""}`}>
+              <div className="section-head"><div><p className="eyebrow">Controllo operativo</p><h2>{riskState} · {positions.length} posizioni</h2></div><span className="today-status-icon"><Gauge size={19} /></span></div>
+              <p className="today-status-copy">Il budget è vicino al limite, ma nessuna protezione è stata attivata.</p>
+              <div className="today-budget-head"><span>Budget di rischio</span><strong>{riskUsed.toLocaleString("it-IT", { maximumFractionDigits: 1 })}% usato</strong></div>
+              <div className="today-budget-track"><i style={{ width: `${Math.min(100, riskUsed)}%` }} /></div>
+              <div className="today-budget-scale"><span>0%</span><span>Limite {ALPHA_ACCOUNT.riskLimit.toLocaleString("it-IT")}%</span></div>
+              <dl className="today-status-values"><div><dt>Rischio aperto</dt><dd>{ALPHA_ACCOUNT.activeRisk.toLocaleString("it-IT")}%</dd></div><div><dt>Buffer</dt><dd>{riskBuffer.toLocaleString("it-IT", { maximumFractionDigits: 2 })}%</dd></div><div><dt>Uso margine</dt><dd>{ALPHA_ACCOUNT.marginUsage.toLocaleString("it-IT")}%</dd></div></dl>
               <button className="text-action" onClick={() => goTo("risk")}>Apri Risk Center <ArrowRight size={15} /></button>
             </article>
           </section>
 
           <section className="metrics">
-            <MetricCard label="Profitto mensile" value={signedMoney(DEMO_PERIOD_STATS["30G"].net)} detail={`Calcolato su ${DEMO_PERIOD_STATS["30G"].trades} operazioni`} values={DEMO_EQUITY_SERIES["1M"]} signValue={DEMO_PERIOD_STATS["30G"].net} />
-            <MetricCard label="Drawdown massimo" value={`${ALPHA_ACCOUNT.maxDrawdown.toLocaleString("it-IT")}%`} detail={`Drawdown corrente ${ALPHA_ACCOUNT.currentDrawdown.toLocaleString("it-IT")}%`} values={DEMO_BALANCE_SERIES["1Y"]} tone="violet" />
-            <MetricCard label="Profit factor" value={DEMO_PERIOD_STATS["30G"].factor.toLocaleString("it-IT")} detail={`${DEMO_PERIOD_STATS["30G"].wins} vincenti · ${DEMO_PERIOD_STATS["30G"].losses} perdenti`} values={DEMO_PERIOD_STATS["30G"].flow} tone="amber" />
+            <MetricCard icon={<TrendingUp size={17} />} label="Profitto mensile" value={signedMoney(DEMO_PERIOD_STATS["30G"].net)} detail={`${DEMO_PERIOD_STATS["30G"].trades} operazioni chiuse`} values={DEMO_EQUITY_SERIES["1M"]} signValue={DEMO_PERIOD_STATS["30G"].net} />
+            <MetricCard icon={<Activity size={17} />} label="Drawdown massimo" value={`${ALPHA_ACCOUNT.maxDrawdown.toLocaleString("it-IT")}%`} detail={`Corrente ${ALPHA_ACCOUNT.currentDrawdown.toLocaleString("it-IT")}%`} values={DEMO_BALANCE_SERIES["1Y"]} tone="violet" />
+            <MetricCard icon={<Target size={17} />} label="Profit factor" value={DEMO_PERIOD_STATS["30G"].factor.toLocaleString("it-IT")} detail={`${DEMO_PERIOD_STATS["30G"].wins} vincenti · ${DEMO_PERIOD_STATS["30G"].losses} perdenti`} values={DEMO_PERIOD_STATS["30G"].flow} tone="amber" />
           </section>
 
           <section className="lower-grid">

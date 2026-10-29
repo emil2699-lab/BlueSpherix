@@ -124,6 +124,39 @@ nav button b { margin-left: auto; font-size: 8px; color: #091110; background: va
 .metric-card strong { font-size: 20px; letter-spacing: -.6px; font-weight: 620; }
 .metric-detail { font-size: 8px; color: #71808c; margin: 7px 0 0; }
 .mini-chart { width: 95px; height: 38px; opacity: .9; }
+.today-welcome { margin-bottom: 20px; }
+.today-notice { color: #aebbc2; border-color: rgba(86,217,202,.16); background: linear-gradient(90deg,rgba(86,217,202,.065),rgba(86,217,202,.018)); }
+.today-notice svg { color: var(--aqua); }
+.today-hero { grid-template-columns: minmax(0,1.75fr) minmax(310px,.75fr); margin-top: 15px; }
+.today-chart-controls { display: flex; flex-direction: column; align-items: flex-end; gap: 13px; }
+.today-chart-controls .range-switch button { height: 28px; min-width: 35px; font-size: 9px; }
+.today-status-card { min-width: 0; padding: 22px; display: flex; flex-direction: column; overflow: hidden; border-color: rgba(255,184,92,.16); background: radial-gradient(circle at 100% 0%,rgba(255,184,92,.13),transparent 45%),linear-gradient(145deg,rgba(28,25,22,.9),rgba(13,17,23,.8)); }
+.today-status-card .section-head { align-items: center; margin-bottom: 0; }
+.today-status-card .section-head h2 { font-size: 19px; }
+.today-status-icon { width: 36px; height: 36px; flex-shrink: 0; display: grid; place-items: center; border: 1px solid rgba(255,184,92,.17); border-radius: 10px; color: var(--amber); background: rgba(255,184,92,.07); }
+.today-status-copy { min-height: 42px; margin: 15px 0 23px; color: #928b82; font-size: 9px; line-height: 1.65; }
+.today-budget-head, .today-budget-scale { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.today-budget-head { color: #7d858d; font-size: 8px; }
+.today-budget-head strong { color: #e1b978; font-size: 9px; }
+.today-budget-track { height: 12px; padding: 3px; margin: 9px 0 7px; border: 1px solid var(--stroke); border-radius: 99px; background: rgba(4,8,12,.56); }
+.today-budget-track i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,var(--aqua),var(--amber) 78%,var(--red)); box-shadow: 0 0 14px rgba(255,184,92,.17); }
+.today-budget-scale { color: #5f6871; font-size: 7px; }
+.today-status-values { display: grid; grid-template-columns: repeat(3,1fr); gap: 1px; margin: 23px 0 20px; overflow: hidden; border: 1px solid var(--stroke); border-radius: 10px; background: var(--stroke); }
+.today-status-values > div { min-width: 0; padding: 11px 9px; background: rgba(8,13,18,.9); }
+.today-status-values dt { margin-bottom: 6px; color: #747d86; font-size: 7px; white-space: nowrap; }
+.today-status-values dd { margin: 0; color: #e6eaed; font-size: 10px; font-weight: 650; }
+.today-status-card > .text-action { margin-top: auto; }
+.today-kpi { min-height: 134px; display: grid; grid-template-columns: 34px minmax(0,1fr) auto; align-items: center; gap: 14px; position: relative; overflow: hidden; }
+.today-kpi::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at 0 0,rgba(86,217,202,.085),transparent 52%); }
+.today-kpi.violet::after { background: radial-gradient(circle at 0 0,rgba(157,139,255,.1),transparent 52%); }
+.today-kpi.amber::after { background: radial-gradient(circle at 0 0,rgba(255,184,92,.1),transparent 52%); }
+.today-kpi-icon { width: 34px; height: 34px; display: grid; place-items: center; position: relative; z-index: 1; border: 1px solid rgba(86,217,202,.14); border-radius: 9px; color: var(--aqua); background: rgba(86,217,202,.07); }
+.today-kpi.violet .today-kpi-icon { color: var(--violet); border-color: rgba(157,139,255,.17); background: rgba(157,139,255,.08); }
+.today-kpi.amber .today-kpi-icon { color: var(--amber); border-color: rgba(255,184,92,.17); background: rgba(255,184,92,.08); }
+.today-kpi > div, .today-kpi .mini-chart { position: relative; z-index: 1; }
+.today-kpi p, .today-kpi strong, .today-kpi small { display: block; }
+.today-kpi p { margin: 0 0 7px; color: var(--muted); font-size: 9px; }
+.today-kpi small { margin-top: 7px; color: #6e7a86; font-size: 8px; }
 .lower-grid { display: grid; grid-template-columns: minmax(0, 2.1fr) minmax(260px, .9fr); gap: 15px; margin-top: 15px; }
 .positions-card { padding: 20px 21px 10px; min-width: 0; scroll-margin-top: 90px; }
 .section-head { margin-bottom: 17px; }
@@ -1107,7 +1140,9 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
 @keyframes focus-pill-right { 0% { transform: translateX(0) scale(1); } 20% { transform: translateX(0) scale(1.04); } 72% { transform: translateX(calc(100% + 12px)) scale(1.04); } 100% { transform: translateX(calc(100% + 12px)) scale(1); } }
 @keyframes focus-pill-left { 0% { transform: translateX(calc(100% + 12px)) scale(1); } 20% { transform: translateX(calc(100% + 12px)) scale(1.04); } 72% { transform: translateX(0) scale(1.04); } 100% { transform: translateX(0) scale(1); } }
 @keyframes focus-tab-pop { 0%,100% { transform: scale(1); } 24%,70% { transform: scale(1.025); } }
-.portfolio-totals, .portfolio-main, .account-grid, .analytics-kpis, .analytics-main, .analytics-secondary, .dna-card, .risk-overview, .risk-kpis, .risk-main-grid, .risk-simulator, .risk-correlation-grid, .drawdown-pulse, .risk-protections-grid, .monte-carlo-lab, .risk-bottom-grid, .operations-kpis, .flow-card, .ledger-card, .focus-kpis, .focus-workspace, .focus-pattern, .hybrid-overview, .hybrid-ledger, .lab-canvas, .lab-results, .lab-main-grid, .lab-oos, .lab-friction, .lab-sensitivity, .lab-next, .lab-vault { animation: surface-in .38s cubic-bezier(.2,.8,.2,1) both; }
+.today-notice, .today-hero, .metrics, .lower-grid, .story-card, .calendar-strip, .portfolio-totals, .portfolio-main, .account-grid, .analytics-kpis, .analytics-main, .analytics-secondary, .dna-card, .risk-overview, .risk-kpis, .risk-main-grid, .risk-simulator, .risk-correlation-grid, .drawdown-pulse, .risk-protections-grid, .monte-carlo-lab, .risk-bottom-grid, .operations-kpis, .flow-card, .ledger-card, .focus-kpis, .focus-workspace, .focus-pattern, .hybrid-overview, .hybrid-ledger, .lab-canvas, .lab-results, .lab-main-grid, .lab-oos, .lab-friction, .lab-sensitivity, .lab-next, .lab-vault { animation: surface-in .38s cubic-bezier(.2,.8,.2,1) both; }
+.today-hero { animation-delay: .035s; }
+.metrics, .lower-grid { animation-delay: .07s; }
 .portfolio-main, .analytics-main, .risk-kpis, .focus-workspace { animation-delay: .035s; }
 .account-grid, .analytics-secondary, .dna-card, .risk-main-grid, .risk-bottom-grid { animation-delay: .07s; }
 .flow-card, .focus-workspace { animation-delay: .035s; }
@@ -1264,14 +1299,25 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
   .command-search span, .command-search kbd, .privacy { display: none; }
   .command-search { width: 34px; padding: 0; display: grid; place-items: center; margin-right: auto; }
   .welcome { align-items: flex-start; flex-direction: column; gap: 18px; }
+  .today-welcome { gap: 15px; }
+  .today-welcome .risk-live-status { width: 100%; justify-content: center; }
+  .today-notice { align-items: flex-start; font-size: 10px; }
   .equity-card { padding: 17px 14px 14px; }
   .card-head { flex-direction: column; }
+  .today-chart-controls { width: 100%; align-items: stretch; }
+  .today-chart-controls .range-switch { width: 100%; }
+  .today-chart-controls .range-switch button { min-width: 44px; height: 40px; flex: 1; font-size: 11px; }
   .legend { width: 100%; }
   .legend span { display: flex; }
   .chart-wrap { height: 220px; }
   .chart-summary { gap: 8px; }
   .chart-summary > div { padding-left: 8px; }
   .chart-summary strong { font-size: 10px; }
+  .today-status-card { padding: 19px 17px; }
+  .today-status-values { grid-template-columns: 1fr 1fr; }
+  .today-status-values > div:last-child { grid-column: 1 / -1; }
+  .today-kpi { grid-template-columns: 34px minmax(0,1fr) 82px; padding: 16px; }
+  .today-kpi .mini-chart { width: 82px; }
   .positions-card { padding-left: 15px; padding-right: 15px; }
   .event-pills span { display: none; }
   .analytics-kpis { grid-template-columns: 1fr; }
