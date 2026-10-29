@@ -175,9 +175,13 @@ export default function Home() {
       const distance = Math.hypot(distanceX, distanceY);
       const proximity = Math.max(0, 1 - distance / lightReach);
       const intensity = distance === 0 ? 1 : Math.pow(proximity, .75) * .82;
+      const localX = event.clientX - bounds.left;
+      const localY = event.clientY - bounds.top;
 
-      target.style.setProperty("--cursor-reflect-x", `${event.clientX - bounds.left}px`);
-      target.style.setProperty("--cursor-reflect-y", `${event.clientY - bounds.top}px`);
+      target.style.setProperty("--cursor-reflect-x", `${localX}px`);
+      target.style.setProperty("--cursor-reflect-y", `${localY}px`);
+      target.style.setProperty("--cursor-shadow-x", `${bounds.width - localX}px`);
+      target.style.setProperty("--cursor-shadow-y", `${bounds.height - localY}px`);
       target.style.setProperty("--cursor-reflect-opacity", intensity.toFixed(3));
     });
     illuminatedTargets.current = targets;
