@@ -131,69 +131,6 @@ nav button b { margin-left: auto; font-size: 8px; color: #091110; background: va
 .mini-chart { width: 95px; height: 38px; opacity: .9; }
 .today-welcome { margin-bottom: 20px; }
 .today-notice { color: #aebbc2; border-color: rgba(86,217,202,.16); background: linear-gradient(90deg,rgba(86,217,202,.065),rgba(86,217,202,.018)); }
-.today-dashboard .glass-card,
-.today-dashboard .today-notice,
-.today-dashboard .calendar-strip,
-.today-dashboard .range-switch,
-.today-dashboard .quiet-button,
-.today-dashboard .insight-card button,
-.today-dashboard .event-pills button,
-.today-dashboard .table-row:not(.table-header) { --cursor-reflect-rgb: 86 217 202; position: relative; isolation: isolate; }
-.today-dashboard .today-kpi.violet,
-.today-dashboard .insight-card { --cursor-reflect-rgb: 157 139 255; }
-.today-dashboard .today-kpi.amber,
-.today-dashboard .event-pills button { --cursor-reflect-rgb: 255 184 92; }
-.today-dashboard .position-table .negative-row { --cursor-reflect-rgb: 255 111 125; }
-.today-dashboard .glass-card::before,
-.today-dashboard .today-notice::before,
-.today-dashboard .calendar-strip::before,
-.today-dashboard .range-switch::before,
-.today-dashboard .quiet-button::before,
-.today-dashboard .insight-card button::before,
-.today-dashboard .event-pills button::before,
-.today-dashboard .table-row:not(.table-header)::before {
-  content: "";
-  position: absolute;
-  z-index: 4;
-  pointer-events: none;
-  inset: 0;
-  padding: 1.5px;
-  border-radius: inherit;
-  opacity: var(--cursor-reflect-opacity, 0);
-  background: radial-gradient(860px circle at var(--cursor-reflect-x, 50%) var(--cursor-reflect-y, 50%), rgb(var(--cursor-reflect-rgb) / .72), rgb(var(--cursor-reflect-rgb) / .28) 42%, transparent 93%);
-  mix-blend-mode: screen;
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  transition: opacity .34s var(--ease-apple-fade);
-}
-.today-dashboard .glass-card::after,
-.today-dashboard .today-notice::after,
-.today-dashboard .calendar-strip::after,
-.today-dashboard .table-row:not(.table-header)::after {
-  content: "";
-  position: absolute;
-  z-index: 3;
-  pointer-events: none;
-  inset: 1px;
-  padding: 11px;
-  border-radius: inherit;
-  opacity: calc(var(--cursor-reflect-opacity, 0) * .82);
-  background:
-    radial-gradient(860px circle at var(--cursor-reflect-x, 50%) var(--cursor-reflect-y, 50%), rgb(var(--cursor-reflect-rgb) / .32), rgb(var(--cursor-reflect-rgb) / .11) 38%, transparent 82%),
-    radial-gradient(680px circle at var(--cursor-shadow-x, 50%) var(--cursor-shadow-y, 50%), rgba(0,0,0,.34), rgba(0,0,0,.12) 48%, transparent 84%);
-  filter: blur(1.8px);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  transition: opacity .4s var(--ease-apple-fade);
-}
-.today-dashboard .glass-card {
-  transform: perspective(1200px) rotateX(var(--cursor-tilt-x, 0deg)) rotateY(var(--cursor-tilt-y, 0deg)) translateY(var(--cursor-depth, 0px));
-  transform-style: preserve-3d;
-  will-change: transform;
-  transition: transform .48s var(--ease-apple-layout), box-shadow .48s var(--ease-apple-layout), background .48s var(--ease-apple-fade);
-}
 .today-notice svg { color: var(--aqua); }
 .today-hero { grid-template-columns: minmax(0,1.75fr) minmax(310px,.75fr); margin-top: 15px; }
 .today-chart-controls { display: flex; flex-direction: column; align-items: flex-end; gap: 13px; }
@@ -1264,7 +1201,7 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
 
 @media (hover: hover) and (pointer: fine) {
   .glass-card { transition: transform .32s var(--ease-apple-layout),border-color .28s var(--ease-apple-fade),box-shadow .32s var(--ease-apple-layout),background .28s var(--ease-apple-fade); }
-  .glass-card:not(.timeline-card):not(.trade-inspector):hover { transform: perspective(1200px) rotateX(var(--cursor-tilt-x, 0deg)) rotateY(var(--cursor-tilt-y, 0deg)) translateY(calc(-2px + var(--cursor-depth, 0px))); border-color: rgba(86,217,202,.18); box-shadow: 0 27px 76px rgba(0,0,0,.26), 0 10px 28px rgba(0,0,0,.12), 0 0 0 1px rgba(86,217,202,.025); }
+  .glass-card:not(.timeline-card):not(.trade-inspector):hover { transform: translateY(-2px); box-shadow: 0 27px 76px rgba(0,0,0,.26), 0 10px 28px rgba(0,0,0,.12); }
   .hybrid-trade:hover { transform: translateX(2px); border-color: var(--stroke-strong); }
   .hybrid-trade.loss:hover { border-color: rgba(255,111,125,.3); }
   .negative-surface:hover { border-color: rgba(255,111,125,.34); box-shadow: 0 23px 70px rgba(54,4,14,.2), inset 0 1px rgba(255,170,178,.04); }

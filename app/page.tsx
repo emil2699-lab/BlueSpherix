@@ -26,7 +26,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import Portfolio from "./portfolio";
 import Analytics from "./analytics";
 import Operations from "./operations";
@@ -36,7 +36,6 @@ import { ALPHA_ACCOUNT, BEST_RECENT_TRADE, BEST_SESSION_30D, DASHBOARD_RANGE_STA
 import { valueSign } from "./value-sign";
 
 type Range = DashboardRange;
-const TODAY_LIGHT_TARGETS = ".glass-card, .today-notice, .calendar-strip, .range-switch, .quiet-button, .insight-card button, .event-pills button, .table-row:not(.table-header)";
 const equitySeries = DEMO_EQUITY_SERIES;
 const balanceSeries = DEMO_BALANCE_SERIES;
 
@@ -126,8 +125,6 @@ function MetricCard({ label, value, detail, values, tone = "aqua", signValue, ic
 
 export default function Home() {
   const [view, setView] = useState("overview");
-  const illuminatedTargets = useRef<HTMLElement[]>([]);
-  const activeDepthTarget = useRef<HTMLElement | null>(null);
   useEffect(() => {
     const applyHash = (behavior: ScrollBehavior) => {
       const target = window.location.hash.slice(1) || "overview";
@@ -161,54 +158,6 @@ export default function Home() {
     window.history.pushState(null, "", `#${target}`);
     window.dispatchEvent(new HashChangeEvent("hashchange"));
     setSidebarOpen(false);
-  };
-
-  const updateTodayBorderLight = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const card = (event.target as HTMLElement).closest<HTMLElement>(".glass-card");
-    const targets = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(TODAY_LIGHT_TARGETS));
-    const measuredTargets = targets.map((target) => ({ target, bounds: target.getBoundingClientRect() }));
-    const lightReach = 780;
-
-    measuredTargets.forEach(({ target, bounds }) => {
-      const distanceX = event.clientX < bounds.left ? bounds.left - event.clientX : event.clientX > bounds.right ? event.clientX - bounds.right : 0;
-      const distanceY = event.clientY < bounds.top ? bounds.top - event.clientY : event.clientY > bounds.bottom ? event.clientY - bounds.bottom : 0;
-      const distance = Math.hypot(distanceX, distanceY);
-      const proximity = Math.max(0, 1 - distance / lightReach);
-      const intensity = distance === 0 ? 1 : Math.pow(proximity, .75) * .82;
-      const localX = event.clientX - bounds.left;
-      const localY = event.clientY - bounds.top;
-
-      target.style.setProperty("--cursor-reflect-x", `${localX}px`);
-      target.style.setProperty("--cursor-reflect-y", `${localY}px`);
-      target.style.setProperty("--cursor-shadow-x", `${bounds.width - localX}px`);
-      target.style.setProperty("--cursor-shadow-y", `${bounds.height - localY}px`);
-      target.style.setProperty("--cursor-reflect-opacity", intensity.toFixed(3));
-    });
-    illuminatedTargets.current = targets;
-
-    if (activeDepthTarget.current && activeDepthTarget.current !== card) {
-      activeDepthTarget.current.style.setProperty("--cursor-tilt-x", "0deg");
-      activeDepthTarget.current.style.setProperty("--cursor-tilt-y", "0deg");
-      activeDepthTarget.current.style.setProperty("--cursor-depth", "0px");
-    }
-    if (card) {
-      const bounds = card.getBoundingClientRect();
-      const horizontal = (event.clientX - bounds.left) / bounds.width - .5;
-      const vertical = (event.clientY - bounds.top) / bounds.height - .5;
-      card.style.setProperty("--cursor-tilt-x", `${(-vertical * 2.4).toFixed(2)}deg`);
-      card.style.setProperty("--cursor-tilt-y", `${(horizontal * 2.4).toFixed(2)}deg`);
-      card.style.setProperty("--cursor-depth", "-3px");
-      activeDepthTarget.current = card;
-    }
-  };
-
-  const clearTodayBorderLight = () => {
-    illuminatedTargets.current.forEach((target) => target.style.setProperty("--cursor-reflect-opacity", "0"));
-    activeDepthTarget.current?.style.setProperty("--cursor-tilt-x", "0deg");
-    activeDepthTarget.current?.style.setProperty("--cursor-tilt-y", "0deg");
-    activeDepthTarget.current?.style.setProperty("--cursor-depth", "0px");
-    illuminatedTargets.current = [];
-    activeDepthTarget.current = null;
   };
 
   return (
@@ -251,7 +200,7 @@ export default function Home() {
           {view === "positions" && <Operations />}
           {view === "risk" && <Risk />}
           {view === "lab" && <Lab />}
-          <div className="today-dashboard" onPointerMove={updateTodayBorderLight} onPointerLeave={clearTodayBorderLight} hidden={view === "portfolio" || view === "analytics" || view === "positions" || view === "risk" || view === "lab"}>
+          <div className="today-dashboard" hidden={view === "portfolio" || view === "analytics" || view === "positions" || view === "risk" || view === "lab"}>
           <section className="welcome today-welcome" id="overview">
             <div><p className="date-line">Mercoledì, 28 ottobre</p><h1>Buongiorno, Luca.</h1><p>Il portafoglio è stabile. Il rischio è sotto controllo.</p></div>
             <span className={`risk-live-status ${riskUsed < 80 ? "calm" : riskUsed < 100 ? "warning" : "critical"}`}><i /> Dati aggiornati · 28 ott, 18:42</span>
