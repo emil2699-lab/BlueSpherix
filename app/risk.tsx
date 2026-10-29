@@ -2,11 +2,12 @@
 
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, CheckCircle2, Crosshair, Gauge, Layers3, Network, Plus, ShieldAlert, ShieldCheck, Sparkles, Target, TrendingDown } from "lucide-react";
-import { ALPHA_ACCOUNT, OPEN_TRADES, type DemoTrade } from "./demo-data";
+import { ALPHA_ACCOUNT, DEMO_EQUITY_SERIES, OPEN_TRADES, type DemoTrade } from "./demo-data";
 import { valueSign } from "./value-sign";
 
 type StressScenario = "stop" | "volatility" | "gap";
 type CorrelationId = "eur-xau" | "eur-gbp" | "xau-gbp";
+type DrawdownRange = "7G" | "30G" | "90G";
 
 const money = (value: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value);
 const signedMoney = (value: number) => `${value > 0 ? "+" : ""}${money(value)}`;
@@ -25,11 +26,34 @@ const correlationPairs = [
   { id: "xau-gbp", left: "XAUUSD", right: "GBPJPY", value: -.12, label: "Relazione inversa", detail: "I movimenti recenti sono lievemente opposti. L’effetto diversificante esiste, ma non è abbastanza stabile per compensare un eccesso di rischio." },
 ] as const;
 
+const drawdownRanges = {
+  "7G": { days: 7, series: DEMO_EQUITY_SERIES["1W"] },
+  "30G": { days: 30, series: DEMO_EQUITY_SERIES["1M"] },
+  "90G": { days: 90, series: DEMO_EQUITY_SERIES["3M"] },
+} satisfies Record<DrawdownRange, { days: number; series: number[] }>;
+
+function drawdownFrom(values: number[]) {
+  let peak = values[0] ?? 0;
+  return values.map(value => {
+    peak = Math.max(peak, value);
+    return peak ? (peak - value) / peak * 100 : 0;
+  });
+}
+
+function pointDate(range: DrawdownRange, index: number, count: number) {
+  const days = drawdownRanges[range].days;
+  const daysAgo = Math.round((count - 1 - index) * (days - 1) / Math.max(1, count - 1));
+  const date = new Date(Date.UTC(2026, 9, 28 - daysAgo));
+  return new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "short", timeZone: "UTC" }).format(date);
+}
+
 export default function Risk() {
   const [scenario, setScenario] = useState<StressScenario>("stop");
   const [selectedId, setSelectedId] = useState(OPEN_TRADES[0]?.id ?? "");
   const [candidateRiskPct, setCandidateRiskPct] = useState(.1);
   const [correlationId, setCorrelationId] = useState<CorrelationId>("eur-xau");
+  const [drawdownRange, setDrawdownRange] = useState<DrawdownRange>("30G");
+  const [drawdownPoint, setDrawdownPoint] = useState(drawdownRanges["30G"].series.length - 1);
   const openRisk = useMemo(() => OPEN_TRADES.reduce((total, trade) => total + trade.riskUsd, 0), []);
   const budgetUsd = ALPHA_ACCOUNT.equity * ALPHA_ACCOUNT.riskLimit / 100;
   const budgetUsed = openRisk / budgetUsd * 100;
@@ -55,6 +79,22 @@ export default function Risk() {
   const correlatedRisk = correlatedTrades.reduce((total, trade) => total + trade.riskUsd, 0);
   const correlatedShare = correlatedRisk / openRisk * 100;
   const correlationTone = Math.abs(selectedCorrelation.value) >= .65 ? "critical" : Math.abs(selectedCorrelation.value) >= .35 ? "warning" : "calm";
+  const equityHistory = drawdownRanges[drawdownRange].series;
+  const drawdownHistory = useMemo(() => drawdownFrom(equityHistory), [equityHistory]);
+  const activeDrawdownPoint = Math.min(drawdownPoint, drawdownHistory.length - 1);
+  const selectedDrawdown = drawdownHistory[activeDrawdownPoint] ?? 0;
+  const selectedEquity = (equityHistory[activeDrawdownPoint] ?? ALPHA_ACCOUNT.equity / 1000) * 1000;
+  const selectedPeak = Math.max(...equityHistory.slice(0, activeDrawdownPoint + 1));
+  const recoveryAmount = Math.max(0, selectedPeak * 1000 - selectedEquity);
+  const visibleDrawdownMax = Math.max(2, Math.ceil(Math.max(...drawdownHistory) * 1.35 * 2) / 2);
+  const drawdownPoints = drawdownHistory.map((value, index) => ({ x: 24 + index / Math.max(1, drawdownHistory.length - 1) * 752, y: 22 + value / visibleDrawdownMax * 174 }));
+  const drawdownPath = drawdownPoints.map((point, index) => `${index ? "L" : "M"}${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
+  const drawdownArea = `${drawdownPath} L${drawdownPoints.at(-1)?.x ?? 776},22 L24,22 Z`;
+  const selectedChartPoint = drawdownPoints[activeDrawdownPoint] ?? { x: 24, y: 22 };
+  const previousPeakIndex = drawdownHistory.slice(0, activeDrawdownPoint + 1).findLastIndex(value => value < .01);
+  const timeUnderwater = selectedDrawdown < .01 ? 0 : Math.max(1, Math.round((activeDrawdownPoint - previousPeakIndex) * (drawdownRanges[drawdownRange].days - 1) / Math.max(1, drawdownHistory.length - 1)));
+  const drawdownLimit = 8;
+  const drawdownStrength = Math.min(1, selectedDrawdown / drawdownLimit);
 
   return <div className="risk-view">
     <section className="welcome">
@@ -149,6 +189,33 @@ export default function Risk() {
         <dl><div><dt>Rischio combinato</dt><dd>{money(correlatedRisk)}</dd></div><div><dt>Peso sul rischio aperto</dt><dd>{percent(correlatedShare, 1)}</dd></div><div><dt>Posizioni coinvolte</dt><dd>{correlatedTrades.length}</dd></div></dl>
         <p>{selectedCorrelation.detail}</p>
         <small><ShieldAlert size={13} /> La correlazione descrive il comportamento recente, non garantisce quello futuro.</small>
+      </aside>
+    </section>
+
+    <section className="glass-card drawdown-pulse" aria-labelledby="drawdown-pulse-title">
+      <div className="drawdown-chart-panel">
+        <div className="section-head drawdown-head"><div><p className="eyebrow">Drawdown pulse</p><h2 id="drawdown-pulse-title">Quanto tempo resta il capitale sotto il massimo.</h2></div><div className="range-switch drawdown-range" aria-label="Periodo drawdown">{(Object.keys(drawdownRanges) as DrawdownRange[]).map(range => <button key={range} className={drawdownRange === range ? "active" : ""} aria-pressed={drawdownRange === range} onClick={() => { setDrawdownRange(range); setDrawdownPoint(drawdownRanges[range].series.length - 1); }}>{range}</button>)}</div></div>
+        <div className="drawdown-chart" aria-label={`Storico drawdown ${drawdownRange}`}>
+          <svg viewBox="0 0 800 230" role="img">
+            <defs><linearGradient id="drawdownArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#ff6f7d" stopOpacity=".04" /><stop offset="100%" stopColor="#ff6f7d" stopOpacity=".28" /></linearGradient></defs>
+            {[22, 109, 196].map((y, index) => <g key={y}><line x1="24" x2="776" y1={y} y2={y} className="drawdown-grid-line" /><text x="5" y={y + 4} className="drawdown-y-label">{index === 0 ? "0" : index === 1 ? (visibleDrawdownMax / 2).toLocaleString("it-IT", { maximumFractionDigits: 2 }) : visibleDrawdownMax.toLocaleString("it-IT", { maximumFractionDigits: 2 })}%</text></g>)}
+            <path d={drawdownArea} fill="url(#drawdownArea)" />
+            <path d={drawdownPath} className="drawdown-path" />
+            <line x1={selectedChartPoint.x} x2={selectedChartPoint.x} y1="18" y2="200" className="drawdown-cursor" />
+            <circle cx={selectedChartPoint.x} cy={selectedChartPoint.y} r="5" className="drawdown-dot" />
+          </svg>
+          <div className="drawdown-axis"><span>{pointDate(drawdownRange, 0, drawdownHistory.length)}</span><span>{pointDate(drawdownRange, Math.floor(drawdownHistory.length / 2), drawdownHistory.length)}</span><span>{pointDate(drawdownRange, drawdownHistory.length - 1, drawdownHistory.length)}</span></div>
+        </div>
+        <label className="drawdown-scrubber"><span>Esplora il periodo</span><input type="range" min="0" max={drawdownHistory.length - 1} value={activeDrawdownPoint} onChange={event => setDrawdownPoint(Number(event.target.value))} aria-label="Punto dello storico drawdown" /></label>
+      </div>
+
+      <aside className="drawdown-readout" style={{ "--drawdown-strength": drawdownStrength } as CSSProperties} aria-live="polite">
+        <span className="drawdown-date">{pointDate(drawdownRange, activeDrawdownPoint, drawdownHistory.length)}</span>
+        <p>Drawdown selezionato</p>
+        <strong>{percent(selectedDrawdown)}</strong>
+        <div className="drawdown-limit-track"><i style={{ width: `${drawdownStrength * 100}%` }} /></div>
+        <small>{percent(Math.max(0, drawdownLimit - selectedDrawdown))} prima del limite dell’{percent(drawdownLimit, 0)}</small>
+        <dl><div><dt>Equity</dt><dd>{money(selectedEquity)}</dd></div><div><dt>Da recuperare</dt><dd>{money(recoveryAmount)}</dd></div><div><dt>Tempo sotto il massimo</dt><dd>{timeUnderwater ? `${timeUnderwater} giorni` : "Nuovo massimo"}</dd></div><div><dt>Picco nel periodo</dt><dd>{percent(Math.max(...drawdownHistory))}</dd></div></dl>
       </aside>
     </section>
 
