@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
-import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, Crosshair, Gauge, Layers3, ShieldCheck, Sparkles, Target, TrendingDown } from "lucide-react";
+import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, CheckCircle2, Crosshair, Gauge, Layers3, Plus, ShieldAlert, ShieldCheck, Sparkles, Target, TrendingDown } from "lucide-react";
 import { ALPHA_ACCOUNT, OPEN_TRADES, type DemoTrade } from "./demo-data";
 import { valueSign } from "./value-sign";
 
@@ -20,6 +20,7 @@ const scenarios = {
 export default function Risk() {
   const [scenario, setScenario] = useState<StressScenario>("stop");
   const [selectedId, setSelectedId] = useState(OPEN_TRADES[0]?.id ?? "");
+  const [candidateRiskPct, setCandidateRiskPct] = useState(.1);
   const openRisk = useMemo(() => OPEN_TRADES.reduce((total, trade) => total + trade.riskUsd, 0), []);
   const budgetUsd = ALPHA_ACCOUNT.equity * ALPHA_ACCOUNT.riskLimit / 100;
   const budgetUsed = openRisk / budgetUsd * 100;
@@ -33,6 +34,13 @@ export default function Risk() {
   const riskTone = ALPHA_ACCOUNT.riskScore < 35 ? "calm" : ALPHA_ACCOUNT.riskScore < 70 ? "warning" : "critical";
   const budgetTone = budgetUsed < 60 ? "calm" : budgetUsed < 90 ? "warning" : "critical";
   const largestRisk = [...OPEN_TRADES].sort((a, b) => b.riskUsd - a.riskUsd)[0];
+  const candidateRiskUsd = ALPHA_ACCOUNT.equity * candidateRiskPct / 100;
+  const projectedOpenRisk = openRisk + candidateRiskUsd;
+  const projectedRiskPct = projectedOpenRisk / ALPHA_ACCOUNT.equity * 100;
+  const projectedBudgetUsed = projectedOpenRisk / budgetUsd * 100;
+  const bufferAfterTrade = budgetUsd - projectedOpenRisk;
+  const simulatorTone = projectedBudgetUsed <= 80 ? "calm" : projectedBudgetUsed <= 100 ? "warning" : "critical";
+  const tradeFits = bufferAfterTrade >= 0;
 
   return <div className="risk-view">
     <section className="welcome">
@@ -79,6 +87,36 @@ export default function Risk() {
         <p>{scenarioData.detail}</p>
         <dl className="stress-values"><div><dt>Equity proiettata</dt><dd data-sign={valueSign(projectedEquity)}>{money(projectedEquity)}</dd></div><div><dt>Drawdown proiettato</dt><dd>{percent(projectedDrawdown)}</dd></div></dl>
       </article>
+    </section>
+
+    <section className={`glass-card risk-simulator risk-${simulatorTone}`} aria-labelledby="risk-simulator-title">
+      <div className="section-head simulator-head">
+        <div><p className="eyebrow">Simulatore pre-trade</p><h2 id="risk-simulator-title">Prima di entrare, guarda cosa cambia.</h2></div>
+        <span className={`simulator-verdict ${simulatorTone}`}>{tradeFits ? <CheckCircle2 size={15} /> : <ShieldAlert size={15} />}{tradeFits ? "Entro il limite" : "Limite superato"}</span>
+      </div>
+      <div className="risk-simulator-grid">
+        <div className="simulator-controls">
+          <span className="simulator-label">Rischio della nuova operazione</span>
+          <div className="risk-presets" aria-label="Rischio rapido">{[.1, .25, .5].map(value => <button key={value} className={candidateRiskPct === value ? "active" : ""} aria-pressed={candidateRiskPct === value} onClick={() => setCandidateRiskPct(value)}>{percent(value, value === .1 ? 2 : 2)}</button>)}</div>
+          <label className="risk-slider"><span><b>{percent(candidateRiskPct)}</b><small>{money(candidateRiskUsd)}</small></span><input type="range" min="0.05" max="1" step="0.05" value={candidateRiskPct} onChange={event => setCandidateRiskPct(Number(event.target.value))} aria-label="Rischio della nuova operazione in percentuale" /></label>
+          <div className="risk-slider-scale"><span>0,05%</span><span>1,00%</span></div>
+        </div>
+
+        <div className="simulator-projection" aria-live="polite">
+          <div className="projection-orbit" style={{ "--projected-budget": `${Math.min(100, projectedBudgetUsed) * 3.6}deg` } as CSSProperties}><div className="projection-orbit-core"><Plus size={15} /><strong>{percent(projectedRiskPct)}</strong><span>rischio dopo il trade</span></div></div>
+          <div className="projection-budget">
+            <div className="projection-track" aria-label={`${percent(projectedBudgetUsed, 1)} del limite utilizzato`}><i className="current" style={{ width: `${Math.min(100, budgetUsed)}%` }} /><i className="candidate" style={{ left: `${Math.min(100, budgetUsed)}%`, width: `${Math.min(100 - Math.min(100, budgetUsed), candidateRiskUsd / budgetUsd * 100)}%` }} /><b style={{ left: `${Math.min(100, projectedBudgetUsed)}%` }} /></div>
+            <div className="projection-legend"><span><i className="current" />Rischio attuale</span><span><i className="candidate" />Nuovo trade</span><strong>Limite {percent(ALPHA_ACCOUNT.riskLimit, 1)}</strong></div>
+          </div>
+        </div>
+
+        <div className={`simulator-result ${simulatorTone}`}>
+          <p>{tradeFits ? "Il trade entra nel budget." : "Il trade eccede il budget."}</p>
+          <strong data-sign={valueSign(bufferAfterTrade)}>{tradeFits ? money(bufferAfterTrade) : `-${money(Math.abs(bufferAfterTrade))}`}</strong>
+          <span>{tradeFits ? "margine residuo" : "oltre il limite"}</span>
+          <dl><div><dt>Prima</dt><dd>{percent(openRisk / ALPHA_ACCOUNT.equity * 100)}</dd></div><div><dt>Dopo</dt><dd>{percent(projectedRiskPct)}</dd></div><div><dt>Utilizzo</dt><dd>{percent(projectedBudgetUsed, 1)}</dd></div></dl>
+        </div>
+      </div>
     </section>
 
     <section className="risk-bottom-grid">
