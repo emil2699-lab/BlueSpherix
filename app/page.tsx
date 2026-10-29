@@ -127,6 +127,7 @@ function MetricCard({ label, value, detail, values, tone = "aqua", signValue, ic
 export default function Home() {
   const [view, setView] = useState("overview");
   const activeLightTarget = useRef<HTMLElement | null>(null);
+  const activeDepthTarget = useRef<HTMLElement | null>(null);
   useEffect(() => {
     const applyHash = (behavior: ScrollBehavior) => {
       const target = window.location.hash.slice(1) || "overview";
@@ -164,9 +165,14 @@ export default function Home() {
 
   const updateTodayBorderLight = (event: ReactPointerEvent<HTMLDivElement>) => {
     const target = (event.target as HTMLElement).closest<HTMLElement>(TODAY_LIGHT_TARGETS);
+    const card = (event.target as HTMLElement).closest<HTMLElement>(".glass-card");
     if (activeLightTarget.current && activeLightTarget.current !== target) activeLightTarget.current.style.setProperty("--cursor-reflect-opacity", "0");
     if (!target) {
       activeLightTarget.current = null;
+      activeDepthTarget.current?.style.setProperty("--cursor-tilt-x", "0deg");
+      activeDepthTarget.current?.style.setProperty("--cursor-tilt-y", "0deg");
+      activeDepthTarget.current?.style.setProperty("--cursor-depth", "0px");
+      activeDepthTarget.current = null;
       return;
     }
     const bounds = target.getBoundingClientRect();
@@ -174,11 +180,30 @@ export default function Home() {
     target.style.setProperty("--cursor-reflect-y", `${event.clientY - bounds.top}px`);
     target.style.setProperty("--cursor-reflect-opacity", "1");
     activeLightTarget.current = target;
+
+    if (activeDepthTarget.current && activeDepthTarget.current !== card) {
+      activeDepthTarget.current.style.setProperty("--cursor-tilt-x", "0deg");
+      activeDepthTarget.current.style.setProperty("--cursor-tilt-y", "0deg");
+      activeDepthTarget.current.style.setProperty("--cursor-depth", "0px");
+    }
+    if (card) {
+      const bounds = card.getBoundingClientRect();
+      const horizontal = (event.clientX - bounds.left) / bounds.width - .5;
+      const vertical = (event.clientY - bounds.top) / bounds.height - .5;
+      card.style.setProperty("--cursor-tilt-x", `${(-vertical * 2.4).toFixed(2)}deg`);
+      card.style.setProperty("--cursor-tilt-y", `${(horizontal * 2.4).toFixed(2)}deg`);
+      card.style.setProperty("--cursor-depth", "-3px");
+      activeDepthTarget.current = card;
+    }
   };
 
   const clearTodayBorderLight = () => {
     activeLightTarget.current?.style.setProperty("--cursor-reflect-opacity", "0");
+    activeDepthTarget.current?.style.setProperty("--cursor-tilt-x", "0deg");
+    activeDepthTarget.current?.style.setProperty("--cursor-tilt-y", "0deg");
+    activeDepthTarget.current?.style.setProperty("--cursor-depth", "0px");
     activeLightTarget.current = null;
+    activeDepthTarget.current = null;
   };
 
   return (
