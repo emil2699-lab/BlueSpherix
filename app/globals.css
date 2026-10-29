@@ -151,7 +151,7 @@ nav button b { margin-left: auto; font-size: 8px; color: #091110; background: va
   padding: 1px;
   border-radius: inherit;
   opacity: var(--cursor-reflect-opacity, 0);
-  background: radial-gradient(680px circle at var(--cursor-reflect-x, 50%) var(--cursor-reflect-y, 50%), rgba(223,255,251,.68), rgba(86,217,202,.3) 48%, transparent 94%);
+  background: radial-gradient(360px circle at var(--cursor-reflect-x, 50%) var(--cursor-reflect-y, 50%), rgba(223,255,251,.62), rgba(86,217,202,.25) 36%, transparent 86%);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
