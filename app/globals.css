@@ -270,8 +270,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .instrument-row strong { font-size: 11px; }
 .instrument-row small { color: var(--muted); font-size: 8px; margin-top: 5px; }
 .instrument-row > span { font-size: 10px; color: var(--aqua); }
+.instrument-row > span.down { color: var(--red); }
 .instrument-track { height: 5px; background: rgba(255,255,255,.05); border-radius: 9px; overflow: hidden; }
 .instrument-track i { display: block; height: 100%; min-width: 5px; background: linear-gradient(90deg,var(--violet),var(--aqua)); border-radius: inherit; }
+.negative-row .instrument-track i { background: linear-gradient(90deg,#a8485a,var(--red)); }
 .dna-card { display: grid; grid-template-columns: minmax(190px,.7fr) minmax(360px,1.2fr) minmax(240px,.8fr); gap: 28px; align-items: center; margin-top: 16px; }
 .dna-card h2 { font-size: 19px; margin: 0 0 9px; }
 .dna-card > div:first-child > p:last-child, .dna-insight p { color: var(--muted); font-size: 10px; line-height: 1.7; margin: 0; }
