@@ -167,19 +167,15 @@ export default function Home() {
     const target = (event.target as HTMLElement).closest<HTMLElement>(TODAY_LIGHT_TARGETS);
     const card = (event.target as HTMLElement).closest<HTMLElement>(".glass-card");
     if (activeLightTarget.current && activeLightTarget.current !== target) activeLightTarget.current.style.setProperty("--cursor-reflect-opacity", "0");
-    if (!target) {
+    if (target) {
+      const bounds = target.getBoundingClientRect();
+      target.style.setProperty("--cursor-reflect-x", `${event.clientX - bounds.left}px`);
+      target.style.setProperty("--cursor-reflect-y", `${event.clientY - bounds.top}px`);
+      target.style.setProperty("--cursor-reflect-opacity", "1");
+      activeLightTarget.current = target;
+    } else {
       activeLightTarget.current = null;
-      activeDepthTarget.current?.style.setProperty("--cursor-tilt-x", "0deg");
-      activeDepthTarget.current?.style.setProperty("--cursor-tilt-y", "0deg");
-      activeDepthTarget.current?.style.setProperty("--cursor-depth", "0px");
-      activeDepthTarget.current = null;
-      return;
     }
-    const bounds = target.getBoundingClientRect();
-    target.style.setProperty("--cursor-reflect-x", `${event.clientX - bounds.left}px`);
-    target.style.setProperty("--cursor-reflect-y", `${event.clientY - bounds.top}px`);
-    target.style.setProperty("--cursor-reflect-opacity", "1");
-    activeLightTarget.current = target;
 
     event.currentTarget.querySelectorAll<HTMLElement>(".glass-card").forEach((nearbyCard) => {
       const nearbyBounds = nearbyCard.getBoundingClientRect();
@@ -187,9 +183,15 @@ export default function Home() {
       const verticalDistance = Math.max(nearbyBounds.top - event.clientY, 0, event.clientY - nearbyBounds.bottom);
       const distance = Math.hypot(horizontalDistance, verticalDistance);
       const strength = Math.max(0, 1 - distance / 520);
+      const isInside = event.clientX >= nearbyBounds.left && event.clientX <= nearbyBounds.right && event.clientY >= nearbyBounds.top && event.clientY <= nearbyBounds.bottom;
+      const directionX = Math.max(-1, Math.min(1, (event.clientX - (nearbyBounds.left + nearbyBounds.width / 2)) / (nearbyBounds.width / 2)));
+      const directionY = Math.max(-1, Math.min(1, (event.clientY - (nearbyBounds.top + nearbyBounds.height / 2)) / (nearbyBounds.height / 2)));
       nearbyCard.style.setProperty("--cursor-reflect-x", `${event.clientX - nearbyBounds.left}px`);
       nearbyCard.style.setProperty("--cursor-reflect-y", `${event.clientY - nearbyBounds.top}px`);
       nearbyCard.style.setProperty("--cursor-reflect-opacity", strength.toFixed(3));
+      nearbyCard.style.setProperty("--cursor-edge-shadow", isInside
+        ? "inset 0 0 0 1px rgba(223,255,251,.3), inset 0 0 24px rgba(86,217,202,.1)"
+        : strength > 0 ? `${(directionX * 11).toFixed(1)}px ${(directionY * 11).toFixed(1)}px 38px rgba(86,217,202,${(strength * .2).toFixed(3)})` : "0 0 transparent");
     });
 
     if (activeDepthTarget.current && activeDepthTarget.current !== card) {
@@ -210,7 +212,10 @@ export default function Home() {
 
   const clearTodayBorderLight = () => {
     activeLightTarget.current?.style.setProperty("--cursor-reflect-opacity", "0");
-    document.querySelectorAll<HTMLElement>(".today-dashboard .glass-card").forEach((card) => card.style.setProperty("--cursor-reflect-opacity", "0"));
+    document.querySelectorAll<HTMLElement>(".today-dashboard .glass-card").forEach((card) => {
+      card.style.setProperty("--cursor-reflect-opacity", "0");
+      card.style.setProperty("--cursor-edge-shadow", "0 0 transparent");
+    });
     activeDepthTarget.current?.style.setProperty("--cursor-tilt-x", "0deg");
     activeDepthTarget.current?.style.setProperty("--cursor-tilt-y", "0deg");
     activeDepthTarget.current?.style.setProperty("--cursor-depth", "0px");

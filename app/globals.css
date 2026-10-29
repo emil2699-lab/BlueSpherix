@@ -74,7 +74,7 @@ nav button b { margin-left: auto; font-size: 8px; color: #091110; background: va
 .range-switch button { min-width: 38px; height: 32px; border: 0; border-radius: 7px; background: transparent; color: #687582; font-size: 10px; cursor: pointer; transition: color .28s var(--ease-apple-fade),background .38s var(--ease-apple-layout),transform .32s var(--ease-apple-spring),box-shadow .38s var(--ease-apple-layout),scale .16s var(--ease-apple-press); }
 .range-switch button.active { color: #e9fdf9; background: rgba(86,217,202,.13); box-shadow: inset 0 0 0 1px rgba(86,217,202,.12); }
 .range-switch button:active { scale: .94; }
-.glass-card { background: linear-gradient(145deg, rgba(19,26,35,.82), rgba(12,17,24,.72)); border: 0; border-radius: 18px; box-shadow: 0 18px 60px rgba(0,0,0,.15); backdrop-filter: blur(18px); }
+.glass-card { background: linear-gradient(145deg, rgba(19,26,35,.82), rgba(12,17,24,.72)); border: 0; border-radius: 18px; box-shadow: 0 18px 60px rgba(0,0,0,.15), var(--cursor-edge-shadow, 0 0 transparent); backdrop-filter: blur(18px); }
 .hero-grid { display: grid; grid-template-columns: minmax(0, 2.1fr) minmax(260px, .9fr); gap: 15px; scroll-margin-top: 90px; }
 .equity-card { padding: 21px 22px 17px; min-width: 0; }
 .card-head, .section-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; }
@@ -1241,7 +1241,7 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
 
 @media (hover: hover) and (pointer: fine) {
   .glass-card { transition: transform .32s var(--ease-apple-layout),border-color .28s var(--ease-apple-fade),box-shadow .32s var(--ease-apple-layout),background .28s var(--ease-apple-fade); }
-  .glass-card:not(.timeline-card):not(.trade-inspector):hover { transform: perspective(1200px) rotateX(var(--cursor-tilt-x, 0deg)) rotateY(var(--cursor-tilt-y, 0deg)) translateY(calc(-2px + var(--cursor-depth, 0px))); border-color: rgba(86,217,202,.18); box-shadow: 0 27px 76px rgba(0,0,0,.26), 0 10px 28px rgba(0,0,0,.12), 0 0 0 1px rgba(86,217,202,.025); }
+  .glass-card:not(.timeline-card):not(.trade-inspector):hover { transform: perspective(1200px) rotateX(var(--cursor-tilt-x, 0deg)) rotateY(var(--cursor-tilt-y, 0deg)) translateY(calc(-2px + var(--cursor-depth, 0px))); border-color: rgba(86,217,202,.18); box-shadow: 0 27px 76px rgba(0,0,0,.26), 0 10px 28px rgba(0,0,0,.12), 0 0 0 1px rgba(86,217,202,.025), var(--cursor-edge-shadow, 0 0 transparent); }
   .hybrid-trade:hover { transform: translateX(2px); border-color: var(--stroke-strong); }
   .hybrid-trade.loss:hover { border-color: rgba(255,111,125,.3); }
   .negative-surface:hover { border-color: rgba(255,111,125,.34); box-shadow: 0 23px 70px rgba(54,4,14,.2), inset 0 1px rgba(255,170,178,.04); }
