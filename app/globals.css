@@ -157,12 +157,12 @@ nav button b { margin-left: auto; font-size: 8px; color: #091110; background: va
   z-index: 4;
   pointer-events: none;
   inset: 0;
-  padding: 3px;
+  padding: 4px;
   border-radius: inherit;
   opacity: var(--cursor-reflect-opacity, 0);
   background: radial-gradient(860px circle at var(--cursor-reflect-x, 50%) var(--cursor-reflect-y, 50%), rgb(var(--cursor-reflect-rgb) / .56), rgb(var(--cursor-reflect-rgb) / .22) 42%, transparent 93%);
   mix-blend-mode: screen;
-  filter: blur(.65px);
+  filter: blur(1.25px);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
