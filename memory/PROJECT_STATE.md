@@ -11,9 +11,9 @@ Web app moderna per analisi di trading, ispirata alle funzioni di Myfxbook ma co
 - Repository: `emil2699-lab/BlueSpherix`, branch `first`.
 - Anteprima: `https://emil2699-lab.github.io/BlueSpherix/`.
 - Stack: Next.js 16.4.3, React 19.3.1, TypeScript, export statico su GitHub Pages.
-- Sezioni già sviluppate: Dashboard, Portfolio, Analytics, Operazioni e Rischio.
+- Sezioni già sviluppate: Dashboard, Portfolio, Analytics, Operazioni, Rischio e Strategy Lab.
 - La sezione Rischio è completa: budget di rischio, stress test, simulatore pre-trade, correlazioni, drawdown, protezioni, Monte Carlo e guardrail.
-- Ultimo commit pubblicato al momento di questo file: `5cade63 feat: expand monte carlo risk options`.
+- Strategy Lab include tre ipotesi interattive, confronto Digital Twin, costi reali, rischio variabile e validazione walk-forward.
 
 ## Preferenze UI vincolanti
 
@@ -45,4 +45,4 @@ Web app moderna per analisi di trading, ispirata alle funzioni di Myfxbook ma co
 
 ## Prossimo passo consigliato
 
-Considerare conclusa la sezione Rischio e sviluppare in un unico blocco la prossima sezione principale. La voce `Lab` non ha ancora una pagina dedicata completa ed è il candidato naturale.
+Consolidare il prossimo blocco principale dopo la revisione utente dello Strategy Lab; evitare nuove estensioni della sezione Rischio salvo richieste specifiche.

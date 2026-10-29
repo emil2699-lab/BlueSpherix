@@ -29,6 +29,7 @@ import Portfolio from "./portfolio";
 import Analytics from "./analytics";
 import Operations from "./operations";
 import Risk from "./risk";
+import Lab from "./lab";
 import { ALPHA_ACCOUNT, BEST_RECENT_TRADE, BEST_SESSION_30D, DASHBOARD_RANGE_STATS, DEMO_BALANCE_SERIES, DEMO_EQUITY_SERIES, DEMO_PERIOD_STATS, OPEN_PNL, OPEN_TRADES, type DashboardRange } from "./demo-data";
 import { valueSign } from "./value-sign";
 
@@ -42,7 +43,7 @@ const navItems = [
   { label: "Analisi", icon: LineChart, target: "analytics" },
   { label: "Operazioni", icon: Activity, target: "positions" },
   { label: "Rischio", icon: ShieldCheck, target: "risk" },
-  { label: "Lab", icon: FlaskConical, target: "story" },
+  { label: "Lab", icon: FlaskConical, target: "lab" },
 ];
 
 const money = (value: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(value);
@@ -115,7 +116,7 @@ export default function Home() {
       const target = window.location.hash.slice(1) || "overview";
       setView(target);
       requestAnimationFrame(() => {
-        if (target === "portfolio" || target === "analytics" || target === "positions" || target === "risk") window.scrollTo({ top: 0, behavior });
+        if (target === "portfolio" || target === "analytics" || target === "positions" || target === "risk" || target === "lab") window.scrollTo({ top: 0, behavior });
         else document.getElementById(target)?.scrollIntoView({ behavior, block: "start" });
       });
     };
@@ -154,7 +155,7 @@ export default function Home() {
             <button className={view === target ? "active" : ""} aria-current={view === target ? "page" : undefined} key={label} onClick={() => goTo(target)}><Icon size={18} /><span>{label}</span>{label === "Lab" && <em>Beta</em>}</button>
           ))}
           <p className="nav-label spaced">Strumenti</p>
-          <button onClick={() => goTo("story")}><BookOpen size={18} /><span>Diario</span></button>
+          <button onClick={() => goTo("positions")}><BookOpen size={18} /><span>Diario</span></button>
           <button onClick={() => goTo("calendar")}><CalendarDays size={18} /><span>Calendario</span><b>3</b></button>
         </nav>
         <div className="sidebar-bottom">
@@ -181,7 +182,8 @@ export default function Home() {
           {view === "analytics" && <Analytics />}
           {view === "positions" && <Operations />}
           {view === "risk" && <Risk />}
-          <div hidden={view === "portfolio" || view === "analytics" || view === "positions" || view === "risk"}>
+          {view === "lab" && <Lab />}
+          <div hidden={view === "portfolio" || view === "analytics" || view === "positions" || view === "risk" || view === "lab"}>
           <section className="welcome" id="overview">
             <div><p className="date-line">Mercoledì, 28 ottobre</p><h1>Buongiorno, Luca.</h1><p>Il portafoglio è stabile. Il rischio è sotto controllo.</p></div>
             <div className="range-switch" aria-label="Periodo">
