@@ -434,10 +434,11 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
 .filter-field { position: relative; min-width: 0; }
 .filter-field > span { min-height: 12px; display: flex; align-items: center; gap: 5px; margin-bottom: 6px; color: #74818e; font-size: 7px; text-transform: uppercase; letter-spacing: .65px; }
 .filter-field > span svg { color: #8f82da; }
-.filter-field input, .filter-select-control { width: 100%; height: 35px; border: 1px solid rgba(255,255,255,.085); border-radius: 9px; outline: 0; color: #c3cdd4; background: linear-gradient(145deg,rgba(255,255,255,.045),rgba(255,255,255,.018)); font: inherit; font-size: 9px; transition: border-color .18s ease,background .18s ease,box-shadow .18s ease; }
+.filter-field input, .filter-select-control, .date-picker-control { width: 100%; height: 35px; border: 1px solid rgba(255,255,255,.085); border-radius: 9px; outline: 0; color: #c3cdd4; background: linear-gradient(145deg,rgba(255,255,255,.045),rgba(255,255,255,.018)); font: inherit; font-size: 9px; transition: border-color .18s ease,background .18s ease,box-shadow .18s ease; }
 .filter-field input { padding: 0 10px; }
-.filter-field input:hover, .filter-select-control:hover { border-color: rgba(157,139,255,.2); background: rgba(255,255,255,.045); }
-.filter-field input:focus, .filter-select.open .filter-select-control { border-color: rgba(157,139,255,.38); box-shadow: 0 0 0 3px rgba(157,139,255,.07); }
+.filter-field input:hover, .filter-select-control:hover, .date-picker-control:hover { border-color: rgba(157,139,255,.2); background: rgba(255,255,255,.045); }
+.filter-field input:focus, .filter-select.open .filter-select-control, .date-picker.open .date-picker-control { border-color: rgba(157,139,255,.38); box-shadow: 0 0 0 3px rgba(157,139,255,.07); }
+.filter-field.open { z-index: 50; }
 .filter-select-control { display: flex; align-items: center; justify-content: space-between; gap: 7px; padding: 0 9px 0 10px; cursor: pointer; text-align: left; }
 .filter-select-control > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .filter-select-control svg { flex-shrink: 0; color: #777f91; transition: transform .22s ease,color .18s ease; }
@@ -447,8 +448,25 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
 .filter-select-menu button:hover { color: #edf5f7; background: rgba(157,139,255,.09); transform: translateX(1px); }
 .filter-select-menu button[aria-selected="true"] { color: #e7e1ff; background: linear-gradient(90deg,rgba(157,139,255,.16),rgba(157,139,255,.045)); }
 .filter-select-menu button svg { flex-shrink: 0; color: #aa9bff; }
-.date-filter input { color-scheme: dark; cursor: pointer; }
-.date-filter input::-webkit-calendar-picker-indicator { opacity: .6; cursor: pointer; filter: sepia(.15) saturate(1.35) hue-rotate(205deg); }
+.date-picker-control { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 9px 0 10px; cursor: pointer; text-align: left; }
+.date-picker-control .placeholder { color: #697581; }
+.date-picker-control svg { flex-shrink: 0; color: #897bd2; }
+.date-picker-menu { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; width: 246px; padding: 10px; border: 1px solid rgba(157,139,255,.22); border-radius: 14px; background: radial-gradient(circle at 100% 0%,rgba(157,139,255,.12),transparent 42%),linear-gradient(155deg,rgba(24,30,40,.99),rgba(10,15,22,.99)); box-shadow: 0 20px 48px rgba(0,0,0,.46),inset 0 1px rgba(255,255,255,.045); backdrop-filter: blur(22px); transform-origin: top; animation: filter-menu-in .2s cubic-bezier(.2,.8,.2,1) both; }
+.date-picker-head { display: grid; grid-template-columns: 29px 1fr 29px; align-items: center; gap: 5px; margin-bottom: 9px; }
+.date-picker-head strong { text-align: center; color: #d7dfe5; font-size: 10px; font-weight: 620; text-transform: capitalize; }
+.date-picker-head button { width: 29px; height: 29px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.07); border-radius: 8px; color: #8e99a5; background: rgba(255,255,255,.025); cursor: pointer; transition: color .15s ease,border-color .15s ease,background .15s ease; }
+.date-picker-head button:hover { color: #e8e3ff; border-color: rgba(157,139,255,.24); background: rgba(157,139,255,.08); }
+.date-weekdays, .date-days { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; }
+.date-weekdays { margin-bottom: 4px; }
+.date-weekdays span { display: grid; place-items: center; height: 20px; color: #596672; font-size: 7px; font-weight: 700; }
+.date-days > span, .date-days button { height: 27px; display: grid; place-items: center; border: 0; border-radius: 8px; font: inherit; font-size: 8px; }
+.date-days button { color: #aab5be; background: transparent; cursor: pointer; transition: color .15s ease,background .15s ease,transform .15s ease; }
+.date-days button:hover:not(:disabled) { color: #f3f8fa; background: rgba(157,139,255,.11); transform: translateY(-1px); }
+.date-days button[aria-pressed="true"] { color: #07110f; background: linear-gradient(145deg,#7cebdd,#4fcabd); box-shadow: 0 5px 14px rgba(86,217,202,.2); font-weight: 750; }
+.date-days button:disabled { color: #3d4853; cursor: not-allowed; }
+.date-picker-foot { display: flex; justify-content: flex-end; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--stroke); }
+.date-picker-foot button { min-height: 27px; padding: 0 8px; border: 0; border-radius: 7px; color: #9d91d8; background: rgba(157,139,255,.06); font-size: 7px; cursor: pointer; }
+.date-picker-foot button:disabled { opacity: .35; cursor: default; }
 .advanced-filters .clear-filters { grid-column: 1 / -1; justify-self: end; height: 30px; padding: 0 11px; border: 1px solid rgba(157,139,255,.18); border-radius: 8px; color: #beb4e8; background: rgba(157,139,255,.07); font-size: 8px; cursor: pointer; transition: color .18s ease,border-color .18s ease,background .18s ease; }
 .advanced-filters .clear-filters:hover { color: #eeeaff; border-color: rgba(157,139,255,.3); background: rgba(157,139,255,.12); }
 .trade-timeline { margin-top: 8px; }

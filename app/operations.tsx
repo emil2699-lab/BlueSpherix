@@ -8,6 +8,8 @@ import {
   CalendarDays,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Download,
   ImagePlus,
   Search,
@@ -26,6 +28,7 @@ type FocusTab = "Dettagli" | "Diario";
 
 const periodStats = DEMO_PERIOD_STATS;
 const trades = DEMO_TRADES;
+const latestTradeDate = trades.reduce((latest, trade) => trade.openedAt > latest ? trade.openedAt : latest, trades[0]?.openedAt ?? "1970-01-01T00:00:00.000Z").slice(0, 10);
 
 const money = (value: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value);
 const signedMoney = (value: number) => `${value > 0 ? "+" : ""}${money(value)}`;
@@ -332,8 +335,8 @@ function AdvancedFilters({ accountFilter, setAccountFilter, symbolFilter, setSym
     <FilterSelect label="Simbolo" value={symbolFilter} options={["Tutti", ...symbolOptions]} onChange={setSymbolFilter} />
     <FilterSelect label="Direzione" value={directionFilter} options={["Tutte", "Long", "Short"]} onChange={(value) => setDirectionFilter(value as DirectionFilter)} />
     <FilterSelect label="Setup" value={setupFilter} options={["Tutti", ...setupOptions]} onChange={setSetupFilter} />
-    <label className="filter-field date-filter"><span><CalendarDays size={11} /> Data da</span><input type="date" value={dateFrom} max={dateTo || undefined} onChange={(event) => setDateFrom(event.target.value)} /></label>
-    <label className="filter-field date-filter"><span><CalendarDays size={11} /> Data a</span><input type="date" value={dateTo} min={dateFrom || undefined} onChange={(event) => setDateTo(event.target.value)} /></label>
+    <DateFilterPicker label="Data da" value={dateFrom} max={dateTo || undefined} onChange={setDateFrom} />
+    <DateFilterPicker label="Data a" value={dateTo} min={dateFrom || undefined} onChange={setDateTo} />
     {!pendingMode && <><label className="filter-field"><span>Risultato min.</span><input type="number" value={minResult} onChange={(event) => setMinResult(event.target.value)} placeholder="USD" /></label><label className="filter-field"><span>Risultato max.</span><input type="number" value={maxResult} onChange={(event) => setMaxResult(event.target.value)} placeholder="USD" /></label></>}
     <button className="clear-filters" onClick={clear}>Azzera filtri</button>
   </div>;
@@ -364,6 +367,78 @@ function FilterSelect({ label, value, options, onChange }: { label: string; valu
     <button className="filter-select-control" type="button" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((current) => !current)}><span>{value}</span><ChevronDown size={13} /></button>
     {open && <div className="filter-select-menu" role="listbox" aria-label={label}>
       {options.map((option) => <button type="button" role="option" aria-selected={value === option} key={option} onClick={() => { onChange(option); setOpen(false); }}><span>{option}</span>{value === option && <Check size={12} />}</button>)}
+    </div>}
+  </div>;
+}
+
+const dateToIso = (date: Date) => `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+const dateFromIso = (value: string) => {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day));
+};
+
+function DateFilterPicker({ label, value, min, max, onChange }: { label: string; value: string; min?: string; max?: string; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [viewMonth, setViewMonth] = useState(() => {
+    const anchor = dateFromIso(value || latestTradeDate);
+    return new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), 1));
+  });
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOnOutside = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
+
+  const year = viewMonth.getUTCFullYear();
+  const month = viewMonth.getUTCMonth();
+  const firstWeekday = (viewMonth.getUTCDay() + 6) % 7;
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const calendarCells = Array.from({ length: 42 }, (_, index) => {
+    const day = index - firstWeekday + 1;
+    return day > 0 && day <= daysInMonth ? day : null;
+  });
+  const visibleValue = value ? new Intl.DateTimeFormat("it-IT", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" }).format(dateFromIso(value)).replace(".", "") : "Seleziona data";
+  const monthLabel = new Intl.DateTimeFormat("it-IT", { month: "long", year: "numeric", timeZone: "UTC" }).format(viewMonth);
+  const moveMonth = (amount: number) => setViewMonth(new Date(Date.UTC(year, month + amount, 1)));
+  const toggleCalendar = () => {
+    if (!open) {
+      const anchor = dateFromIso(value || latestTradeDate);
+      setViewMonth(new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), 1)));
+    }
+    setOpen((current) => !current);
+  };
+  const chooseDay = (day: number) => {
+    onChange(dateToIso(new Date(Date.UTC(year, month, day))));
+    setOpen(false);
+  };
+
+  return <div className={`filter-field date-picker ${open ? "open" : ""}`} ref={rootRef}>
+    <span><CalendarDays size={11} /> {label}</span>
+    <button className="date-picker-control" type="button" aria-haspopup="dialog" aria-expanded={open} onClick={toggleCalendar}><span className={value ? "" : "placeholder"}>{visibleValue}</span><CalendarDays size={13} /></button>
+    {open && <div className="date-picker-menu" role="dialog" aria-label={`Calendario ${label}`}>
+      <div className="date-picker-head"><button type="button" aria-label="Mese precedente" onClick={() => moveMonth(-1)}><ChevronLeft size={14} /></button><strong>{monthLabel}</strong><button type="button" aria-label="Mese successivo" onClick={() => moveMonth(1)}><ChevronRight size={14} /></button></div>
+      <div className="date-weekdays" aria-hidden="true">{["L", "M", "M", "G", "V", "S", "D"].map((day, index) => <span key={`${day}-${index}`}>{day}</span>)}</div>
+      <div className="date-days">
+        {calendarCells.map((day, index) => {
+          if (!day) return <span key={`empty-${index}`} />;
+          const iso = dateToIso(new Date(Date.UTC(year, month, day)));
+          const disabled = Boolean((min && iso < min) || (max && iso > max));
+          return <button type="button" key={iso} disabled={disabled} aria-pressed={value === iso} onClick={() => chooseDay(day)}>{day}</button>;
+        })}
+      </div>
+      <div className="date-picker-foot"><button type="button" disabled={!value} onClick={() => { onChange(""); setOpen(false); }}>Rimuovi data</button></div>
     </div>}
   </div>;
 }
