@@ -1,13 +1,14 @@
 "use client";
 
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
-import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, CheckCircle2, Crosshair, Gauge, Layers3, Network, Plus, ShieldAlert, ShieldCheck, Sparkles, Target, TrendingDown } from "lucide-react";
-import { ALPHA_ACCOUNT, DEMO_EQUITY_SERIES, OPEN_TRADES, type DemoTrade } from "./demo-data";
+import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, BellRing, CalendarClock, CheckCircle2, Crosshair, Gauge, Layers3, Network, Plus, ShieldAlert, ShieldCheck, Sparkles, Target, TrendingDown } from "lucide-react";
+import { ALPHA_ACCOUNT, DEMO_EQUITY_SERIES, DEMO_TRADES, OPEN_TRADES, type DemoTrade } from "./demo-data";
 import { valueSign } from "./value-sign";
 
 type StressScenario = "stop" | "volatility" | "gap";
 type CorrelationId = "eur-xau" | "eur-gbp" | "xau-gbp";
 type DrawdownRange = "7G" | "30G" | "90G";
+type ProtectionId = "daily-loss" | "loss-streak" | "margin" | "news";
 
 const money = (value: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value);
 const signedMoney = (value: number) => `${value > 0 ? "+" : ""}${money(value)}`;
@@ -54,6 +55,7 @@ export default function Risk() {
   const [correlationId, setCorrelationId] = useState<CorrelationId>("eur-xau");
   const [drawdownRange, setDrawdownRange] = useState<DrawdownRange>("30G");
   const [drawdownPoint, setDrawdownPoint] = useState(drawdownRanges["30G"].series.length - 1);
+  const [protections, setProtections] = useState<Record<ProtectionId, boolean>>({ "daily-loss": true, "loss-streak": true, margin: true, news: true });
   const openRisk = useMemo(() => OPEN_TRADES.reduce((total, trade) => total + trade.riskUsd, 0), []);
   const budgetUsd = ALPHA_ACCOUNT.equity * ALPHA_ACCOUNT.riskLimit / 100;
   const budgetUsed = openRisk / budgetUsd * 100;
@@ -95,6 +97,18 @@ export default function Risk() {
   const timeUnderwater = selectedDrawdown < .01 ? 0 : Math.max(1, Math.round((activeDrawdownPoint - previousPeakIndex) * (drawdownRanges[drawdownRange].days - 1) / Math.max(1, drawdownHistory.length - 1)));
   const drawdownLimit = 8;
   const drawdownStrength = Math.min(1, selectedDrawdown / drawdownLimit);
+  const latestClosedTrades = DEMO_TRADES.filter(trade => trade.status === "Chiusa").sort((a, b) => b.openedAt.localeCompare(a.openedAt));
+  const consecutiveLosses = latestClosedTrades.findIndex(trade => trade.netPnl >= 0) === -1 ? latestClosedTrades.length : latestClosedTrades.findIndex(trade => trade.netPnl >= 0);
+  const todayClosedNet = latestClosedTrades.filter(trade => trade.openedAt.startsWith("2026-10-28")).reduce((total, trade) => total + trade.netPnl, 0);
+  const dailyLossPct = Math.max(0, -todayClosedNet / ALPHA_ACCOUNT.equity * 100);
+  const protectionRules = [
+    { id: "daily-loss" as const, icon: <TrendingDown size={17} />, label: "Perdita giornaliera", detail: "Avvisa quando le perdite chiuse raggiungono il 2% dell’equity.", value: `${percent(dailyLossPct)} / ${percent(2)}`, used: dailyLossPct / 2 * 100, tone: dailyLossPct >= 2 ? "critical" : dailyLossPct >= 1.4 ? "warning" : "calm", triggered: dailyLossPct >= 2 },
+    { id: "loss-streak" as const, icon: <Activity size={17} />, label: "Serie di perdite", detail: "Segnala tre operazioni chiuse consecutive in perdita.", value: `${consecutiveLosses} / 3 trade`, used: consecutiveLosses / 3 * 100, tone: consecutiveLosses >= 3 ? "critical" : consecutiveLosses === 2 ? "warning" : "calm", triggered: consecutiveLosses >= 3 },
+    { id: "margin" as const, icon: <Gauge size={17} />, label: "Utilizzo del margine", detail: "Avvisa prima che il margine utilizzato superi il 20%.", value: `${percent(ALPHA_ACCOUNT.marginUsage, 1)} / ${percent(20, 0)}`, used: ALPHA_ACCOUNT.marginUsage / 20 * 100, tone: ALPHA_ACCOUNT.marginUsage >= 20 ? "critical" : ALPHA_ACCOUNT.marginUsage >= 14 ? "warning" : "calm", triggered: ALPHA_ACCOUNT.marginUsage >= 20 },
+    { id: "news" as const, icon: <CalendarClock size={17} />, label: "News ad alto impatto", detail: "Ricorda gli eventi macro entro 24 ore sulle valute esposte.", value: "3 eventi · 24h", used: 75, tone: "warning", triggered: false },
+  ];
+  const activeProtectionCount = protectionRules.filter(rule => protections[rule.id]).length;
+  const triggeredProtections = protectionRules.filter(rule => protections[rule.id] && rule.triggered);
 
   return <div className="risk-view">
     <section className="welcome">
@@ -216,6 +230,31 @@ export default function Risk() {
         <div className="drawdown-limit-track"><i style={{ width: `${drawdownStrength * 100}%` }} /></div>
         <small>{percent(Math.max(0, drawdownLimit - selectedDrawdown))} prima del limite dell’{percent(drawdownLimit, 0)}</small>
         <dl><div><dt>Equity</dt><dd>{money(selectedEquity)}</dd></div><div><dt>Da recuperare</dt><dd>{money(recoveryAmount)}</dd></div><div><dt>Tempo sotto il massimo</dt><dd>{timeUnderwater ? `${timeUnderwater} giorni` : "Nuovo massimo"}</dd></div><div><dt>Picco nel periodo</dt><dd>{percent(Math.max(...drawdownHistory))}</dd></div></dl>
+      </aside>
+    </section>
+
+    <section className="risk-protections-grid">
+      <article className="glass-card protections-card">
+        <div className="section-head"><div><p className="eyebrow">Protezioni e avvisi</p><h2>Le soglie che sorvegliano il conto.</h2></div><BellRing size={20} /></div>
+        <p className="protections-intro">Ogni regola analizza i dati sincronizzati e genera un avviso. BlueSpherix non apre, modifica o chiude operazioni.</p>
+        <div className="protection-list">{protectionRules.map(rule => {
+          const enabled = protections[rule.id];
+          return <div className={`protection-row ${rule.tone} ${enabled ? "enabled" : "disabled"}`} key={rule.id}>
+            <span className="protection-icon">{rule.icon}</span>
+            <div className="protection-copy"><strong>{rule.label}</strong><p>{rule.detail}</p><div className="protection-progress"><i style={{ width: `${Math.min(100, rule.used)}%` }} /></div></div>
+            <div className="protection-value"><strong>{rule.value}</strong><small>{enabled ? rule.triggered ? "Soglia raggiunta" : rule.tone === "warning" ? "Da monitorare" : "Nella norma" : "Disattivato"}</small></div>
+            <button type="button" className={`protection-switch ${enabled ? "on" : ""}`} aria-pressed={enabled} aria-label={`${enabled ? "Disattiva" : "Attiva"} avviso ${rule.label}`} onClick={() => setProtections(current => ({ ...current, [rule.id]: !current[rule.id] }))}><span /></button>
+          </div>;
+        })}</div>
+      </article>
+
+      <aside className={`glass-card protection-summary ${triggeredProtections.length ? "has-alert" : "all-clear"}`} aria-live="polite">
+        <div className="protection-ring" style={{ "--protection-progress": `${activeProtectionCount / protectionRules.length * 360}deg` } as CSSProperties}><div><ShieldCheck size={20} /><strong>{activeProtectionCount}/{protectionRules.length}</strong><span>attive</span></div></div>
+        <p className="eyebrow">Spherix shield</p>
+        <h2>{triggeredProtections.length ? `${triggeredProtections.length} soglia raggiunta` : "Nessuna soglia raggiunta"}</h2>
+        <p>{triggeredProtections.length ? `La regola “${triggeredProtections[0].label}” richiede attenzione prima della prossima operazione.` : "Le protezioni attive non rilevano condizioni critiche in questo momento."}</p>
+        <div className={`protection-alert ${triggeredProtections.length ? "critical" : "calm"}`}>{triggeredProtections.length ? <ShieldAlert size={16} /> : <CheckCircle2 size={16} />}<span><strong>{triggeredProtections.length ? triggeredProtections[0].value : "Conto monitorato"}</strong><small>{triggeredProtections.length ? "Valuta una pausa e rivedi le ultime esecuzioni." : "Gli avvisi restano attivi in background."}</small></span></div>
+        <small className="read-only-note"><ShieldCheck size={12} /> Modalità sola lettura · nessuna azione automatica su MT5</small>
       </aside>
     </section>
 
