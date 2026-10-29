@@ -5,7 +5,9 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   BookOpen,
+  CalendarDays,
   Check,
+  ChevronDown,
   Download,
   ImagePlus,
   Search,
@@ -50,6 +52,8 @@ export default function Operations() {
   const [setupFilter, setSetupFilter] = useState("Tutti");
   const [minResult, setMinResult] = useState("");
   const [maxResult, setMaxResult] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const stats = periodStats[period];
   const periodTrades = useMemo(() => tradesForPeriod(period), [period]);
   const setupOptions = useMemo(() => [...new Set([...periodTrades.map((trade) => trade.setup), ...DEMO_PENDING_ORDERS.map((order) => order.setup)])].sort(), [periodTrades]);
@@ -66,12 +70,14 @@ export default function Operations() {
       if (symbolFilter !== "Tutti" && trade.symbol !== symbolFilter) return false;
       if (directionFilter !== "Tutte" && trade.side !== directionFilter) return false;
       if (setupFilter !== "Tutti" && trade.setup !== setupFilter) return false;
+      if (dateFrom && trade.openedAt.slice(0, 10) < dateFrom) return false;
+      if (dateTo && trade.openedAt.slice(0, 10) > dateTo) return false;
       if (minResult && trade.result < Number(minResult)) return false;
       if (maxResult && trade.result > Number(maxResult)) return false;
       return !normalized || `${trade.symbol} ${trade.setup} ${trade.id}`.toLowerCase().includes(normalized);
     });
     return matching;
-  }, [directionFilter, filter, maxResult, minResult, periodTrades, query, setupFilter, symbolFilter]);
+  }, [dateFrom, dateTo, directionFilter, filter, maxResult, minResult, periodTrades, query, setupFilter, symbolFilter]);
 
   const visiblePending = useMemo(() => {
     if (filter !== "Pendenti") return [];
@@ -81,9 +87,11 @@ export default function Operations() {
       if (symbolFilter !== "Tutti" && order.symbol !== symbolFilter) return false;
       if (directionFilter !== "Tutte" && order.side !== directionFilter) return false;
       if (setupFilter !== "Tutti" && order.setup !== setupFilter) return false;
+      if (dateFrom && order.createdAt.slice(0, 10) < dateFrom) return false;
+      if (dateTo && order.createdAt.slice(0, 10) > dateTo) return false;
       return !normalized || `${order.symbol} ${order.setup} ${order.id} ${order.type}`.toLowerCase().includes(normalized);
     });
-  }, [accountFilter, directionFilter, filter, query, setupFilter, symbolFilter]);
+  }, [accountFilter, dateFrom, dateTo, directionFilter, filter, query, setupFilter, symbolFilter]);
 
   const selectedTrade = visibleTrades.find((trade) => trade.id === selected) ?? visibleTrades[0] ?? periodTrades[0] ?? trades[0];
   const selectedPending = visiblePending.find((order) => order.id === selectedPendingId) ?? visiblePending[0] ?? DEMO_PENDING_ORDERS[0];
@@ -95,6 +103,8 @@ export default function Operations() {
     setSetupFilter("Tutti");
     setMinResult("");
     setMaxResult("");
+    setDateFrom("");
+    setDateTo("");
   };
 
   const download = () => {
@@ -159,6 +169,10 @@ export default function Operations() {
         setMinResult={setMinResult}
         maxResult={maxResult}
         setMaxResult={setMaxResult}
+        dateFrom={dateFrom}
+        setDateFrom={setDateFrom}
+        dateTo={dateTo}
+        setDateTo={setDateTo}
         clearAdvancedFilters={clearAdvancedFilters}
       />
 
@@ -206,7 +220,7 @@ function HybridOverview({ stats, period, maxFlow, periodTrades }: { stats: (type
   </section>;
 }
 
-function TimelineWorkspace({ contained = false, visible, pendingOrders, selectedTrade, selectedPending, setSelected, setSelectedPending, query, setQuery, filter, setFilter, filtersOpen, setFiltersOpen, accountFilter, setAccountFilter, symbolFilter, setSymbolFilter, symbolOptions, directionFilter, setDirectionFilter, setupFilter, setSetupFilter, setupOptions, minResult, setMinResult, maxResult, setMaxResult, clearAdvancedFilters }: {
+function TimelineWorkspace({ contained = false, visible, pendingOrders, selectedTrade, selectedPending, setSelected, setSelectedPending, query, setQuery, filter, setFilter, filtersOpen, setFiltersOpen, accountFilter, setAccountFilter, symbolFilter, setSymbolFilter, symbolOptions, directionFilter, setDirectionFilter, setupFilter, setSetupFilter, setupOptions, minResult, setMinResult, maxResult, setMaxResult, dateFrom, setDateFrom, dateTo, setDateTo, clearAdvancedFilters }: {
   contained?: boolean;
   visible: typeof trades;
   pendingOrders: DemoPendingOrder[];
@@ -234,6 +248,10 @@ function TimelineWorkspace({ contained = false, visible, pendingOrders, selected
   setMinResult: (value: string) => void;
   maxResult: string;
   setMaxResult: (value: string) => void;
+  dateFrom: string;
+  setDateFrom: (value: string) => void;
+  dateTo: string;
+  setDateTo: (value: string) => void;
   clearAdvancedFilters: () => void;
 }) {
   const inspectorRef = useRef<HTMLElement>(null);
@@ -271,7 +289,7 @@ function TimelineWorkspace({ contained = false, visible, pendingOrders, selected
         </div>
       </div>
       <TradeFilters filter={filter} setFilter={setFilter} />
-      {filtersOpen && <AdvancedFilters accountFilter={accountFilter} setAccountFilter={setAccountFilter} symbolFilter={symbolFilter} setSymbolFilter={setSymbolFilter} symbolOptions={symbolOptions} directionFilter={directionFilter} setDirectionFilter={setDirectionFilter} setupFilter={setupFilter} setSetupFilter={setSetupFilter} setupOptions={setupOptions} minResult={minResult} setMinResult={setMinResult} maxResult={maxResult} setMaxResult={setMaxResult} clear={clearAdvancedFilters} pendingMode={pendingMode} />}
+      {filtersOpen && <AdvancedFilters accountFilter={accountFilter} setAccountFilter={setAccountFilter} symbolFilter={symbolFilter} setSymbolFilter={setSymbolFilter} symbolOptions={symbolOptions} directionFilter={directionFilter} setDirectionFilter={setDirectionFilter} setupFilter={setupFilter} setSetupFilter={setSetupFilter} setupOptions={setupOptions} minResult={minResult} setMinResult={setMinResult} maxResult={maxResult} setMaxResult={setMaxResult} dateFrom={dateFrom} setDateFrom={setDateFrom} dateTo={dateTo} setDateTo={setDateTo} clear={clearAdvancedFilters} pendingMode={pendingMode} />}
       <div className="trade-timeline">
         {pendingMode ? <PendingStream orders={pendingOrders} selected={selectedPending} setSelected={setSelectedPending} /> : groupedTradeDays(visible).map(({ day, trades: dayTrades }) => {
           const total = dayTrades.reduce((sum, trade) => sum + trade.result, 0);
@@ -298,22 +316,55 @@ function TimelineWorkspace({ contained = false, visible, pendingOrders, selected
   </section>;
 }
 
-function AdvancedFilters({ accountFilter, setAccountFilter, symbolFilter, setSymbolFilter, symbolOptions, directionFilter, setDirectionFilter, setupFilter, setSetupFilter, setupOptions, minResult, setMinResult, maxResult, setMaxResult, clear, pendingMode }: {
+function AdvancedFilters({ accountFilter, setAccountFilter, symbolFilter, setSymbolFilter, symbolOptions, directionFilter, setDirectionFilter, setupFilter, setSetupFilter, setupOptions, minResult, setMinResult, maxResult, setMaxResult, dateFrom, setDateFrom, dateTo, setDateTo, clear, pendingMode }: {
   accountFilter: string; setAccountFilter: (value: string) => void;
   symbolFilter: string; setSymbolFilter: (value: string) => void; symbolOptions: string[];
   directionFilter: DirectionFilter; setDirectionFilter: (value: DirectionFilter) => void;
   setupFilter: string; setSetupFilter: (value: string) => void; setupOptions: string[];
   minResult: string; setMinResult: (value: string) => void;
   maxResult: string; setMaxResult: (value: string) => void;
+  dateFrom: string; setDateFrom: (value: string) => void;
+  dateTo: string; setDateTo: (value: string) => void;
   clear: () => void; pendingMode: boolean;
 }) {
   return <div className="advanced-filters">
-    <label><span>Conto</span><select value={accountFilter} onChange={(event) => setAccountFilter(event.target.value)}><option>Tutti</option><option>Alpha Momentum</option></select></label>
-    <label><span>Simbolo</span><select value={symbolFilter} onChange={(event) => setSymbolFilter(event.target.value)}><option>Tutti</option>{symbolOptions.map((symbol) => <option key={symbol}>{symbol}</option>)}</select></label>
-    <label><span>Direzione</span><select value={directionFilter} onChange={(event) => setDirectionFilter(event.target.value as DirectionFilter)}><option>Tutte</option><option>Long</option><option>Short</option></select></label>
-    <label><span>Setup</span><select value={setupFilter} onChange={(event) => setSetupFilter(event.target.value)}><option>Tutti</option>{setupOptions.map((setup) => <option key={setup}>{setup}</option>)}</select></label>
-    {!pendingMode && <><label><span>Risultato min.</span><input type="number" value={minResult} onChange={(event) => setMinResult(event.target.value)} placeholder="USD" /></label><label><span>Risultato max.</span><input type="number" value={maxResult} onChange={(event) => setMaxResult(event.target.value)} placeholder="USD" /></label></>}
-    <button onClick={clear}>Azzera filtri</button>
+    <FilterSelect label="Conto" value={accountFilter} options={["Tutti", "Alpha Momentum"]} onChange={setAccountFilter} />
+    <FilterSelect label="Simbolo" value={symbolFilter} options={["Tutti", ...symbolOptions]} onChange={setSymbolFilter} />
+    <FilterSelect label="Direzione" value={directionFilter} options={["Tutte", "Long", "Short"]} onChange={(value) => setDirectionFilter(value as DirectionFilter)} />
+    <FilterSelect label="Setup" value={setupFilter} options={["Tutti", ...setupOptions]} onChange={setSetupFilter} />
+    <label className="filter-field date-filter"><span><CalendarDays size={11} /> Data da</span><input type="date" value={dateFrom} max={dateTo || undefined} onChange={(event) => setDateFrom(event.target.value)} /></label>
+    <label className="filter-field date-filter"><span><CalendarDays size={11} /> Data a</span><input type="date" value={dateTo} min={dateFrom || undefined} onChange={(event) => setDateTo(event.target.value)} /></label>
+    {!pendingMode && <><label className="filter-field"><span>Risultato min.</span><input type="number" value={minResult} onChange={(event) => setMinResult(event.target.value)} placeholder="USD" /></label><label className="filter-field"><span>Risultato max.</span><input type="number" value={maxResult} onChange={(event) => setMaxResult(event.target.value)} placeholder="USD" /></label></>}
+    <button className="clear-filters" onClick={clear}>Azzera filtri</button>
+  </div>;
+}
+
+function FilterSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOnOutside = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
+
+  return <div className={`filter-field filter-select ${open ? "open" : ""}`} ref={rootRef}>
+    <span>{label}</span>
+    <button className="filter-select-control" type="button" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((current) => !current)}><span>{value}</span><ChevronDown size={13} /></button>
+    {open && <div className="filter-select-menu" role="listbox" aria-label={label}>
+      {options.map((option) => <button type="button" role="option" aria-selected={value === option} key={option} onClick={() => { onChange(option); setOpen(false); }}><span>{option}</span>{value === option && <Check size={12} />}</button>)}
+    </div>}
   </div>;
 }
 
