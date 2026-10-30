@@ -10,18 +10,15 @@ export const INTERACTIVE_DARK_GLASS = {
   lightSoftness: 1.55,
   edgeReflection: .92,
   glassOpacity: .9,
-  movementSmoothing: .34,
+  exitFade: .52,
   cornerReflection: 1.18,
 } as const;
 
 type LightState = {
-  currentX: number;
-  currentY: number;
-  targetX: number;
-  targetY: number;
+  pointerX: number;
+  pointerY: number;
   currentPresence: number;
   targetPresence: number;
-  hasPointer: boolean;
   frame: number | null;
 };
 
@@ -60,13 +57,10 @@ export function useGlobalGlassLight(rootRef: RefObject<HTMLElement | null>) {
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const config = INTERACTIVE_DARK_GLASS;
     const state: LightState = {
-      currentX: 0,
-      currentY: 0,
-      targetX: 0,
-      targetY: 0,
+      pointerX: 0,
+      pointerY: 0,
       currentPresence: 0,
       targetPresence: 0,
-      hasPointer: false,
       frame: null,
     };
 
@@ -82,30 +76,26 @@ export function useGlobalGlassLight(rootRef: RefObject<HTMLElement | null>) {
         });
         return;
       }
-      const smoothing = reducedMotion ? 1 : config.movementSmoothing;
-      state.currentX += (state.targetX - state.currentX) * smoothing;
-      state.currentY += (state.targetY - state.currentY) * smoothing;
-      const presenceSmoothing = state.targetPresence === 0 ? Math.max(.48, smoothing) : smoothing;
+      const presenceSmoothing = reducedMotion || state.targetPresence === 1 ? 1 : config.exitFade;
       state.currentPresence += (state.targetPresence - state.currentPresence) * presenceSmoothing;
       if (state.targetPresence === 0 && state.currentPresence < .004) state.currentPresence = 0;
 
       const measurements = cards.map((card) => ({ card, rect: card.getBoundingClientRect() }));
 
       measurements.forEach(({ card, rect }) => {
-        const distance = distanceFromRect(state.currentX, state.currentY, rect);
+        const distance = distanceFromRect(state.pointerX, state.pointerY, rect);
         const normalizedDistance = Math.max(0, 1 - distance / config.lightRadius);
         const falloff = Math.pow(normalizedDistance, config.lightSoftness) * state.currentPresence;
-        const cornerBoost = 1 + cornerProximity(state.currentX, state.currentY, rect) * (config.cornerReflection - 1);
-        const edgePoint = reflectedEdgePoint(state.currentX, state.currentY, rect);
+        const cornerBoost = 1 + cornerProximity(state.pointerX, state.pointerY, rect) * (config.cornerReflection - 1);
+        const edgePoint = reflectedEdgePoint(state.pointerX, state.pointerY, rect);
 
         card.style.setProperty("--glass-light-x", `${edgePoint.x.toFixed(2)}px`);
         card.style.setProperty("--glass-light-y", `${edgePoint.y.toFixed(2)}px`);
         card.style.setProperty("--glass-edge-strength", `${Math.min(1, falloff * config.lightIntensity * config.edgeReflection * cornerBoost).toFixed(3)}`);
       });
 
-      const moving = Math.abs(state.targetX - state.currentX) > .15 || Math.abs(state.targetY - state.currentY) > .15;
       const fading = Math.abs(state.targetPresence - state.currentPresence) > .003;
-      if (moving || fading) state.frame = window.requestAnimationFrame(render);
+      if (fading) state.frame = window.requestAnimationFrame(render);
     };
 
     const schedule = () => {
@@ -114,14 +104,9 @@ export function useGlobalGlassLight(rootRef: RefObject<HTMLElement | null>) {
 
     const handlePointerMove = (event: PointerEvent) => {
       if (event.pointerType === "touch") return;
-      state.targetX = event.clientX;
-      state.targetY = event.clientY;
+      state.pointerX = event.clientX;
+      state.pointerY = event.clientY;
       state.targetPresence = 1;
-      if (!state.hasPointer) {
-        state.currentX = event.clientX;
-        state.currentY = event.clientY;
-        state.hasPointer = true;
-      }
       schedule();
     };
 
