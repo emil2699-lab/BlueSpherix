@@ -1,0 +1,20 @@
+/** Optical calibration in CSS pixels. No temporal interpolation of the light. */
+export const ICE_GLASS = {
+  glassIOR: 1.5,
+  glassThickness: 11,
+  glassRoughness: .24,
+  glassOpacity: .88,
+  ambientReflection: .075,
+  lightIntensity: 2.3,
+  lightHeight: 48,
+  lightFalloff: 340,
+  fresnelStrength: .8,
+  chromaticDispersion: .028,
+  edgeRefraction: 1.15,
+  internalReflection: .3,
+  specularSharpness: 38,
+  bloomIntensity: .12,
+  bloomRadius: 4,
+  cursorSmoothing: 0,
+  maxDPR: 2,
+} as const;
