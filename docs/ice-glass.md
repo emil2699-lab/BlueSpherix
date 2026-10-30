@@ -58,6 +58,22 @@ da confermare su un display macOS. Non è stata calcolata una percentuale affida
 le immagini di riferimento sono disponibili nel messaggio, non come file locale
 allineato. Nessuna dichiarazione di fedeltà del 90%.
 
+## Dispersione cromatica
+
+La calibrazione successiva aumenta `chromaticDispersion` da 0,045 a 0,0765
+(+70%). Sei fuochi spettrali separano rosso, arancione, giallo, ciano, blu e
+viola lungo la normale ottica deformata; intensità e ampiezza restano legate
+alla sorgente e al profilo del vetro. Lo stesso spettro alimenta le caustiche
+che raggiungono una card successiva. Il nucleo bianco resta un contributo
+separato. Screenshot nelle stesse posizioni in
+`/workspace/artifacts/ice-glass-spectrum/`.
+
+Confrontando `edge.png` con la versione precedente, la differenza media
+normalizzata è 0,0267 nella fascia illuminata di 28×132 px e 0,0000038
+nel centro di 120×40 px. A cursore lontano, l'RMSE globale è 0,00167.
+Le differenze indicano una modifica localizzata della dispersione, non un
+aumento uniforme della luce.
+
 ## Verifica
 
 - Shader applicativo compilato/linkato in Chromium WebGL 2, errore GL 0.

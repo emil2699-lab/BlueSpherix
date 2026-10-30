@@ -77,14 +77,27 @@ void main() {
   vec3 transmittedG = refract(-L,N,1.0/uGlass.x);
   vec3 transmittedB = refract(-L,N,1.0/(uGlass.x+uOptics.y));
   vec3 refracted = vec3(environment(transmittedR).r,environment(transmittedG).g,environment(transmittedB).b);
-  // RGB foci separate only where the rounded glass bends the ray.
-  float focus = depth/thickness + dot(transmittedG.xy,grad)*.34 + wave*.055*bevel;
+  // Six wavelength bands share the same incident ray. Liquid curvature and
+  // channel-specific refraction move each focus, so no static spectrum exists.
+  float focus = depth/thickness + dot(transmittedG.xy,grad)*.34 + wave*.12*bevel;
   float spread = uOptics.y*(4.2+.65*wave)*bevel;
-  vec3 caustic = exp(-pow((vec3(focus)-vec3(.42+spread,.42,.42-spread))/.12,vec3(2)));
+  float bendR = dot(transmittedR.xy-transmittedG.xy,grad)*.3;
+  float bendB = dot(transmittedB.xy-transmittedG.xy,grad)*.3;
+  float width = .095+.025*abs(wave);
+  float red = exp(-pow((focus-(.42+spread*1.22+bendR))/width,2.0));
+  float orange = exp(-pow((focus-(.42+spread*.77+bendR*.65))/width,2.0));
+  float yellow = exp(-pow((focus-(.42+spread*.32+bendR*.3))/width,2.0));
+  float cyan = exp(-pow((focus-(.42-spread*.24+bendB*.2))/width,2.0));
+  float blue = exp(-pow((focus-(.42-spread*.72+bendB*.7))/width,2.0));
+  float violet = exp(-pow((focus-(.42-spread*1.2+bendB))/width,2.0));
+  vec3 caustic = red*vec3(1.0,.025,.018) + orange*vec3(1.0,.29,.015) +
+    yellow*vec3(1.0,.82,.055) + cyan*vec3(.018,.82,1.0) +
+    blue*vec3(.05,.22,1.0) + violet*vec3(.58,.075,1.0);
   float facing = .11+.89*max(dot(N.xy,normalize(delta.xy+vec2(.001))),0.0);
   float light = attenuation*uEnergy.y*facing;
   float alongEdge = dot(delta.xy,vec2(-grad.y,grad.x));
   float sourceFocus = exp(-pow(alongEdge/(uEnergy.z*.72),2.0));
+  float spectralFocus = exp(-pow(alongEdge/(uEnergy.z*1.8),2.0));
   float whiteCore = pow(attenuation,4.2)*sourceFocus*edge;
   vec2 secondaryDelta=pixel-uSecondary.xy;
   float travel=dot(secondaryDelta,uSecondary.zw);
@@ -103,8 +116,9 @@ void main() {
   face += mix(vec3(.34,.55,.77),uTint,.35)*bounced*(.12+.24*bevel);
   face += vec3(.63,.76,.92)*attenuation*(1.0-bevel)*.035;
   vec3 edgeLight = light*(vec3(.93,.96,1.0)*specular + tint*shoulder*.18);
-  edgeLight += light*caustic*edge*uOptics.z*.92;
-  edgeLight += bounced*caustic*edge*vec3(.40,.68,1.0)*.34;
+  float spectralReach = exp(-depth/(thickness*1.45));
+  edgeLight += light*caustic*spectralReach*spectralFocus*uOptics.z*1.12;
+  edgeLight += bounced*caustic*spectralReach*.50;
   edgeLight += vec3(.92,.98,1.0)*whiteCore*.31;
   edgeLight += light*tint*edge*uOptics.w*.08;
   vec3 color = face + edgeLight*(.32+.68*edge);
