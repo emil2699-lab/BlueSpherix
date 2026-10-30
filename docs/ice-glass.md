@@ -8,11 +8,21 @@ React, easing o interpolazione delle coordinate. Il renderer riposa a mouse ferm
 Le altre sezioni mantengono il proprio stile.
 
 `app/ice-glass.tsx` gestisce lifecycle, geometrie, scissor, DPR e recupero del
-contesto. `app/ice-glass-shader.ts` ricostruisce il bordo con una SDF arrotondata:
-normali del bisello, Snell per tre indici RGB, Fresnel Schlick, speculare GGX,
-assorbimento e una caustica focalizzata dalla sorgente. Quattro fasce per card
-evitano di rasterizzare il centro. Nessun alone esterno, nessuna texture dello
-screenshot. I parametri sono in `app/ice-glass-config.ts`.
+contesto. `app/ice-glass-shader.ts` disegna ora l'intera card con una SDF
+arrotondata: normali del bisello che diventano gradualmente frontali, Snell per
+tre indici RGB, Fresnel Schlick, speculare GGX, assorbimento e caustiche
+deformate da una curvatura stabile a bassa frequenza. La superficie interna
+riceve trasmissione e riflessi più diffusi. Nessuna texture dello screenshot.
+I parametri sono in `app/ice-glass-config.ts`.
+
+`app/ice-glass-transport.ts` proietta raggi nel piano delle card: intersezione
+con una prima superficie, rifrazione all'ingresso e all'uscita, attenuazione
+del percorso e fino a due passaggi prima della card ricevente. La card
+successiva riceve una caustica centrata sulla direzione del raggio emergente.
+È un'approssimazione 2.5D dello scambio luminoso tra card quasi complanari,
+non un path tracer 3D. Per vedere i raggi, le normali e la larghezza dei fasci
+in sviluppo, aprire `?iceGlassDebug=1#overview`; il livello di debug non viene
+creato nella build di produzione.
 
 L'ambiente ottico è procedurale. La rifrazione **non campiona il DOM**: testo,
 icone, valori e grafici conservano il rendering HTML/SVG originale. Il modello
@@ -36,13 +46,15 @@ dei KPI sono quindi diverse dalle card ingrandite del riferimento.
 | 3 | Perimetro opposto troppo acceso, rasterizzazione costosa | Riduzione del contributo non orientato, quattro fasce geometriche |
 | 4 | Nucleo vicino troppo debole rispetto al riferimento | Fuoco bianco localizzato in funzione di sorgente e tangente al bordo |
 
-Le acquisizioni coprono bordo sinistro, superiore, angolo, centro, spazio tra
-card, distanza, scroll, resize, mobile e reduced motion. Sono salvate fuori dal
-repository in `/workspace/artifacts/ice-glass/`, con `final.png` e `results.json`.
+La prima serie copre bordo sinistro, superiore, angolo, centro, spazio tra card,
+distanza, scroll, resize, mobile e reduced motion in `/workspace/artifacts/ice-glass/`.
+La correzione della superficie e del trasporto è documentata da un'altra serie
+nelle medesime posizioni in `/workspace/artifacts/ice-glass-correction/`, con
+`transmit.png`, `debug.png` e `results.json`.
 
-Differenze residue: vetro più levigato e regolare del riferimento; meno
-microtexture e riflessioni interne; intensità dei colori da confermare su un
-display macOS. Non è stata calcolata una percentuale affidabile di somiglianza:
+Differenze residue: vetro ancora più levigato e regolare del riferimento;
+microtexture e riflessioni interne soltanto approssimate; intensità dei colori
+da confermare su un display macOS. Non è stata calcolata una percentuale affidabile di somiglianza:
 le immagini di riferimento sono disponibili nel messaggio, non come file locale
 allineato. Nessuna dichiarazione di fedeltà del 90%.
 
@@ -57,8 +69,10 @@ allineato. Nessuna dichiarazione di fedeltà del 90%.
   nell'import `basename` del validatore delle skill).
 
 Prestazioni: il test usa Chromium headless con ANGLE SwiftShader, quindi una GPU
-simulata dalla CPU. Dopo l'ottimizzazione il p95 è circa 217 ms contro 483 ms nella
-prima acquisizione; il gestore del puntatore richiede circa 0,3 ms al p95.
+simulata dalla CPU. La superficie continua e il trasporto secondario richiedono
+circa 283 ms al p95 in questo ambiente; la precedente versione a sole fasce
+richiedeva circa 217 ms. Il costo è aumentato perché viene disegnata tutta la
+card. I dati esatti sono nel manifest `results.json`.
 Queste misure **non dimostrano 60 FPS**: il test Safari/macOS con GPU reale resta
 necessario per confermare fluidità, Retina e gestione del colore. I dati esatti
 dell'ultima esecuzione sono nel manifest `results.json`.
