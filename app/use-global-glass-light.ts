@@ -18,8 +18,12 @@ type LightState = {
   pointerX: number;
   pointerY: number;
   currentPresence: number;
-  targetPresence: number;
   frame: number | null;
+};
+
+type CardMeasurement = {
+  card: HTMLElement;
+  rect: DOMRect;
 };
 
 const distanceFromRect = (x: number, y: number, rect: DOMRect) => {
@@ -60,32 +64,32 @@ export function useGlobalGlassLight(rootRef: RefObject<HTMLElement | null>) {
       pointerX: 0,
       pointerY: 0,
       currentPresence: 0,
-      targetPresence: 0,
       frame: null,
     };
+    let measurements: CardMeasurement[] = [];
 
     root.style.setProperty("--glass-edge-radius", `${config.edgeRadius}px`);
     root.style.setProperty("--glass-opacity", `${config.glassOpacity}`);
 
-    const render = () => {
-      state.frame = null;
-      const cards = Array.from(root.querySelectorAll<HTMLElement>(config.selector));
+    const refreshMeasurements = () => {
+      measurements = Array.from(root.querySelectorAll<HTMLElement>(config.selector)).map((card) => ({
+        card,
+        rect: card.getBoundingClientRect(),
+      }));
+    };
+
+    const renderAtPointer = (presence: number) => {
       if (root.hidden) {
-        cards.forEach((card) => {
+        measurements.forEach(({ card }) => {
           card.style.setProperty("--glass-edge-strength", "0");
         });
         return;
       }
-      const presenceSmoothing = reducedMotion || state.targetPresence === 1 ? 1 : config.exitFade;
-      state.currentPresence += (state.targetPresence - state.currentPresence) * presenceSmoothing;
-      if (state.targetPresence === 0 && state.currentPresence < .004) state.currentPresence = 0;
-
-      const measurements = cards.map((card) => ({ card, rect: card.getBoundingClientRect() }));
 
       measurements.forEach(({ card, rect }) => {
         const distance = distanceFromRect(state.pointerX, state.pointerY, rect);
         const normalizedDistance = Math.max(0, 1 - distance / config.lightRadius);
-        const falloff = Math.pow(normalizedDistance, config.lightSoftness) * state.currentPresence;
+        const falloff = Math.pow(normalizedDistance, config.lightSoftness) * presence;
         const cornerBoost = 1 + cornerProximity(state.pointerX, state.pointerY, rect) * (config.cornerReflection - 1);
         const edgePoint = reflectedEdgePoint(state.pointerX, state.pointerY, rect);
 
@@ -93,43 +97,56 @@ export function useGlobalGlassLight(rootRef: RefObject<HTMLElement | null>) {
         card.style.setProperty("--glass-light-y", `${edgePoint.y.toFixed(2)}px`);
         card.style.setProperty("--glass-edge-strength", `${Math.min(1, falloff * config.lightIntensity * config.edgeReflection * cornerBoost).toFixed(3)}`);
       });
-
-      const fading = Math.abs(state.targetPresence - state.currentPresence) > .003;
-      if (fading) state.frame = window.requestAnimationFrame(render);
     };
 
-    const schedule = () => {
-      if (state.frame === null) state.frame = window.requestAnimationFrame(render);
+    const fadeOut = () => {
+      state.frame = null;
+      state.currentPresence = reducedMotion ? 0 : state.currentPresence * (1 - config.exitFade);
+      if (state.currentPresence < .004) state.currentPresence = 0;
+      renderAtPointer(state.currentPresence);
+      if (state.currentPresence > 0) state.frame = window.requestAnimationFrame(fadeOut);
+    };
+
+    const refreshAndRender = () => {
+      refreshMeasurements();
+      renderAtPointer(state.currentPresence);
     };
 
     const handlePointerMove = (event: PointerEvent) => {
       if (event.pointerType === "touch") return;
+      if (state.frame !== null) {
+        window.cancelAnimationFrame(state.frame);
+        state.frame = null;
+      }
       state.pointerX = event.clientX;
       state.pointerY = event.clientY;
-      state.targetPresence = 1;
-      schedule();
+      state.currentPresence = 1;
+      renderAtPointer(1);
     };
 
     const handlePointerLeave = (event: PointerEvent) => {
       if (event.relatedTarget) return;
-      state.targetPresence = 0;
-      schedule();
+      if (state.frame === null) state.frame = window.requestAnimationFrame(fadeOut);
     };
 
+    refreshMeasurements();
     window.addEventListener("pointermove", handlePointerMove, { passive: true });
     window.addEventListener("pointerout", handlePointerLeave, { passive: true });
-    window.addEventListener("resize", schedule, { passive: true });
-    window.addEventListener("scroll", schedule, { passive: true });
-    const visibilityObserver = new MutationObserver(schedule);
+    window.addEventListener("resize", refreshAndRender, { passive: true });
+    window.addEventListener("scroll", refreshAndRender, { passive: true });
+    const resizeObserver = new ResizeObserver(refreshAndRender);
+    resizeObserver.observe(root);
+    const visibilityObserver = new MutationObserver(refreshAndRender);
     visibilityObserver.observe(root, { attributes: true, attributeFilter: ["hidden"] });
 
     return () => {
       if (state.frame !== null) window.cancelAnimationFrame(state.frame);
+      resizeObserver.disconnect();
       visibilityObserver.disconnect();
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerout", handlePointerLeave);
-      window.removeEventListener("resize", schedule);
-      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", refreshAndRender);
+      window.removeEventListener("scroll", refreshAndRender);
     };
   }, [rootRef]);
 }
