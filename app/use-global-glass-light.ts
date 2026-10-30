@@ -4,16 +4,12 @@ import { useEffect, type RefObject } from "react";
 
 export const INTERACTIVE_DARK_GLASS = {
   selector: ".glass-card",
-  lightRadius: 480,
+  lightRadius: 720,
   edgeRadius: 245,
-  surfaceRadius: 390,
-  surfaceHeight: 265,
   lightIntensity: .86,
   lightSoftness: 1.55,
   edgeReflection: .92,
-  surfaceReflection: .18,
   glassOpacity: .9,
-  refractionStrength: 1.4,
   movementSmoothing: .34,
   cornerReflection: 1.18,
 } as const;
@@ -47,6 +43,15 @@ const cornerProximity = (x: number, y: number, rect: DOMRect) => {
   return Math.max(0, 1 - distance / 115);
 };
 
+const reflectedEdgePoint = (x: number, y: number, rect: DOMRect) => {
+  const inside = x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+  if (inside) return { x: x - rect.left, y: y - rect.top };
+  return {
+    x: Math.min(rect.width, Math.max(0, x - rect.left)),
+    y: Math.min(rect.height, Math.max(0, y - rect.top)),
+  };
+};
+
 export function useGlobalGlassLight(rootRef: RefObject<HTMLElement | null>) {
   useEffect(() => {
     const root = rootRef.current;
@@ -66,8 +71,6 @@ export function useGlobalGlassLight(rootRef: RefObject<HTMLElement | null>) {
     };
 
     root.style.setProperty("--glass-edge-radius", `${config.edgeRadius}px`);
-    root.style.setProperty("--glass-surface-radius", `${config.surfaceRadius}px`);
-    root.style.setProperty("--glass-surface-height", `${config.surfaceHeight}px`);
     root.style.setProperty("--glass-opacity", `${config.glassOpacity}`);
 
     const render = () => {
@@ -76,7 +79,6 @@ export function useGlobalGlassLight(rootRef: RefObject<HTMLElement | null>) {
       if (root.hidden) {
         cards.forEach((card) => {
           card.style.setProperty("--glass-edge-strength", "0");
-          card.style.setProperty("--glass-surface-strength", "0");
         });
         return;
       }
@@ -94,21 +96,11 @@ export function useGlobalGlassLight(rootRef: RefObject<HTMLElement | null>) {
         const normalizedDistance = Math.max(0, 1 - distance / config.lightRadius);
         const falloff = Math.pow(normalizedDistance, config.lightSoftness) * state.currentPresence;
         const cornerBoost = 1 + cornerProximity(state.currentX, state.currentY, rect) * (config.cornerReflection - 1);
-        const localX = state.currentX - rect.left;
-        const localY = state.currentY - rect.top;
-        const directionX = localX - rect.width / 2;
-        const directionY = localY - rect.height / 2;
-        const directionLength = Math.hypot(directionX, directionY) || 1;
-        const refraction = reducedMotion ? 0 : config.refractionStrength;
-        const angle = Math.atan2(directionY, directionX) * 180 / Math.PI + 90;
+        const edgePoint = reflectedEdgePoint(state.currentX, state.currentY, rect);
 
-        card.style.setProperty("--glass-light-x", `${localX.toFixed(2)}px`);
-        card.style.setProperty("--glass-light-y", `${localY.toFixed(2)}px`);
-        card.style.setProperty("--glass-light-angle", `${angle.toFixed(2)}deg`);
-        card.style.setProperty("--glass-refract-x", `${(directionX / directionLength * refraction).toFixed(2)}px`);
-        card.style.setProperty("--glass-refract-y", `${(directionY / directionLength * refraction).toFixed(2)}px`);
+        card.style.setProperty("--glass-light-x", `${edgePoint.x.toFixed(2)}px`);
+        card.style.setProperty("--glass-light-y", `${edgePoint.y.toFixed(2)}px`);
         card.style.setProperty("--glass-edge-strength", `${Math.min(1, falloff * config.lightIntensity * config.edgeReflection * cornerBoost).toFixed(3)}`);
-        card.style.setProperty("--glass-surface-strength", `${Math.min(.24, falloff * config.lightIntensity * config.surfaceReflection).toFixed(3)}`);
       });
 
       const moving = Math.abs(state.targetX - state.currentX) > .15 || Math.abs(state.targetY - state.currentY) > .15;
