@@ -47,9 +47,18 @@ const cornerProximity = (x: number, y: number, rect: DOMRect) => {
 const reflectedEdgePoint = (x: number, y: number, rect: DOMRect) => {
   const inside = x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
   if (inside) return { x: x - rect.left, y: y - rect.top };
+
+  const centerX = rect.width / 2;
+  const centerY = rect.height / 2;
+  const directionX = x - (rect.left + centerX);
+  const directionY = y - (rect.top + centerY);
+  const horizontalScale = directionX === 0 ? Number.POSITIVE_INFINITY : centerX / Math.abs(directionX);
+  const verticalScale = directionY === 0 ? Number.POSITIVE_INFINITY : centerY / Math.abs(directionY);
+  const edgeScale = Math.min(horizontalScale, verticalScale);
+
   return {
-    x: Math.min(rect.width, Math.max(0, x - rect.left)),
-    y: Math.min(rect.height, Math.max(0, y - rect.top)),
+    x: centerX + directionX * edgeScale,
+    y: centerY + directionY * edgeScale,
   };
 };
 
@@ -112,7 +121,8 @@ export function useGlobalGlassLight(rootRef: RefObject<HTMLElement | null>) {
       renderAtPointer(state.currentPresence);
     };
 
-    const handlePointerMove = (event: PointerEvent) => {
+    const handlePointerMove: EventListener = (nativeEvent) => {
+      const event = nativeEvent as PointerEvent;
       if (event.pointerType === "touch") return;
       if (state.frame !== null) {
         window.cancelAnimationFrame(state.frame);
@@ -130,7 +140,8 @@ export function useGlobalGlassLight(rootRef: RefObject<HTMLElement | null>) {
     };
 
     refreshMeasurements();
-    window.addEventListener("pointermove", handlePointerMove, { passive: true });
+    const pointerMoveEvent = "onpointerrawupdate" in window ? "pointerrawupdate" : "pointermove";
+    window.addEventListener(pointerMoveEvent, handlePointerMove, { passive: true });
     window.addEventListener("pointerout", handlePointerLeave, { passive: true });
     window.addEventListener("resize", refreshAndRender, { passive: true });
     window.addEventListener("scroll", refreshAndRender, { passive: true });
@@ -143,7 +154,7 @@ export function useGlobalGlassLight(rootRef: RefObject<HTMLElement | null>) {
       if (state.frame !== null) window.cancelAnimationFrame(state.frame);
       resizeObserver.disconnect();
       visibilityObserver.disconnect();
-      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener(pointerMoveEvent, handlePointerMove);
       window.removeEventListener("pointerout", handlePointerLeave);
       window.removeEventListener("resize", refreshAndRender);
       window.removeEventListener("scroll", refreshAndRender);
