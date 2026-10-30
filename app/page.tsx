@@ -34,7 +34,7 @@ import Risk from "./risk";
 import Lab from "./lab";
 import { ALPHA_ACCOUNT, BEST_RECENT_TRADE, BEST_SESSION_30D, DASHBOARD_RANGE_STATS, DEMO_BALANCE_SERIES, DEMO_EQUITY_SERIES, DEMO_PERIOD_STATS, OPEN_PNL, OPEN_TRADES, type DashboardRange } from "./demo-data";
 import { valueSign } from "./value-sign";
-import { useLiquidGlassRefraction } from "./use-liquid-glass-refraction";
+import { useGlobalGlassLight } from "./use-global-glass-light";
 
 type Range = DashboardRange;
 const equitySeries = DEMO_EQUITY_SERIES;
@@ -127,7 +127,7 @@ function MetricCard({ label, value, detail, values, tone = "aqua", signValue, ic
 export default function Home() {
   const [view, setView] = useState("overview");
   const todayDashboardRef = useRef<HTMLDivElement>(null);
-  useLiquidGlassRefraction(todayDashboardRef);
+  useGlobalGlassLight(todayDashboardRef);
   useEffect(() => {
     const applyHash = (behavior: ScrollBehavior) => {
       const target = window.location.hash.slice(1) || "overview";
