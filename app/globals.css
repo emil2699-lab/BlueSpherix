@@ -131,6 +131,47 @@ nav button b { margin-left: auto; font-size: 8px; color: #091110; background: va
 .mini-chart { width: 95px; height: 38px; opacity: .9; }
 .today-welcome { margin-bottom: 20px; }
 .today-notice { color: #aebbc2; border-color: rgba(86,217,202,.16); background: linear-gradient(90deg,rgba(86,217,202,.065),rgba(86,217,202,.018)); }
+.today-dashboard .glass-card {
+  position: relative;
+  isolation: isolate;
+  border: 0;
+  background-color: rgba(12,17,24,var(--glass-opacity,.9));
+  backdrop-filter: blur(18px) saturate(112%);
+  -webkit-backdrop-filter: blur(18px) saturate(112%);
+}
+.today-dashboard .glass-card::before,
+.today-dashboard .glass-card::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  border-radius: inherit;
+}
+.today-dashboard .glass-card::before {
+  z-index: 4;
+  inset: 0;
+  padding: 1.2px;
+  opacity: var(--glass-edge-strength,0);
+  background: radial-gradient(circle var(--glass-edge-radius,245px) at var(--glass-light-x,-1000px) var(--glass-light-y,-1000px),rgba(255,255,255,.94) 0%,rgba(220,231,237,.72) 15%,rgba(168,190,202,.28) 39%,transparent 72%);
+  filter: saturate(.65) contrast(1.05);
+  -webkit-mask: linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  will-change: opacity,background-position;
+}
+.today-dashboard .glass-card::after {
+  z-index: 3;
+  inset: 1px;
+  opacity: var(--glass-surface-strength,0);
+  background:
+    radial-gradient(ellipse var(--glass-surface-radius,390px) var(--glass-surface-height,265px) at var(--glass-light-x,-1000px) var(--glass-light-y,-1000px),rgba(246,250,252,.48) 0%,rgba(210,224,232,.19) 24%,rgba(151,176,189,.055) 48%,transparent 72%),
+    linear-gradient(var(--glass-light-angle,135deg),transparent 34%,rgba(234,242,246,.12) 48%,rgba(164,186,198,.035) 55%,transparent 66%);
+  -webkit-mask-image: radial-gradient(circle var(--glass-surface-radius,390px) at var(--glass-light-x,-1000px) var(--glass-light-y,-1000px),#000 0%,rgba(0,0,0,.72) 46%,transparent 100%);
+  mask-image: radial-gradient(circle var(--glass-surface-radius,390px) at var(--glass-light-x,-1000px) var(--glass-light-y,-1000px),#000 0%,rgba(0,0,0,.72) 46%,transparent 100%);
+  mix-blend-mode: screen;
+  filter: blur(.45px) saturate(.7);
+  transform: translate3d(var(--glass-refract-x,0),var(--glass-refract-y,0),0);
+  will-change: opacity,transform,background-position;
+}
 .today-notice svg { color: var(--aqua); }
 .today-hero { grid-template-columns: minmax(0,1.75fr) minmax(310px,.75fr); margin-top: 15px; }
 .today-chart-controls { display: flex; flex-direction: column; align-items: flex-end; gap: 13px; }
