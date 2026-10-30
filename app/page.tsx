@@ -26,7 +26,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import Portfolio from "./portfolio";
 import Analytics from "./analytics";
 import Operations from "./operations";
@@ -34,7 +34,6 @@ import Risk from "./risk";
 import Lab from "./lab";
 import { ALPHA_ACCOUNT, BEST_RECENT_TRADE, BEST_SESSION_30D, DASHBOARD_RANGE_STATS, DEMO_BALANCE_SERIES, DEMO_EQUITY_SERIES, DEMO_PERIOD_STATS, OPEN_PNL, OPEN_TRADES, type DashboardRange } from "./demo-data";
 import { valueSign } from "./value-sign";
-import { useGlobalGlassLight } from "./use-global-glass-light";
 
 type Range = DashboardRange;
 const equitySeries = DEMO_EQUITY_SERIES;
@@ -126,8 +125,6 @@ function MetricCard({ label, value, detail, values, tone = "aqua", signValue, ic
 
 export default function Home() {
   const [view, setView] = useState("overview");
-  const todayDashboardRef = useRef<HTMLDivElement>(null);
-  useGlobalGlassLight(todayDashboardRef);
   useEffect(() => {
     const applyHash = (behavior: ScrollBehavior) => {
       const target = window.location.hash.slice(1) || "overview";
@@ -203,7 +200,7 @@ export default function Home() {
           {view === "positions" && <Operations />}
           {view === "risk" && <Risk />}
           {view === "lab" && <Lab />}
-          <div className="today-dashboard" ref={todayDashboardRef} hidden={view === "portfolio" || view === "analytics" || view === "positions" || view === "risk" || view === "lab"}>
+          <div className="today-dashboard" hidden={view === "portfolio" || view === "analytics" || view === "positions" || view === "risk" || view === "lab"}>
           <section className="welcome today-welcome" id="overview">
             <div><p className="date-line">Mercoledì, 28 ottobre</p><h1>Buongiorno, Luca.</h1><p>Il portafoglio è stabile. Il rischio è sotto controllo.</p></div>
             <span className={`risk-live-status ${riskUsed < 80 ? "calm" : riskUsed < 100 ? "warning" : "critical"}`}><i /> Dati aggiornati · 28 ott, 18:42</span>
