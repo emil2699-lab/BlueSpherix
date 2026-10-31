@@ -66,6 +66,16 @@ function pathFor(values: number[], width: number, height: number, padding = 4) {
     .join(" ");
 }
 
+function pointFor(values: number[], index: number, width: number, height: number, padding = 4) {
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 1;
+  return {
+    x: padding + (index / Math.max(1, values.length - 1)) * (width - padding * 2),
+    y: height - padding - ((values[index] - min) / span) * (height - padding * 2),
+  };
+}
+
 function orbitalNodeStyle(pressure: number, startAngle: number, sweep: number, radius = 88) {
   const normalized = Math.min(1, Math.max(0, pressure));
   const angle = (startAngle + sweep * normalized) * Math.PI / 180;
@@ -92,6 +102,7 @@ function EquityChart({ range }: { range: Range }) {
   const equityPath = pathFor(equity, 760, 255, 14);
   const balancePath = pathFor(balance, 760, 255, 14);
   const areaPath = `${equityPath} L746,241 L14,241 Z`;
+  const equityEnd = pointFor(equity, equity.length - 1, 760, 255, 14);
   return (
     <div className="chart-wrap" aria-label={`Grafico equity e balance, periodo ${range}`}>
       <svg viewBox="0 0 760 255" preserveAspectRatio="none" role="img">
@@ -106,7 +117,7 @@ function EquityChart({ range }: { range: Range }) {
         <path d={areaPath} fill="url(#equityArea)" />
         <path d={balancePath} className="balance-path" />
         <path d={equityPath} className="equity-path" filter="url(#glow)" />
-        <circle cx="746" cy="14" r="4.5" className="end-dot" />
+        <circle cx={equityEnd.x} cy={equityEnd.y} r="4.5" className="end-dot" />
       </svg>
       <div className="chart-axis"><span>Inizio</span><span>Metà periodo</span><span>Oggi</span></div>
     </div>
