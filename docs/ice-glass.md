@@ -1,4 +1,4 @@
-# Ice Glass — prova nella sezione Oggi
+# Ice Glass — renderer globale BlueSpherix
 
 ## Rendering
 
@@ -128,12 +128,20 @@ gli eventi `visualViewport` invalidano le geometrie durante zoom e pan. In quest
 modo il materiale WebGL resta sovrapposto alle card anche mentre Safari cambia
 separatamente viewport, layout e scala del backing store.
 
+### Copertura dell'applicazione
+
+Il renderer globale è montato una sola volta sul contenitore principale e
+rileva le superfici della sezione attiva. Il cambio di sezione aggiorna
+automaticamente geometrie e osservatori senza ricreare il contesto WebGL; la
+sincronizzazione con zoom, DPR, scroll e `visualViewport` vale quindi per Oggi,
+Portafoglio, Analisi, Operazioni, Rischio e Lab.
+
 ## Verifica
 
 - Shader applicativo compilato/linkato in Chromium WebGL 2, errore GL 0.
 - Nessun errore console; coordinate richieste e renderer coincidenti.
 - Ripristino del contesto WebGL riuscito; fallback senza WebGL funzionante.
-- Periodo del grafico e navigazione funzionanti; canvas nascosto nelle altre viste.
+- Periodo del grafico e navigazione funzionanti; un solo canvas condiviso tra le viste.
 - Nessun overflow orizzontale a 390 px; acquisizione anche a 1024 px.
 - TypeScript e build statico verificati; lint senza errori (warning preesistente
   nell'import `basename` del validatore delle skill).

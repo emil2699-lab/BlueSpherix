@@ -131,7 +131,7 @@ nav button b { margin-left: auto; font-size: 8px; color: #091110; background: va
 .mini-chart { width: 95px; height: 38px; opacity: .9; }
 .today-welcome { margin-bottom: 20px; }
 .today-notice { color: #aebbc2; border-color: rgba(86,217,202,.16); background: linear-gradient(90deg,rgba(86,217,202,.065),rgba(86,217,202,.018)); }
-.today-dashboard .glass-card {
+.content .glass-card {
   position: relative;
   isolation: isolate;
   border: 0;
@@ -140,10 +140,9 @@ nav button b { margin-left: auto; font-size: 8px; color: #091110; background: va
   -webkit-backdrop-filter: blur(18px) saturate(112%);
 }
 .ice-glass-canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; z-index: 8; }
-.today-dashboard[hidden] .ice-glass-canvas { display: none; }
-.today-dashboard[data-ice-glass="ready"] .glass-card { background-image: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
-.today-dashboard[data-ice-glass="ready"] .glass-card:hover { transform: none; }
-.today-dashboard .glass-card:not(.timeline-card):not(.trade-inspector):hover { transform: none !important; }
+.content[data-ice-glass="ready"] :is(.glass-card, .calendar-strip, .demo-notice) { background-image: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.content[data-ice-glass="ready"] .glass-card:hover { transform: none; }
+.content .glass-card:not(.timeline-card):not(.trade-inspector):hover { transform: none !important; }
 .today-notice svg { color: var(--aqua); }
 .today-hero { grid-template-columns: minmax(0,1.75fr) minmax(310px,.75fr); margin-top: 15px; }
 .today-chart-controls { display: flex; flex-direction: column; align-items: flex-end; gap: 13px; }

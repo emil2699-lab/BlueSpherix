@@ -126,7 +126,7 @@ function MetricCard({ label, value, detail, values, tone = "aqua", signValue, ic
 
 export default function Home() {
   const [view, setView] = useState("overview");
-  const todayDashboardRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const applyHash = (behavior: ScrollBehavior) => {
       const target = window.location.hash.slice(1) || "overview";
@@ -196,14 +196,14 @@ export default function Home() {
           </div>
         </header>
 
-        <div className="content">
+        <div className="content" ref={contentRef}>
+          <IceGlass rootRef={contentRef} />
           {view === "portfolio" && <Portfolio />}
           {view === "analytics" && <Analytics />}
           {view === "positions" && <Operations />}
           {view === "risk" && <Risk />}
           {view === "lab" && <Lab />}
-          <div className="today-dashboard" ref={todayDashboardRef} hidden={view === "portfolio" || view === "analytics" || view === "positions" || view === "risk" || view === "lab"}>
-          <IceGlass rootRef={todayDashboardRef} />
+          <div className="today-dashboard" hidden={view === "portfolio" || view === "analytics" || view === "positions" || view === "risk" || view === "lab"}>
           <section className="welcome today-welcome" id="overview">
             <div><p className="date-line">Mercoledì, 28 ottobre</p><h1>Buongiorno, Luca.</h1><p>Il portafoglio è stabile. Il rischio è sotto controllo.</p></div>
             <span className={`risk-live-status ${riskUsed < 80 ? "calm" : riskUsed < 100 ? "warning" : "critical"}`}><i /> Dati aggiornati · 28 ott, 18:42</span>

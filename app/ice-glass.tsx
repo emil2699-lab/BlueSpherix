@@ -8,6 +8,7 @@ import { secondaryBeam } from "./ice-glass-transport";
 type ViewportRect = { left: number; top: number; width: number; height: number };
 type GlassRect = ViewportRect & { right: number; bottom: number };
 type Measurement = { element: HTMLElement; rect: GlassRect; radius: number; tint: number[] };
+const GLASS_SURFACE_SELECTOR = ".glass-card, .calendar-strip, .demo-notice";
 
 export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -30,6 +31,8 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     let lastRender = 0;
     let slowFrames = 0;
     let settleUntil = 0;
+    let resize: ResizeObserver | null = null;
+    const observedSurfaces = new Set<Element>();
     const pointer = { x: -10000, y: -10000, presence: 0 };
     const reduced = matchMedia("(prefers-reduced-motion: reduce)");
     const debug = process.env.NODE_ENV === "development" && new URLSearchParams(location.search).get("iceGlassDebug") === "1" ? document.createElement("canvas") : null;
@@ -89,9 +92,12 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       Math.abs(next.width-viewport.width) > .05 || Math.abs(next.height-viewport.height) > .05;
     const measure = (nextViewport = readViewport()) => {
       viewport = nextViewport;
-      cards = Array.from(root.querySelectorAll<HTMLElement>(".glass-card, .calendar-strip, .today-notice")).map((element) => {
+      cards = Array.from(root.querySelectorAll<HTMLElement>(GLASS_SURFACE_SELECTOR)).map((element) => {
         const style = getComputedStyle(element);
-        const tint = element.classList.contains("violet") || element.classList.contains("insight-card") ? [.64,.46,1] : element.classList.contains("amber") || element.classList.contains("calendar-strip") ? [1,.62,.24] : [.31,.77,.87];
+        const tint = element.matches(".negative-surface, .negative-strong, .critical, .risk-critical, .failed") ? [1,.34,.43]
+          : element.matches(".violet, .insight-card, .lab-validation") ? [.64,.46,1]
+          : element.matches(".amber, .calendar-strip, .warning, .risk-warning") ? [1,.62,.24]
+          : [.31,.77,.87];
         const domRect = element.getBoundingClientRect();
         const left = domRect.left-nextViewport.left;
         const top = domRect.top-nextViewport.top;
@@ -175,6 +181,16 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     const schedule = () => { if (!frame && !lost && !document.hidden) frame = requestAnimationFrame(draw); };
     const invalidate = () => { dirty = true; schedule(); };
     const settleLayout = () => { settleUntil = performance.now()+700; invalidate(); };
+    const syncObservedSurfaces = () => {
+      if (!resize) return;
+      const current = new Set(root.querySelectorAll(GLASS_SURFACE_SELECTOR));
+      for (const surface of observedSurfaces) {
+        if (!current.has(surface)) { resize.unobserve(surface); observedSurfaces.delete(surface); }
+      }
+      for (const surface of current) {
+        if (!observedSurfaces.has(surface)) { resize.observe(surface); observedSurfaces.add(surface); }
+      }
+    };
     const move: EventListener = (nativeEvent) => {
       const event = nativeEvent as PointerEvent;
       if (event.pointerType === "touch" || root.hidden || reduced.matches) return;
@@ -186,11 +202,11 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     const contextLost = (event: Event) => { event.preventDefault(); lost = true; cancelAnimationFrame(frame); frame = 0; delete root.dataset.iceGlass; };
     const contextRestored = () => { dispose(); lost = false; initialize(); invalidate(); };
     initialize();
-    const resize = new ResizeObserver(settleLayout);
+    resize = new ResizeObserver(settleLayout);
     resize.observe(root);
-    root.querySelectorAll(".glass-card, .calendar-strip, .today-notice").forEach((card) => resize.observe(card));
-    const mutation = new MutationObserver(invalidate);
-    mutation.observe(root,{ attributes: true, attributeFilter: ["hidden"] });
+    syncObservedSurfaces();
+    const mutation = new MutationObserver(() => { syncObservedSurfaces(); settleLayout(); });
+    mutation.observe(root,{ childList: true, subtree: true, attributes: true, attributeFilter: ["hidden", "class", "style"] });
     window.addEventListener("pointermove",move,{passive:true});
     window.addEventListener("pointerrawupdate",move,{passive:true});
     window.addEventListener("pointerout",leave,{passive:true});
@@ -206,7 +222,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     canvas.addEventListener("webglcontextrestored",contextRestored);
     invalidate();
     return () => {
-      cancelAnimationFrame(frame); resize.disconnect(); mutation.disconnect();
+      cancelAnimationFrame(frame); resize?.disconnect(); mutation.disconnect();
       window.removeEventListener("pointermove",move); window.removeEventListener("pointerrawupdate",move);
       window.removeEventListener("pointerout",leave); window.removeEventListener("resize",settleLayout);
       window.removeEventListener("scroll",invalidate,true); root.removeEventListener("transitionrun",settleLayout); root.removeEventListener("transitionend",invalidate);
