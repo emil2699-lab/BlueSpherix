@@ -102,6 +102,16 @@ partenza del raggio trasmesso sfuma in una larghezza di raggio. La dispersione
 RGB rimane attiva. La sequenza di nove posizioni del cursore e il contatto
 visivo sono in `/workspace/artifacts/ice-glass-continuity/`.
 
+### Continuità sulle diagonali interne
+
+Il gradiente della distanza di un rettangolo arrotondato sceglie il bordo più
+vicino e crea assi mediani diagonali invisibili nella geometria, ma visibili
+quando orientano una luce molto concentrata. La normale ora conserva il profilo
+esatto sul bordo e sfuma, nei primi pixel interni, verso un unico campo continuo
+da superellisse arrotondata. Attraversando le diagonali il riflesso ruota quindi
+in modo progressivo invece di saltare dalla faccia superiore a quella laterale;
+dispersione, caustiche e trasporto tra card restano invariati.
+
 ## Verifica
 
 - Shader applicativo compilato/linkato in Chromium WebGL 2, errore GL 0.

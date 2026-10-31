@@ -31,6 +31,19 @@ float boxSDF(vec2 p, vec2 b, float r) {
   vec2 q = abs(p) - b + r;
   return min(max(q.x,q.y),0.0) + length(max(q,0.0)) - r;
 }
+vec2 roundedSurfaceNormal(vec2 p, vec2 b, float r) {
+  vec2 q = abs(p)-b+r;
+  if (q.x > 0.0 && q.y > 0.0) return normalize(q)*sign(p);
+  return q.x > q.y ? vec2(sign(p.x),0.0) : vec2(0.0,sign(p.y));
+}
+vec2 continuousInnerNormal(vec2 p, vec2 b, float r) {
+  // A rounded superellipse supplies a single smooth normal field inside the slab.
+  // Unlike the nearest-face gradient of a box SDF, it has no diagonal medial seam.
+  vec2 scale = max(b-vec2(r*.38),vec2(1.0));
+  vec2 unit = p/scale;
+  vec2 field = unit*pow(abs(unit)+vec2(.0001),vec2(4.0));
+  return field/sqrt(dot(field,field)+.000001);
+}
 vec3 environment(vec3 ray) {
   float sky = smoothstep(-.55,.72,ray.y);
   float cool = pow(max(0.0, .5 + .5 * ray.x), 2.4);
@@ -46,13 +59,13 @@ void main() {
   if (coverage <= 0.0) discard;
   float depth = -d;
   float thickness = min(uGlass.y, min(halfSize.x,halfSize.y)*.25);
-  // A filtered SDF gradient blends adjacent face normals through rounded corners.
-  float normalStep = max(1.25,thickness*.16);
-  vec2 sdfGradient = vec2(
-    boxSDF(p+vec2(normalStep,0.0),halfSize,uRadius)-boxSDF(p-vec2(normalStep,0.0),halfSize,uRadius),
-    boxSDF(p+vec2(0.0,normalStep),halfSize,uRadius)-boxSDF(p-vec2(0.0,normalStep),halfSize,uRadius)
-  );
-  vec2 grad = sdfGradient/max(length(sdfGradient),.001);
+  // Keep the exact edge normal at the surface, then blend into a continuous
+  // interior field before the box SDF reaches its diagonal medial axes.
+  vec2 surfaceNormal = roundedSurfaceNormal(p,halfSize,uRadius);
+  vec2 innerNormal = continuousInnerNormal(p,halfSize,uRadius);
+  float innerBlend = smoothstep(.75,max(3.5,thickness*.42),depth);
+  vec2 grad = mix(surfaceNormal,innerNormal,innerBlend);
+  grad /= max(length(grad),.001);
   float bevel = exp(-depth/max(thickness,1.0));
   // A stable, low-frequency liquid normal varies the optical path, not the DOM.
   float phaseA = pixel.x*.018+sin(pixel.y*.023)*1.4;
