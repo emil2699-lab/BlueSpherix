@@ -36,13 +36,25 @@ vec2 roundedSurfaceNormal(vec2 p, vec2 b, float r) {
   if (q.x > 0.0 && q.y > 0.0) return normalize(q)*sign(p);
   return q.x > q.y ? vec2(sign(p.x),0.0) : vec2(0.0,sign(p.y));
 }
-vec2 continuousInnerNormal(vec2 p, vec2 b, float r) {
-  // A rounded superellipse supplies a single smooth normal field inside the slab.
-  // Unlike the nearest-face gradient of a box SDF, it has no diagonal medial seam.
-  vec2 scale = max(b-vec2(r*.38),vec2(1.0));
-  vec2 unit = p/scale;
-  vec2 field = unit*pow(abs(unit)+vec2(.0001),vec2(4.0));
+vec2 innerFaceWeights(vec2 p, vec2 b, float softness) {
+  vec2 faceDistance = max(b-abs(p),vec2(.001));
+  float nearest = min(faceDistance.x,faceDistance.y);
+  return exp(-(faceDistance-vec2(nearest))/softness);
+}
+vec2 continuousInnerNormal(vec2 p, vec2 b, float softness) {
+  // Both adjacent faces contribute through continuous weights. There is no
+  // nearest-face switch when the cursor crosses a diagonal medial axis.
+  vec2 weights = innerFaceWeights(p,b,softness);
+  vec2 softSign = p/sqrt(p*p+vec2(softness*softness*.04));
+  vec2 field = softSign*weights;
   return field/sqrt(dot(field,field)+.000001);
+}
+float continuousInnerDepth(vec2 p, vec2 b, float softness) {
+  vec2 faceDistance = max(b-abs(p),vec2(0.0));
+  vec2 weights = innerFaceWeights(p,b,softness);
+  // A normalized weighted average preserves the local depth at equal-distance
+  // diagonals instead of creating a bright or dark ridge there.
+  return dot(faceDistance,weights)/max(weights.x+weights.y,.0001);
 }
 vec3 environment(vec3 ray) {
   float sky = smoothstep(-.55,.72,ray.y);
@@ -59,14 +71,17 @@ void main() {
   if (coverage <= 0.0) discard;
   float depth = -d;
   float thickness = min(uGlass.y, min(halfSize.x,halfSize.y)*.25);
-  // Keep the exact edge normal at the surface, then blend into a continuous
-  // interior field before the box SDF reaches its diagonal medial axes.
+  // Keep the exact rounded silhouette, but move all optical shading onto a
+  // continuous face blend before the box SDF reaches its diagonal medial axes.
+  float normalSoftness = max(9.0,thickness*1.35);
+  float blendEnd = max(3.0,min(uRadius*.55,thickness*.5));
+  float interiorBlend = smoothstep(.75,blendEnd,depth);
   vec2 surfaceNormal = roundedSurfaceNormal(p,halfSize,uRadius);
-  vec2 innerNormal = continuousInnerNormal(p,halfSize,uRadius);
-  float innerBlend = smoothstep(.75,max(3.5,thickness*.42),depth);
-  vec2 grad = mix(surfaceNormal,innerNormal,innerBlend);
+  vec2 innerNormal = continuousInnerNormal(p,halfSize,normalSoftness);
+  vec2 grad = mix(surfaceNormal,innerNormal,interiorBlend);
   grad /= max(length(grad),.001);
-  float bevel = exp(-depth/max(thickness,1.0));
+  float opticalDepth = mix(depth,continuousInnerDepth(p,halfSize,normalSoftness),interiorBlend);
+  float bevel = exp(-opticalDepth/max(thickness,1.0));
   // A stable, low-frequency liquid normal varies the optical path, not the DOM.
   float phaseA = pixel.x*.018+sin(pixel.y*.023)*1.4;
   float phaseB = pixel.y*.016+pixel.x*.009;
@@ -95,15 +110,15 @@ void main() {
   float denominator = ndh*ndh*(a2-1.0)+1.0;
   float ggx = a2/max(3.141593*denominator*denominator,.0001);
   float specular = min(ggx*.06,1.4) + pow(ndh,uFinish.x)*.19;
-  float edge = exp(-depth/(thickness*.74));
-  float shoulder = exp(-pow((depth-thickness*.72)/(thickness*.58),2.0));
+  float edge = exp(-opticalDepth/(thickness*.74));
+  float shoulder = exp(-pow((opticalDepth-thickness*.72)/(thickness*.58),2.0));
   vec3 transmittedR = refract(-L,N,1.0/(uGlass.x-uOptics.y));
   vec3 transmittedG = refract(-L,N,1.0/uGlass.x);
   vec3 transmittedB = refract(-L,N,1.0/(uGlass.x+uOptics.y));
   vec3 refracted = vec3(environment(transmittedR).r,environment(transmittedG).g,environment(transmittedB).b);
   // Refraction creates the RGB separation; there is no fixed spectral palette.
   // A wider focus profile thickens the previous delicate dispersion.
-  float focus = depth/thickness + dot(transmittedG.xy,N.xy)*.34 + wave*.16*bevel;
+  float focus = opticalDepth/thickness + dot(transmittedG.xy,N.xy)*.34 + wave*.16*bevel;
   vec2 tangent = vec2(-grad.y,grad.x);
   float incidence = dot(L.xy,tangent);
   // Signed incidence moves the channels through each other continuously.
@@ -130,12 +145,12 @@ void main() {
   float frontSpread = attenuation*(.20+.80*max(dot(N,L),0.0));
   vec3 face = ambient*(1.75+.35*(1.0-bevel)) + uTint*.018;
   face += refracted*frontSpread*(.12+.18*(1.0-bevel))*absorption;
-  face += mix(vec3(.32,.53,.78),uTint,.25)*attenuation*exp(-depth/(thickness*3.3))*.20;
-  face += mix(vec3(.23,.36,.54),uTint,.45)*light*exp(-depth/(thickness*4.8))*.14;
+  face += mix(vec3(.32,.53,.78),uTint,.25)*attenuation*exp(-opticalDepth/(thickness*3.3))*.20;
+  face += mix(vec3(.23,.36,.54),uTint,.45)*light*exp(-opticalDepth/(thickness*4.8))*.14;
   face += mix(vec3(.34,.55,.77),uTint,.35)*bounced*(.12+.24*bevel);
   face += vec3(.63,.76,.92)*attenuation*(1.0-bevel)*.035;
   vec3 edgeLight = light*(vec3(.93,.96,1.0)*specular + tint*shoulder*.18);
-  float spectralReach = exp(-depth/(thickness*1.55));
+  float spectralReach = exp(-opticalDepth/(thickness*1.55));
   edgeLight += light*caustic*spectralReach*spectralFocus*uOptics.z*.92;
   edgeLight += bounced*caustic*spectralReach*.34;
   edgeLight += vec3(.92,.98,1.0)*whiteCore*.31;

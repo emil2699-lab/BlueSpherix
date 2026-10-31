@@ -2,14 +2,26 @@ export type GlassRect = { left: number; top: number; right: number; bottom: numb
 export type Beam = { x: number; y: number; dx: number; dy: number; energy: number };
 
 const unit = (x: number, y: number) => { const n = Math.hypot(x,y) || 1; return { x:x/n, y:y/n }; };
+const smoothstep = (a:number,b:number,value:number) => {
+  const t=Math.max(0,Math.min(1,(value-a)/(b-a)));
+  return t*t*(3-2*t);
+};
 function normal(x:number,y:number,r:GlassRect) {
   const left=Math.abs(x-r.left),right=Math.abs(x-r.right),top=Math.abs(y-r.top),bottom=Math.abs(y-r.bottom);
   const nearest=Math.min(left,right,top,bottom);
-  const nx=nearest===left?-1:nearest===right?1:0;
-  const ny=nearest===top?-1:nearest===bottom?1:0;
-  const cx=r.left+r.width*.5,cy=r.top+r.height*.5;
-  const curve=nx ? (y-cy)/r.height : (x-cx)/r.width;
-  return unit(nx+(ny ? curve*.16:0),ny+(nx ? curve*.16:0));
+  const softness=Math.max(9,Math.min(r.width,r.height)*.12);
+  const wl=Math.exp(-(left-nearest)/softness),wr=Math.exp(-(right-nearest)/softness);
+  const wt=Math.exp(-(top-nearest)/softness),wb=Math.exp(-(bottom-nearest)/softness);
+  return unit(wr-wl,wb-wt);
+}
+function crossingConfidence(x:number,y:number,dx:number,dy:number,r:GlassRect) {
+  const left=Math.abs(x-r.left),right=Math.abs(x-r.right),top=Math.abs(y-r.top),bottom=Math.abs(y-r.bottom);
+  const vertical=Math.min(left,right)<Math.min(top,bottom);
+  const cornerDistance=vertical ? Math.min(Math.abs(y-r.top),Math.abs(r.bottom-y)) : Math.min(Math.abs(x-r.left),Math.abs(r.right-x));
+  const cornerFade=Math.max(12,Math.min(r.width,r.height)*.14);
+  const n=normal(x,y,r);
+  const incidence=Math.abs(dx*n.x+dy*n.y);
+  return smoothstep(0,cornerFade,cornerDistance)*smoothstep(.035,.18,incidence);
 }
 function refract(dx:number,dy:number,nx:number,ny:number,ior:number) {
   const cosine=-(dx*nx+dy*ny);
@@ -21,8 +33,10 @@ function refract(dx:number,dy:number,nx:number,ny:number,ior:number) {
 // Screen-space slab approximation. The forward ray crosses up to maxBounces
 // different glass cards; its exit face bends its direction before the next hit.
 function crossing(x: number, y: number, dx: number, dy: number, r: GlassRect) {
-  const invX = 1/(Math.abs(dx)<.0001 ? .0001 : dx);
-  const invY = 1/(Math.abs(dy)<.0001 ? .0001 : dy);
+  const safeX=Math.abs(dx)<.0001 ? (dx<0 ? -.0001 : .0001) : dx;
+  const safeY=Math.abs(dy)<.0001 ? (dy<0 ? -.0001 : .0001) : dy;
+  const invX = 1/safeX;
+  const invY = 1/safeY;
   const tx1=(r.left-x)*invX, tx2=(r.right-x)*invX;
   const ty1=(r.top-y)*invY, ty2=(r.bottom-y)*invY;
   const enter=Math.max(Math.min(tx1,tx2),Math.min(ty1,ty2),0);
@@ -49,14 +63,16 @@ export function secondaryBeam(pointer: {x:number;y:number}, target: GlassRect, s
     // normals and absorption before the next card receives the emergent ray.
     const entryX=x+dx*hit.enter,entryY=y+dy*hit.enter;
     const entrance=normal(entryX,entryY,hit.r);
+    const entranceConfidence=crossingConfidence(entryX,entryY,dx,dy,hit.r);
     const inside=refract(dx,dy,entrance.x,entrance.y,1/1.5);
     const insideHit=crossing(entryX+inside.x*.5,entryY+inside.y*.5,inside.x,inside.y,hit.r);
     if(!insideHit)return null;
     const out=normal(insideHit.x,insideHit.y,hit.r);
+    const exitConfidence=crossingConfidence(insideHit.x,insideHit.y,inside.x,inside.y,hit.r);
     const turn=refract(inside.x,inside.y,-out.x,-out.y,1.5);
     dx=turn.x;dy=turn.y;
     const path=insideHit.exit;
-    energy*=.62*Math.exp(-path/Math.max(hit.r.width,hit.r.height));
+    energy*=.62*Math.exp(-path/Math.max(hit.r.width,hit.r.height))*entranceConfidence*exitConfidence;
     x=insideHit.x+dx*1.5;y=insideHit.y+dy*1.5;
   }
   return null;

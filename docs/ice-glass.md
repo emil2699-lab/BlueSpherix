@@ -104,13 +104,18 @@ visivo sono in `/workspace/artifacts/ice-glass-continuity/`.
 
 ### Continuità sulle diagonali interne
 
-Il gradiente della distanza di un rettangolo arrotondato sceglie il bordo più
-vicino e crea assi mediani diagonali invisibili nella geometria, ma visibili
-quando orientano una luce molto concentrata. La normale ora conserva il profilo
-esatto sul bordo e sfuma, nei primi pixel interni, verso un unico campo continuo
-da superellisse arrotondata. Attraversando le diagonali il riflesso ruota quindi
-in modo progressivo invece di saltare dalla faccia superiore a quella laterale;
-dispersione, caustiche e trasporto tra card restano invariati.
+Il campo di distanza di un rettangolo arrotondato sceglie il bordo più vicino e
+crea assi mediani diagonali invisibili nella geometria, ma visibili quando
+orientano una luce molto concentrata. La prima correzione aveva sfumato la
+normale, lasciando però la stessa scelta netta nella profondità ottica. Ora sia
+normale sia profondità combinano le facce adiacenti con pesi continui prima di
+raggiungere quelle diagonali. La silhouette rimane esatta, mentre highlight,
+dispersione e caustiche ruotano progressivamente tra lato superiore e laterale.
+Anche le normali del trasporto tra card usano la stessa transizione, evitando un
+secondo salto quando il raggio attraversa un angolo. I percorsi che sfiorano un
+angolo o arrivano quasi tangenti perdono energia con una curva morbida prima che
+il lato di ingresso cambi; un nuovo percorso riappare quindi gradualmente e non
+illumina di colpo il lato opposto.
 
 ## Verifica
 
