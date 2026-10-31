@@ -74,6 +74,24 @@ nel centro di 120×40 px. A cursore lontano, l'RMSE globale è 0,00167.
 Le differenze indicano una modifica localizzata della dispersione, non un
 aumento uniforme della luce.
 
+### Calibrazione organica successiva
+
+La versione con sei colori prefissati è stata sostituita da tre canali rifratti,
+come nella dispersione precedente. `chromaticDispersion` torna a 0,045; il
+profilo delle frange passa da 0,12 a circa 0,15–0,168 unità di profondità
+(+25–40% secondo la curvatura locale), senza aumentare la saturazione.
+Una perturbazione spaziale stabile della normale e del cammino ottico incurva
+gli highlights secondo incidenza e geometria; il fuoco bianco resta separato.
+La trasmissione tra card continua a usare il raggio secondario attenuato.
+
+Confronto visivo A/B/C: `ice-glass-correction/edge.png` (precedente),
+`ice-glass-spectrum/edge.png` (sei bande) e
+`ice-glass-organic/edge.png` (nuova versione); i ritagli sono in
+`ice-glass-organic/comparison-abc.png`. La nuova acquisizione include angolo,
+bordo, spazio tra card, distanza intermedia e cursore lontano. Il confronto
+in immagine resta qualitativo perché la pagina di sviluppo introduce una
+testata verticale di 393 px assente nelle due acquisizioni precedenti.
+
 ## Verifica
 
 - Shader applicativo compilato/linkato in Chromium WebGL 2, errore GL 0.

@@ -9,7 +9,7 @@ export const ICE_GLASS = {
   lightHeight: 48,
   lightFalloff: 340,
   fresnelStrength: .8,
-  chromaticDispersion: .0765,
+  chromaticDispersion: .045,
   edgeRefraction: .88,
   internalReflection: .22,
   specularSharpness: 38,
