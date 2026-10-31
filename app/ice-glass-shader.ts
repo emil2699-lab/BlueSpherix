@@ -46,10 +46,13 @@ void main() {
   if (coverage <= 0.0) discard;
   float depth = -d;
   float thickness = min(uGlass.y, min(halfSize.x,halfSize.y)*.25);
-  // Exact rounded-box gradient. The bevel decays into a continuous face.
-  vec2 q = abs(p)-halfSize+uRadius;
-  vec2 grad = q.x>0.0 && q.y>0.0 ? normalize(q)*sign(p) :
-    (q.x>q.y ? vec2(sign(p.x),0.0) : vec2(0.0,sign(p.y)));
+  // A filtered SDF gradient blends adjacent face normals through rounded corners.
+  float normalStep = max(1.25,thickness*.16);
+  vec2 sdfGradient = vec2(
+    boxSDF(p+vec2(normalStep,0.0),halfSize,uRadius)-boxSDF(p-vec2(normalStep,0.0),halfSize,uRadius),
+    boxSDF(p+vec2(0.0,normalStep),halfSize,uRadius)-boxSDF(p-vec2(0.0,normalStep),halfSize,uRadius)
+  );
+  vec2 grad = sdfGradient/max(length(sdfGradient),.001);
   float bevel = exp(-depth/max(thickness,1.0));
   // A stable, low-frequency liquid normal varies the optical path, not the DOM.
   float phaseA = pixel.x*.018+sin(pixel.y*.023)*1.4;
@@ -90,11 +93,11 @@ void main() {
   float focus = depth/thickness + dot(transmittedG.xy,N.xy)*.34 + wave*.16*bevel;
   vec2 tangent = vec2(-grad.y,grad.x);
   float incidence = dot(L.xy,tangent);
-  float spread = uOptics.y*(4.2+.55*wave)*bevel*(.75+abs(incidence)) *
-    (incidence < -.04 ? -1.0 : 1.0);
+  // Signed incidence moves the channels through each other continuously.
+  float spread = uOptics.y*(4.2+.55*wave)*bevel*(.25+.75*incidence);
   vec3 focalDepth = vec3(.42+spread+dot(transmittedR.xy-transmittedG.xy,N.xy)*.3,
     .42,.42-spread+dot(transmittedB.xy-transmittedG.xy,N.xy)*.3);
-  float bandWidth = .15+.018*abs(wave);
+  float bandWidth = .15+.018*wave*wave;
   vec3 caustic = exp(-pow((vec3(focus)-focalDepth)/bandWidth,vec3(2.0)));
   float facing = .11+.89*max(dot(N.xy,normalize(delta.xy+vec2(.001))),0.0);
   float light = attenuation*uEnergy.y*facing;
@@ -106,7 +109,7 @@ void main() {
   float travel=dot(secondaryDelta,uSecondary.zw);
   float deviation=abs(secondaryDelta.x*uSecondary.w-secondaryDelta.y*uSecondary.z);
   float beamWidth=14.0+max(travel,0.0)*.045+wave*3.0;
-  float bounced=uSecondaryEnergy*uLight.z*step(0.0,travel)*
+  float bounced=uSecondaryEnergy*uLight.z*smoothstep(-beamWidth,beamWidth,travel)*
     exp(-pow(deviation/max(beamWidth,2.0),2.0))*exp(-max(travel,0.0)/360.0);
   vec3 tint = mix(vec3(.48,.70,1.0),uTint,.22);
   vec3 absorption = exp(-vec3(.09,.06,.035)*thickness*.12);

@@ -92,6 +92,16 @@ bordo, spazio tra card, distanza intermedia e cursore lontano. Il confronto
 in immagine resta qualitativo perché la pagina di sviluppo introduce una
 testata verticale di 393 px assente nelle due acquisizioni precedenti.
 
+### Continuità delle caustiche
+
+Il salto cromatico sul bordo superiore derivava dal cambio di segno di
+`spread` a un valore fisso dell'incidenza. Ora lo spostamento dei canali
+è una funzione continua dell'angolo. La normale della card usa un gradiente
+SDF filtrato, così gli angoli non cambiano direzione bruscamente; anche la
+partenza del raggio trasmesso sfuma in una larghezza di raggio. La dispersione
+RGB rimane attiva. La sequenza di nove posizioni del cursore e il contatto
+visivo sono in `/workspace/artifacts/ice-glass-continuity/`.
+
 ## Verifica
 
 - Shader applicativo compilato/linkato in Chromium WebGL 2, errore GL 0.
