@@ -191,12 +191,13 @@ nav button b { margin-left: auto; font-size: 8px; color: #091110; background: va
 .today-kpi strong { font-size: clamp(17px,1.45vw,20px); white-space: nowrap; }
 .today-kpi small { margin-top: 7px; color: #6e7a86; font-size: 8px; }
 .lower-grid { display: grid; grid-template-columns: minmax(0, 2.1fr) minmax(260px, .9fr); gap: 15px; margin-top: 15px; }
-.positions-card { padding: 20px 21px 10px; min-width: 0; scroll-margin-top: 90px; }
+.positions-card { padding: 20px 21px 10px; min-width: 0; scroll-margin-top: 90px; container-type: inline-size; }
 .section-head { margin-bottom: 17px; }
 .quiet-button { color: #8794a0; padding: 7px 0; }
 .quiet-button:hover { color: var(--aqua); }
-.position-table { width: 100%; overflow-x: auto; }
-.table-row { min-width: 660px; display: grid; grid-template-columns: 1.25fr .9fr .7fr .9fr .9fr .8fr; align-items: center; min-height: 46px; border-top: 1px solid var(--stroke); color: #a7b2bc; font-size: 9px; }
+.position-table { width: 100%; min-width: 0; overflow-x: hidden; }
+.table-row { width: 100%; min-width: 0; display: grid; grid-template-columns: minmax(0,1.25fr) minmax(0,.9fr) minmax(0,.7fr) minmax(0,.9fr) minmax(0,.9fr) minmax(0,.8fr); align-items: center; min-height: 46px; border-top: 1px solid var(--stroke); color: #a7b2bc; font-size: 9px; }
+.table-row > * { min-width: 0; }
 .position-table .table-row:not(.table-header) { min-height: 42px; margin: 4px 0; padding: 0 10px; border-radius: 9px; }
 .table-header { min-height: 30px; border-top: 0; color: #586470; text-transform: uppercase; font-size: 7px; letter-spacing: .8px; }
 .table-row > *:last-child { text-align: right; }
@@ -204,10 +205,23 @@ nav button b { margin-left: auto; font-size: 8px; color: #091110; background: va
 .symbol i { width: 25px; height: 25px; border-radius: 7px; display: grid; place-items: center; font-style: normal; font-size: 7px; color: #97fff3; background: rgba(86,217,202,.08); border: 1px solid rgba(86,217,202,.09); }
 .symbol strong { color: #dfe8ed; }
 .long, .short { display: flex; gap: 3px; align-items: center; }
+.table-row > .symbol { min-width: 0; }
+.table-row > .symbol strong { overflow: hidden; text-overflow: ellipsis; }
 .long, .up, [data-sign="positive"] { color: var(--aqua); }
 .short { color: var(--red); }
 .down, [data-sign="negative"] { color: var(--red) !important; }
 [data-sign="neutral"] { color: inherit; }
+@container (max-width: 720px) {
+  .position-table .table-header { display: none; }
+  .position-table .table-row:not(.table-header) { grid-template-columns: minmax(0,1.2fr) minmax(0,.9fr) minmax(0,.75fr); grid-template-rows: auto auto; column-gap: 8px; row-gap: 7px; min-height: 58px; padding: 8px 10px; }
+  .position-table .table-row:not(.table-header) > :nth-child(-n+3) { grid-row: 1; }
+  .position-table .table-row:not(.table-header) > :nth-child(n+4) { grid-row: 2; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; white-space: nowrap; }
+  .position-table .table-row:not(.table-header) > :nth-child(4)::before { content: "Apertura"; }
+  .position-table .table-row:not(.table-header) > :nth-child(5)::before { content: "Corrente"; }
+  .position-table .table-row:not(.table-header) > :nth-child(6)::before { content: "P&L"; }
+  .position-table .table-row:not(.table-header) > :nth-child(n+4)::before { color: #687582; font-size: 6px; font-weight: 500; letter-spacing: .45px; text-transform: uppercase; }
+  .position-table .table-row:not(.table-header) > :last-child { text-align: left; }
+}
 .insight-card { padding: 20px; position: relative; overflow: hidden; background: radial-gradient(circle at 138% 138%,transparent 0 104px,rgba(157,139,255,.1) 105px 106px,transparent 107px 130px,rgba(157,139,255,.025) 131px 132px,transparent 133px),radial-gradient(circle at 100% 0%,rgba(157,139,255,.17),transparent 43%),linear-gradient(145deg,rgba(22,25,40,.9),rgba(13,17,25,.75)); }
 .insight-icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; color: #c3b9ff; background: rgba(157,139,255,.11); border: 1px solid rgba(157,139,255,.14); margin-bottom: 16px; }
 .insight-card h2 { font-size: 16px; line-height: 1.35; font-weight: 590; margin: 0 0 9px; letter-spacing: -.3px; }

@@ -26,6 +26,8 @@ uniform vec4 uEnergy; // ambient, intensity, light height, falloff
 uniform vec3 uFinish; // sharpness, bloom intensity, bloom radius
 uniform vec4 uSecondary; // previous slab exit and refracted direction
 uniform float uSecondaryEnergy;
+uniform int uNegativeCount;
+uniform vec4 uNegativeRows[16]; // viewport rectangles for negative position rows
 
 float boxSDF(vec2 p, vec2 b, float r) {
   vec2 q = abs(p) - b + r;
@@ -157,7 +159,24 @@ void main() {
   edgeLight += light*tint*edge*uOptics.w*.08;
   vec3 color = face + edgeLight*(.32+.68*edge);
   color *= .72 + uOptics.x*fresnel;
+  // Keep the single slab, but let negative rows reflect warm light. The soft
+  // rectangle follows the DOM row even when responsive layout moves it.
+  float negativeMask = 0.0;
+  for (int i = 0; i < 16; i++) {
+    if (i >= uNegativeCount) break;
+    vec4 row = uNegativeRows[i];
+    vec2 edgeDistance = min(pixel-row.xy,row.xy+row.zw-pixel);
+    negativeMask = max(negativeMask,smoothstep(-4.0,2.0,min(edgeDistance.x,edgeDistance.y)));
+  }
+  // Preserve neutral highlights, including the white core, while shifting
+  // only the cool chroma that would make a loss appear aqua on hover.
+  float neutral = min(color.r,min(color.g,color.b));
+  vec3 chroma = max(color-vec3(neutral),vec3(0.0));
+  vec3 warmReflection = vec3(neutral) +
+    vec3(max(chroma.r,max(chroma.g,chroma.b)*.9),chroma.g*.18,chroma.b*.22);
+  color = mix(color,warmReflection,negativeMask);
   // Premultiplied, full-card material: no CSS-like stroke or external glow.
   float alpha = clamp((.24 + max(max(color.r,color.g),color.b)*uGlass.w)*coverage,0.0,.72);
+  alpha *= 1.0-.35*negativeMask;
   outColor = vec4(color*alpha,alpha);
 }`;
