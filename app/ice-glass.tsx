@@ -7,8 +7,10 @@ import { secondaryBeam } from "./ice-glass-transport";
 
 type ViewportRect = { left: number; top: number; width: number; height: number };
 type GlassRect = ViewportRect & { right: number; bottom: number };
-type Measurement = { element: HTMLElement; rect: GlassRect; radius: number; tint: number[] };
+type Measurement = { element: HTMLElement; rect: GlassRect; radius: number; tint: number[]; negativeRegions: GlassRect[] };
 const GLASS_SURFACE_SELECTOR = ".glass-card, .calendar-strip, .demo-notice";
+const NEGATIVE_REGION_SELECTOR = ".negative-row, .timeline-trade.loss";
+const NEGATIVE_TINT = [1,.34,.43];
 
 export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -94,7 +96,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       viewport = nextViewport;
       cards = Array.from(root.querySelectorAll<HTMLElement>(GLASS_SURFACE_SELECTOR)).map((element) => {
         const style = getComputedStyle(element);
-        const tint = element.matches(".negative-surface, .negative-strong, .critical, .risk-critical, .failed") ? [1,.34,.43]
+        const tint = element.matches(".negative-surface, .negative-strong, .critical, .risk-critical, .failed") ? NEGATIVE_TINT
           : element.matches(".violet, .insight-card, .lab-validation") ? [.64,.46,1]
           : element.matches(".amber, .calendar-strip, .warning, .risk-warning") ? [1,.62,.24]
           : [.31,.77,.87];
@@ -102,7 +104,13 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         const left = domRect.left-nextViewport.left;
         const top = domRect.top-nextViewport.top;
         const rect = { left, top, width: domRect.width, height: domRect.height, right: left+domRect.width, bottom: top+domRect.height };
-        return { element, rect, radius: parseFloat(style.borderTopLeftRadius) || 14, tint };
+        const negativeRegions = Array.from(element.querySelectorAll<HTMLElement>(NEGATIVE_REGION_SELECTOR)).map((region) => {
+          const regionRect = region.getBoundingClientRect();
+          const regionLeft = regionRect.left-nextViewport.left;
+          const regionTop = regionRect.top-nextViewport.top;
+          return { left: regionLeft, top: regionTop, width: regionRect.width, height: regionRect.height, right: regionLeft+regionRect.width, bottom: regionTop+regionRect.height };
+        });
+        return { element, rect, radius: parseFloat(style.borderTopLeftRadius) || 14, tint, negativeRegions };
       });
       dirty = false;
     };
@@ -133,15 +141,16 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       gl.uniform3f(uniform("uFinish"),config.specularSharpness,config.bloomIntensity,config.bloomRadius);
       gl.enable(gl.SCISSOR_TEST);
       const surfaces = cards.map(card=>card.rect);
-      for (const { rect, radius, tint } of cards) {
+      const localPointer = { x: pointer.x-viewport.left, y: pointer.y-viewport.top };
+      for (const { rect, radius, tint, negativeRegions } of cards) {
         if (rect.bottom <= 0 || rect.top >= viewHeight || rect.right <= 0 || rect.left >= viewWidth || !rect.width) continue;
         // A scissored full-card quad keeps the slab continuous while avoiding work outside it.
         gl.viewport(0,0,width,height);
         gl.scissor(Math.max(0,Math.floor(rect.left*dpr)),Math.max(0,Math.floor((viewHeight-rect.bottom)*dpr)),Math.ceil(Math.min(rect.right,viewWidth)*dpr)-Math.max(0,Math.floor(rect.left*dpr)),Math.ceil(Math.min(rect.bottom,viewHeight)*dpr)-Math.max(0,Math.floor(rect.top*dpr)));
         gl.uniform4f(uniform("uRect"),rect.left,rect.top,rect.width,rect.height);
         gl.uniform1f(uniform("uRadius"),radius);
-        gl.uniform3f(uniform("uTint"),tint[0],tint[1],tint[2]);
-        const localPointer = { x: pointer.x-viewport.left, y: pointer.y-viewport.top };
+        const activeTint = negativeRegions.some((region) => localPointer.x >= region.left && localPointer.x <= region.right && localPointer.y >= region.top && localPointer.y <= region.bottom) ? NEGATIVE_TINT : tint;
+        gl.uniform3f(uniform("uTint"),activeTint[0],activeTint[1],activeTint[2]);
         const beam=pointer.presence ? secondaryBeam(localPointer,rect,surfaces,config.maxBounces) : null;
         gl.uniform4f(uniform("uSecondary"),beam?.x ?? 0,beam?.y ?? 0,beam?.dx ?? 0,beam?.dy ?? 0);
         gl.uniform1f(uniform("uSecondaryEnergy"),beam?.energy ?? 0);
