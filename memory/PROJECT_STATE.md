@@ -49,3 +49,7 @@ Web app moderna per analisi di trading, ispirata alle funzioni di Myfxbook ma co
 ## Prossimo passo consigliato
 
 Consolidare il prossimo blocco principale dopo la revisione utente dello Strategy Lab; evitare nuove estensioni della sezione Rischio salvo richieste specifiche.
+
+### Preferenza jumpcard
+- Il micro-movimento 3D della singola card al passaggio del cursore è temporaneamente disattivato.
+- Parola chiave per riattivarlo: `jumpcard`.
