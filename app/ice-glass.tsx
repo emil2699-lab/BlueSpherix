@@ -5,7 +5,9 @@ import { ICE_GLASS as config } from "./ice-glass-config";
 import { glassFragment, glassVertex } from "./ice-glass-shader";
 import { secondaryBeam } from "./ice-glass-transport";
 
-type Measurement = { element: HTMLElement; rect: DOMRect; radius: number; tint: number[] };
+type ViewportRect = { left: number; top: number; width: number; height: number };
+type GlassRect = ViewportRect & { right: number; bottom: number };
+type Measurement = { element: HTMLElement; rect: GlassRect; radius: number; tint: number[] };
 
 export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -23,8 +25,11 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     let lost = false;
     let cards: Measurement[] = [];
     let dpr = Math.min(devicePixelRatio || 1, config.maxDPR);
+    let dprCap: number = config.maxDPR;
+    let viewport: ViewportRect = { left: 0, top: 0, width: innerWidth, height: innerHeight };
     let lastRender = 0;
     let slowFrames = 0;
+    let settleUntil = 0;
     const pointer = { x: -10000, y: -10000, presence: 0 };
     const reduced = matchMedia("(prefers-reduced-motion: reduce)");
     const debug = process.env.NODE_ENV === "development" && new URLSearchParams(location.search).get("iceGlassDebug") === "1" ? document.createElement("canvas") : null;
@@ -70,19 +75,42 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         delete root.dataset.iceGlass;
       }
     };
-    const measure = () => {
+    const readViewport = (): ViewportRect => {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        left: rect.left,
+        top: rect.top,
+        width: rect.width || document.documentElement.clientWidth,
+        height: rect.height || document.documentElement.clientHeight,
+      };
+    };
+    const viewportChanged = (next: ViewportRect) =>
+      Math.abs(next.left-viewport.left) > .05 || Math.abs(next.top-viewport.top) > .05 ||
+      Math.abs(next.width-viewport.width) > .05 || Math.abs(next.height-viewport.height) > .05;
+    const measure = (nextViewport = readViewport()) => {
+      viewport = nextViewport;
       cards = Array.from(root.querySelectorAll<HTMLElement>(".glass-card, .calendar-strip, .today-notice")).map((element) => {
         const style = getComputedStyle(element);
         const tint = element.classList.contains("violet") || element.classList.contains("insight-card") ? [.64,.46,1] : element.classList.contains("amber") || element.classList.contains("calendar-strip") ? [1,.62,.24] : [.31,.77,.87];
-        return { element, rect: element.getBoundingClientRect(), radius: parseFloat(style.borderTopLeftRadius) || 14, tint };
+        const domRect = element.getBoundingClientRect();
+        const left = domRect.left-nextViewport.left;
+        const top = domRect.top-nextViewport.top;
+        const rect = { left, top, width: domRect.width, height: domRect.height, right: left+domRect.width, bottom: top+domRect.height };
+        return { element, rect, radius: parseFloat(style.borderTopLeftRadius) || 14, tint };
       });
       dirty = false;
     };
     const draw = (time: number) => {
       frame = 0;
       if (lost || !program || document.hidden) return;
-      if (dirty) measure();
-      const width = Math.round(innerWidth*dpr), height = Math.round(innerHeight*dpr);
+      const nextViewport = readViewport();
+      if (dirty || viewportChanged(nextViewport)) measure(nextViewport);
+      // Safari changes devicePixelRatio independently from layout while browser
+      // zoom is in progress. Read it per frame so backing store and DOM remain
+      // in the same coordinate space throughout the zoom gesture.
+      dpr = Math.min(devicePixelRatio || 1,dprCap);
+      const viewWidth = viewport.width, viewHeight = viewport.height;
+      const width = Math.max(1,Math.round(viewWidth*dpr)), height = Math.max(1,Math.round(viewHeight*dpr));
       if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
       gl.disable(gl.SCISSOR_TEST);
       gl.clearColor(0,0,0,0);
@@ -92,7 +120,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       gl.bindVertexArray(vao);
       gl.uniform2f(uniform("uResolution"), width, height);
       gl.uniform1f(uniform("uDPR"),dpr);
-      gl.uniform3f(uniform("uLight"),pointer.x,pointer.y,reduced.matches ? 0 : pointer.presence);
+      gl.uniform3f(uniform("uLight"),pointer.x-viewport.left,pointer.y-viewport.top,reduced.matches ? 0 : pointer.presence);
       gl.uniform4f(uniform("uGlass"),config.glassIOR,config.glassThickness,config.glassRoughness,config.glassOpacity);
       gl.uniform4f(uniform("uOptics"),config.fresnelStrength,config.chromaticDispersion,config.edgeRefraction,config.internalReflection);
       gl.uniform4f(uniform("uEnergy"),config.ambientReflection,config.lightIntensity,config.lightHeight,config.lightFalloff);
@@ -100,14 +128,15 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       gl.enable(gl.SCISSOR_TEST);
       const surfaces = cards.map(card=>card.rect);
       for (const { rect, radius, tint } of cards) {
-        if (rect.bottom <= 0 || rect.top >= innerHeight || !rect.width) continue;
+        if (rect.bottom <= 0 || rect.top >= viewHeight || rect.right <= 0 || rect.left >= viewWidth || !rect.width) continue;
         // A scissored full-card quad keeps the slab continuous while avoiding work outside it.
         gl.viewport(0,0,width,height);
-        gl.scissor(Math.max(0,Math.floor(rect.left*dpr)),Math.max(0,Math.floor((innerHeight-rect.bottom)*dpr)),Math.ceil(Math.min(rect.right,innerWidth)*dpr)-Math.max(0,Math.floor(rect.left*dpr)),Math.ceil(Math.min(rect.bottom,innerHeight)*dpr)-Math.max(0,Math.floor(rect.top*dpr)));
+        gl.scissor(Math.max(0,Math.floor(rect.left*dpr)),Math.max(0,Math.floor((viewHeight-rect.bottom)*dpr)),Math.ceil(Math.min(rect.right,viewWidth)*dpr)-Math.max(0,Math.floor(rect.left*dpr)),Math.ceil(Math.min(rect.bottom,viewHeight)*dpr)-Math.max(0,Math.floor(rect.top*dpr)));
         gl.uniform4f(uniform("uRect"),rect.left,rect.top,rect.width,rect.height);
         gl.uniform1f(uniform("uRadius"),radius);
         gl.uniform3f(uniform("uTint"),tint[0],tint[1],tint[2]);
-        const beam=pointer.presence ? secondaryBeam(pointer,rect,surfaces,config.maxBounces) : null;
+        const localPointer = { x: pointer.x-viewport.left, y: pointer.y-viewport.top };
+        const beam=pointer.presence ? secondaryBeam(localPointer,rect,surfaces,config.maxBounces) : null;
         gl.uniform4f(uniform("uSecondary"),beam?.x ?? 0,beam?.y ?? 0,beam?.dx ?? 0,beam?.dy ?? 0);
         gl.uniform1f(uniform("uSecondaryEnergy"),beam?.energy ?? 0);
         gl.drawArrays(gl.TRIANGLES,0,6);
@@ -116,11 +145,12 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         debug.width=width;debug.height=height;
         const ctx=debug.getContext("2d");
         if (ctx) {
-          ctx.scale(dpr,dpr);ctx.clearRect(0,0,innerWidth,innerHeight);
+          ctx.scale(dpr,dpr);ctx.clearRect(0,0,viewWidth,viewHeight);
+          const localPointer = { x: pointer.x-viewport.left, y: pointer.y-viewport.top };
           for (const {rect} of cards) {
-            const beam=secondaryBeam(pointer,rect,surfaces,config.maxBounces);
+            const beam=secondaryBeam(localPointer,rect,surfaces,config.maxBounces);
             if (!beam) continue;
-            ctx.strokeStyle="rgba(125,235,255,.8)";ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(pointer.x,pointer.y);ctx.lineTo(beam.x,beam.y);ctx.lineTo(beam.x+beam.dx*170,beam.y+beam.dy*170);ctx.stroke();
+            ctx.strokeStyle="rgba(125,235,255,.8)";ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(localPointer.x,localPointer.y);ctx.lineTo(beam.x,beam.y);ctx.lineTo(beam.x+beam.dx*170,beam.y+beam.dy*170);ctx.stroke();
             ctx.fillStyle="rgba(255,215,125,.95)";ctx.beginPath();ctx.arc(beam.x,beam.y,4,0,Math.PI*2);ctx.fill();
             ctx.strokeStyle="rgba(136,169,255,.22)";ctx.lineWidth=26*beam.energy;ctx.beginPath();ctx.moveTo(beam.x,beam.y);ctx.lineTo(beam.x+beam.dx*170,beam.y+beam.dy*170);ctx.stroke();
           }
@@ -132,13 +162,19 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       }
       canvas.dataset.pointer = `${pointer.x},${pointer.y}`;
       // Adapt resolution only under sustained activity, never interpolate position.
-      if (lastRender && time-lastRender < 120 && time-lastRender > 30) slowFrames++;
+      const settling = time < settleUntil;
+      if (!settling && lastRender && time-lastRender < 120 && time-lastRender > 30) slowFrames++;
       else slowFrames = Math.max(0,slowFrames-1);
       lastRender = time;
-      if (slowFrames > 15 && dpr > 1) { dpr = 1; slowFrames = 0; }
+      if (slowFrames > 15 && dprCap > 1) { dprCap = 1; slowFrames = 0; }
+      // A browser zoom can move a card for several frames while responsive CSS
+      // and font metrics settle. ResizeObserver sees size changes, not every
+      // positional shift caused by siblings, so remeasure briefly after zoom.
+      if (settling) { dirty = true; schedule(); }
     };
     const schedule = () => { if (!frame && !lost && !document.hidden) frame = requestAnimationFrame(draw); };
     const invalidate = () => { dirty = true; schedule(); };
+    const settleLayout = () => { settleUntil = performance.now()+700; invalidate(); };
     const move: EventListener = (nativeEvent) => {
       const event = nativeEvent as PointerEvent;
       if (event.pointerType === "touch" || root.hidden || reduced.matches) return;
@@ -150,7 +186,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     const contextLost = (event: Event) => { event.preventDefault(); lost = true; cancelAnimationFrame(frame); frame = 0; delete root.dataset.iceGlass; };
     const contextRestored = () => { dispose(); lost = false; initialize(); invalidate(); };
     initialize();
-    const resize = new ResizeObserver(invalidate);
+    const resize = new ResizeObserver(settleLayout);
     resize.observe(root);
     root.querySelectorAll(".glass-card, .calendar-strip, .today-notice").forEach((card) => resize.observe(card));
     const mutation = new MutationObserver(invalidate);
@@ -158,8 +194,11 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     window.addEventListener("pointermove",move,{passive:true});
     window.addEventListener("pointerrawupdate",move,{passive:true});
     window.addEventListener("pointerout",leave,{passive:true});
-    window.addEventListener("resize",invalidate,{passive:true});
+    window.addEventListener("resize",settleLayout,{passive:true});
     window.addEventListener("scroll",invalidate,{passive:true,capture:true});
+    window.visualViewport?.addEventListener("resize",settleLayout,{passive:true});
+    window.visualViewport?.addEventListener("scroll",invalidate,{passive:true});
+    root.addEventListener("transitionrun",settleLayout);
     root.addEventListener("transitionend",invalidate);
     document.addEventListener("visibilitychange",visibility);
     reduced.addEventListener("change",schedule);
@@ -169,8 +208,9 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     return () => {
       cancelAnimationFrame(frame); resize.disconnect(); mutation.disconnect();
       window.removeEventListener("pointermove",move); window.removeEventListener("pointerrawupdate",move);
-      window.removeEventListener("pointerout",leave); window.removeEventListener("resize",invalidate);
-      window.removeEventListener("scroll",invalidate,true); root.removeEventListener("transitionend",invalidate);
+      window.removeEventListener("pointerout",leave); window.removeEventListener("resize",settleLayout);
+      window.removeEventListener("scroll",invalidate,true); root.removeEventListener("transitionrun",settleLayout); root.removeEventListener("transitionend",invalidate);
+      window.visualViewport?.removeEventListener("resize",settleLayout); window.visualViewport?.removeEventListener("scroll",invalidate);
       document.removeEventListener("visibilitychange",visibility); reduced.removeEventListener("change",schedule);
       canvas.removeEventListener("webglcontextlost",contextLost); canvas.removeEventListener("webglcontextrestored",contextRestored);
       debug?.remove(); delete root.dataset.iceGlass; dispose();

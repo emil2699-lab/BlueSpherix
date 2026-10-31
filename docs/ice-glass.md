@@ -120,6 +120,14 @@ angolo o arrivano quasi tangenti perdono energia con una curva morbida prima che
 il lato di ingresso cambi; un nuovo percorso riappare quindi gradualmente e non
 illumina di colpo il lato opposto.
 
+### Sincronizzazione con lo zoom di Safari
+
+Canvas, card, cursore e regioni di scissor condividono ora il sistema di
+coordinate misurato direttamente sul canvas. Il DPR viene riletto a ogni frame e
+gli eventi `visualViewport` invalidano le geometrie durante zoom e pan. In questo
+modo il materiale WebGL resta sovrapposto alle card anche mentre Safari cambia
+separatamente viewport, layout e scala del backing store.
+
 ## Verifica
 
 - Shader applicativo compilato/linkato in Chromium WebGL 2, errore GL 0.
