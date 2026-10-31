@@ -1239,7 +1239,11 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
   .trade-filters button:hover { color: #dce8eb; border-color: var(--stroke-strong); transform: translateY(-1px); }
   .table-row:not(.table-header), .instrument-row, .allocation-row, .story-item { transition: transform .32s var(--ease-apple-spring), background .36s var(--ease-apple-layout), border-color .36s var(--ease-apple-layout), box-shadow .36s var(--ease-apple-layout); }
   .table-row:not(.table-header):hover { transform: translateX(2px); background: rgba(86,217,202,.025); }
-  .negative-row:hover { background: linear-gradient(90deg,rgba(255,111,125,.15),rgba(255,111,125,.035) 68%,transparent); border-color: rgba(255,111,125,.3); }
+  .position-table .table-row.negative-row:hover {
+    background: linear-gradient(90deg,rgba(255,111,125,.15),rgba(255,111,125,.035) 68%,transparent);
+    border-color: rgba(255,111,125,.3);
+    box-shadow: inset 2px 0 rgba(255,111,125,.88), inset 0 1px rgba(255,183,190,.05);
+  }
   .instrument-row:hover, .allocation-row:hover { transform: translateX(3px); }
   .story-item:hover { transform: translateY(-2px); }
   .story-item:hover > span { box-shadow: 0 0 18px rgba(86,217,202,.28); }

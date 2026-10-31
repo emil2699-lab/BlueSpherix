@@ -7,9 +7,8 @@ import { secondaryBeam } from "./ice-glass-transport";
 
 type ViewportRect = { left: number; top: number; width: number; height: number };
 type GlassRect = ViewportRect & { right: number; bottom: number };
-type Measurement = { element: HTMLElement; rect: GlassRect; radius: number; tint: number[]; negativeRows: Float32Array; negativeCount: number };
+type Measurement = { element: HTMLElement; rect: GlassRect; radius: number; tint: number[] };
 const GLASS_SURFACE_SELECTOR = ".glass-card, .calendar-strip, .demo-notice";
-const MAX_NEGATIVE_ROWS = 16;
 
 export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -103,15 +102,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         const left = domRect.left-nextViewport.left;
         const top = domRect.top-nextViewport.top;
         const rect = { left, top, width: domRect.width, height: domRect.height, right: left+domRect.width, bottom: top+domRect.height };
-        const negativeRows = new Float32Array(MAX_NEGATIVE_ROWS*4);
-        const rows = element.matches(".positions-card")
-          ? Array.from(element.querySelectorAll<HTMLElement>(".position-table .negative-row")).slice(0,MAX_NEGATIVE_ROWS)
-          : [];
-        rows.forEach((row,index) => {
-          const rowRect = row.getBoundingClientRect();
-          negativeRows.set([rowRect.left-nextViewport.left,rowRect.top-nextViewport.top,rowRect.width,rowRect.height],index*4);
-        });
-        return { element, rect, radius: parseFloat(style.borderTopLeftRadius) || 14, tint, negativeRows, negativeCount: rows.length };
+        return { element, rect, radius: parseFloat(style.borderTopLeftRadius) || 14, tint };
       });
       dirty = false;
     };
@@ -142,7 +133,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       gl.uniform3f(uniform("uFinish"),config.specularSharpness,config.bloomIntensity,config.bloomRadius);
       gl.enable(gl.SCISSOR_TEST);
       const surfaces = cards.map(card=>card.rect);
-      for (const { rect, radius, tint, negativeRows, negativeCount } of cards) {
+      for (const { rect, radius, tint } of cards) {
         if (rect.bottom <= 0 || rect.top >= viewHeight || rect.right <= 0 || rect.left >= viewWidth || !rect.width) continue;
         // A scissored full-card quad keeps the slab continuous while avoiding work outside it.
         gl.viewport(0,0,width,height);
@@ -150,8 +141,6 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         gl.uniform4f(uniform("uRect"),rect.left,rect.top,rect.width,rect.height);
         gl.uniform1f(uniform("uRadius"),radius);
         gl.uniform3f(uniform("uTint"),tint[0],tint[1],tint[2]);
-        gl.uniform1i(uniform("uNegativeCount"),negativeCount);
-        gl.uniform4fv(uniform("uNegativeRows[0]"),negativeRows);
         const localPointer = { x: pointer.x-viewport.left, y: pointer.y-viewport.top };
         const beam=pointer.presence ? secondaryBeam(localPointer,rect,surfaces,config.maxBounces) : null;
         gl.uniform4f(uniform("uSecondary"),beam?.x ?? 0,beam?.y ?? 0,beam?.dx ?? 0,beam?.dy ?? 0);
