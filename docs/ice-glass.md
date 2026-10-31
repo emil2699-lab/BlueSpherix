@@ -102,6 +102,9 @@ partenza del raggio trasmesso sfuma in una larghezza di raggio. La dispersione
 RGB rimane attiva. La sequenza di nove posizioni del cursore e il contatto
 visivo sono in `/workspace/artifacts/ice-glass-continuity/`.
 
+La calibrazione corrente porta `chromaticDispersion` a 0,050 (+11%): le frange
+sono leggermente più separate, senza aumentare la luminosità generale.
+
 ### Continuità sulle diagonali interne
 
 Il campo di distanza di un rettangolo arrotondato sceglie il bordo più vicino e
