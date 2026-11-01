@@ -179,7 +179,16 @@ void main() {
   vec3 focalDepth=vec3(.42+spread+dot(differentialR,N)*.3,
     .42,.42-spread+dot(differentialB,N)*.3);
   float bandWidth=.15+.018*shear*shear/(.04+shear*shear);
-  vec3 caustic = exp(-pow((vec3(focus)-focalDepth)/bandWidth,vec3(2.0)));
+  // One reflection, from overlapping white to the existing dispersed RGB.
+  // Evaluate proximity at the surface, so only the nearby part becomes glossy;
+  // the distant band retains its exact Snell paths, width and colour balance.
+  float separation=smoothstep(uEnergy.z*1.25,uEnergy.z*4.0,length(delta));
+  focalDepth=mix(vec3(.42),focalDepth,separation);
+  float reflectionWidth=bandWidth*mix(.72,1.0,separation);
+  // Normalize the narrower channel profiles, rather than placing an unrelated
+  // white glow over the coloured material.
+  vec3 caustic = exp(-pow((vec3(focus)-focalDepth)/reflectionWidth,vec3(2.0)))
+    *(bandWidth/reflectionWidth);
   float facing = .11+.89*max(dot(N.xy,normalize(delta.xy+vec2(.001))),0.0);
   float light = attenuation*uEnergy.y*facing;
   float alongEdge = dot(delta.xy,tangent);

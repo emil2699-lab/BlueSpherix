@@ -345,3 +345,26 @@ fondale passa dal 64–68% a circa l'86%; il contributo dei riflessi è numerica
 identico (errore massimo zero). Screenshot prima/dopo e readback in
 `/workspace/artifacts/glass-clarity/`. Contenuti opachi e geometrie DOM identiche,
 build e lint verificati, nessun errore WebGL/browser.
+
+## Fusione del riflesso bianco con le frange RGB (2026-11-01)
+
+La stessa fascia ottica ora passa dal bianco lucido vicino alla sorgente alla
+dispersione preesistente quando la sorgente si allontana. Una transizione continua
+valutata sulla distanza tridimensionale sorgente-superficie porta i centri RGB
+dal percorso verde comune ai tre percorsi originali. La scala usa l'altezza della
+luce esistente: sovrapposizione entro 60 px, separazione completa da 192 px. Non
+viene aggiunto un riflesso bianco indipendente né un alone sulla superficie.
+
+Il profilo vicino è largo il 72% di quello originale e viene normalizzato per
+compensare il restringimento. Allontanando il cursore, larghezza e separazione
+tornano progressivamente ai valori precedenti. È una calibrazione del modello
+ottico 2.5D esistente, non un nuovo sistema di trasporto fisico. Curva centrale,
+normali, silhouette, tinta del corpo, opacità 0,14, riflesso esterno e parametri
+di dispersione rimangono invariati. Nessuno stato temporale o ritardo aggiunto.
+
+Il readback dello shader reale misura centri RGB coincidenti nei due campioni
+vicini; nella sequenza obliqua la separazione cresce da 0 a 0,71, 3,60 e 5,02 px.
+Tre casi interamente oltre la distanza di transizione sono identici pixel per
+pixel al riferimento. Corpo, normali e altezza hanno errore numerico zero;
+trasmissione centrale invariata. Confronti e script temporanei sono archiviati
+in `/workspace/artifacts/glass-gloss-spectrum/`.
