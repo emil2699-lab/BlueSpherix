@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useRef, type RefObject } from "react";
-import { ICE_GLASS as config, TODAY_GLASS } from "./ice-glass-config";
+import { ICE_GLASS as config } from "./ice-glass-config";
 import { glassFragment, glassVertex } from "./ice-glass-shader";
-import { volumeGlassFragment } from "./ice-glass-volume-shader";
-import { createCaustics } from "./ice-glass-caustics";
 import { secondaryBeam } from "./ice-glass-transport";
 
 type ViewportRect = { left: number; top: number; width: number; height: number };
@@ -12,7 +10,7 @@ type GlassRect = ViewportRect & { right: number; bottom: number };
 type Measurement = { element: HTMLElement; rect: GlassRect; radius: number; tint: number[] };
 const GLASS_SURFACE_SELECTOR = ".glass-card, .calendar-strip, .demo-notice";
 
-export function IceGlass({ rootRef, volumetric = false }: { rootRef: RefObject<HTMLElement | null>; volumetric?: boolean }) {
+export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -23,13 +21,12 @@ export function IceGlass({ rootRef, volumetric = false }: { rootRef: RefObject<H
     let program: WebGLProgram | null = null;
     let vao: WebGLVertexArrayObject | null = null;
     let shaders: WebGLShader[] = [];
-    let caustics: ReturnType<typeof createCaustics>|null=null;
     let frame = 0;
     let dirty = true;
     let lost = false;
     let cards: Measurement[] = [];
     let dpr = Math.min(devicePixelRatio || 1, config.maxDPR);
-    let dprCap: number = volumetric ? 1.5 : config.maxDPR;
+    let dprCap: number = config.maxDPR;
     let viewport: ViewportRect = { left: 0, top: 0, width: innerWidth, height: innerHeight };
     let lastRender = 0;
     let slowFrames = 0;
@@ -38,7 +35,7 @@ export function IceGlass({ rootRef, volumetric = false }: { rootRef: RefObject<H
     const observedSurfaces = new Set<Element>();
     const pointer = { x: -10000, y: -10000, presence: 0 };
     const reduced = matchMedia("(prefers-reduced-motion: reduce)");
-    const debug = !volumetric && process.env.NODE_ENV === "development" && new URLSearchParams(location.search).get("iceGlassDebug") === "1" ? document.createElement("canvas") : null;
+    const debug = process.env.NODE_ENV === "development" && new URLSearchParams(location.search).get("iceGlassDebug") === "1" ? document.createElement("canvas") : null;
     if (debug) { debug.className = "ice-glass-canvas"; debug.style.zIndex = "9"; root.appendChild(debug); }
     const locations = new Map<string, WebGLUniformLocation | null>();
     const uniform = (name: string) => {
@@ -46,7 +43,6 @@ export function IceGlass({ rootRef, volumetric = false }: { rootRef: RefObject<H
       return locations.get(name)!;
     };
     const dispose = () => {
-      caustics?.dispose();caustics=null;
       shaders.forEach((shader) => gl.deleteShader(shader));
       shaders = [];
       if (program) gl.deleteProgram(program);
@@ -59,7 +55,7 @@ export function IceGlass({ rootRef, volumetric = false }: { rootRef: RefObject<H
       try {
         program = gl.createProgram();
         if (!program) throw new Error("Ice Glass: program unavailable");
-        for (const [type, source] of [[gl.VERTEX_SHADER, glassVertex], [gl.FRAGMENT_SHADER, volumetric ? volumeGlassFragment : glassFragment]] as const) {
+        for (const [type, source] of [[gl.VERTEX_SHADER, glassVertex], [gl.FRAGMENT_SHADER, glassFragment]] as const) {
           const shader = gl.createShader(type);
           if (!shader) throw new Error("Ice Glass: shader unavailable");
           shaders.push(shader);
@@ -72,17 +68,14 @@ export function IceGlass({ rootRef, volumetric = false }: { rootRef: RefObject<H
         if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program) || "Ice Glass link");
         vao = gl.createVertexArray();
         gl.bindVertexArray(vao);
-        if(volumetric)caustics=createCaustics(gl);
         gl.useProgram(program);
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
         root.dataset.iceGlass = "ready";
-        root.dataset.glassMode = volumetric ? "volume" : "surface";
       } catch (error) {
         console.warn("Ice Glass uses the dark-card fallback:", error);
         dispose();
         delete root.dataset.iceGlass;
-        delete root.dataset.glassMode;
       }
     };
     const readViewport = (): ViewportRect => {
@@ -125,24 +118,18 @@ export function IceGlass({ rootRef, volumetric = false }: { rootRef: RefObject<H
       const viewWidth = viewport.width, viewHeight = viewport.height;
       const width = Math.max(1,Math.round(viewWidth*dpr)), height = Math.max(1,Math.round(viewHeight*dpr));
       if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
-      const localPointer={x:pointer.x-viewport.left,y:pointer.y-viewport.top,presence:reduced.matches?0:pointer.presence};
-      caustics?.render(cards,localPointer,viewWidth,viewHeight,dpr);
       gl.disable(gl.SCISSOR_TEST);
       gl.clearColor(0,0,0,0);
       gl.clear(gl.COLOR_BUFFER_BIT);
       if (root.hidden) return;
       gl.useProgram(program);
       gl.bindVertexArray(vao);
-      if(caustics) {
-        gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,caustics.texture);
-        gl.uniform1i(uniform("uCausticMap"),0);gl.uniform1f(uniform("uCausticDecode"),caustics.decode);
-      }
       gl.uniform2f(uniform("uResolution"), width, height);
       gl.uniform1f(uniform("uDPR"),dpr);
       gl.uniform3f(uniform("uLight"),pointer.x-viewport.left,pointer.y-viewport.top,reduced.matches ? 0 : pointer.presence);
-      gl.uniform4f(uniform("uGlass"),config.glassIOR,volumetric?TODAY_GLASS.thickness:config.glassThickness,config.glassRoughness,config.glassOpacity);
+      gl.uniform4f(uniform("uGlass"),config.glassIOR,config.glassThickness,config.glassRoughness,config.glassOpacity);
       gl.uniform4f(uniform("uOptics"),config.fresnelStrength,config.chromaticDispersion,config.edgeRefraction,config.internalReflection);
-      gl.uniform4f(uniform("uEnergy"),config.ambientReflection,volumetric?TODAY_GLASS.lightIntensity:config.lightIntensity,config.lightHeight,config.lightFalloff);
+      gl.uniform4f(uniform("uEnergy"),config.ambientReflection,config.lightIntensity,config.lightHeight,config.lightFalloff);
       gl.uniform3f(uniform("uFinish"),config.specularSharpness,config.bloomIntensity,config.bloomRadius);
       gl.enable(gl.SCISSOR_TEST);
       const surfaces = cards.map(card=>card.rect);
@@ -155,7 +142,7 @@ export function IceGlass({ rootRef, volumetric = false }: { rootRef: RefObject<H
         gl.uniform1f(uniform("uRadius"),radius);
         gl.uniform3f(uniform("uTint"),tint[0],tint[1],tint[2]);
         const localPointer = { x: pointer.x-viewport.left, y: pointer.y-viewport.top };
-        const beam=!volumetric && pointer.presence ? secondaryBeam(localPointer,rect,surfaces,config.maxBounces) : null;
+        const beam=pointer.presence ? secondaryBeam(localPointer,rect,surfaces,config.maxBounces) : null;
         gl.uniform4f(uniform("uSecondary"),beam?.x ?? 0,beam?.y ?? 0,beam?.dx ?? 0,beam?.dy ?? 0);
         gl.uniform1f(uniform("uSecondaryEnergy"),beam?.energy ?? 0);
         gl.drawArrays(gl.TRIANGLES,0,6);
@@ -212,7 +199,7 @@ export function IceGlass({ rootRef, volumetric = false }: { rootRef: RefObject<H
     };
     const leave = (event: PointerEvent) => { if (!event.relatedTarget) { pointer.presence = 0; schedule(); } };
     const visibility = () => { if (document.hidden) { cancelAnimationFrame(frame); frame = 0; } else invalidate(); };
-    const contextLost = (event: Event) => { event.preventDefault(); lost = true; cancelAnimationFrame(frame); frame = 0; delete root.dataset.iceGlass; delete root.dataset.glassMode; };
+    const contextLost = (event: Event) => { event.preventDefault(); lost = true; cancelAnimationFrame(frame); frame = 0; delete root.dataset.iceGlass; };
     const contextRestored = () => { dispose(); lost = false; initialize(); invalidate(); };
     initialize();
     resize = new ResizeObserver(settleLayout);
@@ -242,8 +229,8 @@ export function IceGlass({ rootRef, volumetric = false }: { rootRef: RefObject<H
       window.visualViewport?.removeEventListener("resize",settleLayout); window.visualViewport?.removeEventListener("scroll",invalidate);
       document.removeEventListener("visibilitychange",visibility); reduced.removeEventListener("change",schedule);
       canvas.removeEventListener("webglcontextlost",contextLost); canvas.removeEventListener("webglcontextrestored",contextRestored);
-      debug?.remove(); delete root.dataset.iceGlass; delete root.dataset.glassMode; dispose();
+      debug?.remove(); delete root.dataset.iceGlass; dispose();
     };
-  },[rootRef,volumetric]);
+  },[rootRef]);
   return <canvas ref={canvasRef} className="ice-glass-canvas" aria-hidden="true" />;
 }

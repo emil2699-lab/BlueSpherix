@@ -19,6 +19,3 @@ export const ICE_GLASS = {
   maxBounces: 2,
   maxDPR: 2,
 } as const;
-
-/** Isolated optical scene calibration for the Today experiment. */
-export const TODAY_GLASS = { thickness: 20, lightIntensity: 7.8 } as const;

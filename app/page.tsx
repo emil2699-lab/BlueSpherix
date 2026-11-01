@@ -208,7 +208,7 @@ export default function Home() {
         </header>
 
         <div className="content" ref={contentRef}>
-          <IceGlass rootRef={contentRef} volumetric={view === "overview"} />
+          <IceGlass rootRef={contentRef} />
           {view === "portfolio" && <Portfolio />}
           {view === "analytics" && <Analytics />}
           {view === "positions" && <Operations />}
