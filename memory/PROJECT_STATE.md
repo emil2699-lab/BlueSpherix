@@ -48,7 +48,7 @@ Web app moderna per analisi di trading, ispirata alle funzioni di Myfxbook ma co
 
 ## Prossimo passo consigliato
 
-Punto 2 applicato: superficie ottica a saponetta, con campo di altezza convesso e normali analitiche continue; la quota entra nel vettore luce e nella riflessione dell'ambiente esistente. Trasparenza e DOM preservati, nessuna modifica a parametri cromatici o trasporto. Confronti in `/workspace/artifacts/glass-soap/`. Attendere la verifica utente della geometria nella preview. Non avviare altri punti né creare lo sfondo dinamico senza le specifiche dell’utente.
+Punto 2 applicato: superficie ottica a saponetta, con campo di altezza e normali analitiche continue; la quota entra nel vettore luce e nella riflessione dell'ambiente esistente. Dopo il feedback «non vedo differenze» il volume è stato reso più leggibile: spessore geometrico 2,1×, raggio ottico 1,75×, raccordo più ampio e bombatura 30%. Rettangoli DOM, trasparenza e contenuti preservati; nessuna modifica ai parametri di luce/colore o al trasporto. Confronti in `/workspace/artifacts/glass-soap-visible/`. Attendere la verifica utente della geometria nella preview. Non avviare altri punti né creare lo sfondo dinamico senza le specifiche dell’utente.
 
 ### Preferenza jumpcard
 - Il micro-movimento 3D della singola card al passaggio del cursore è temporaneamente disattivato.

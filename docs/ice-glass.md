@@ -196,3 +196,21 @@ verificati in Chromium/SwiftShader; Safari/macOS resta da verificare. Nel test
 headless il tempo di risposta al frame è 212 ms p50 e 289 ms p95, misurato con
 GPU software: non rappresenta la fluidità di Safari con GPU reale.
 Il lavoro si ferma al punto 2 in attesa della revisione della geometria.
+
+### Correzione della leggibilità del volume
+
+Il primo confronto mostrava una differenza troppo tenue: spessore di 14 px,
+raccordo stretto e silhouette originale conservavano l'aspetto della lastra.
+La calibrazione successiva porta lo spessore geometrico a 2,1 volte quello
+nominale (limitato alla metà della semidimensione minore), il raggio ottico a
+1,75 volte quello DOM e la bombatura al 30%. Il raccordo occupa 2,2 volte lo
+spessore. Cambia il contorno arrotondato dentro lo stesso rettangolo; posizione,
+dimensioni e contenuti DOM restano identici. I parametri di luce, colore,
+dispersione e il trasporto secondario non cambiano.
+
+Il confronto precedente/corretto è in
+`/workspace/artifacts/glass-soap-visible/comparison-top.png`. La trasmissione
+misurata nell'area interna resta al 68,75%; 1917 pixel di testo bianco pieno
+restano identici cambiando lo sfondo diagnostico. Verificati anche normali,
+layout, sezioni e formati compatti senza errori console. Il p95 headless con
+GPU software è 315 ms; la fluidità su Safari/macOS resta da confermare.

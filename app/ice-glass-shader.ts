@@ -80,7 +80,7 @@ vec3 soapSurface(vec2 p, vec2 b, float r, float thickness) {
   float bodyDepth = max(mix(depth,innerDepth,blend),0.0);
   vec2 bodyGradient = mix(depthGradient,innerGradient,blend)
     +(innerDepth-depth)*blendDerivative*depthGradient;
-  float rollWidth = max(thickness*1.6,r*.9);
+  float rollWidth = max(thickness*2.2,r*1.1);
   // Rounded roll: a vertical side at the silhouette becomes the convex face
   // progressively, rather than a flat front with a separate exponential rim.
   float decay = exp(-2.0*bodyDepth/rollWidth);
@@ -90,8 +90,8 @@ vec3 soapSurface(vec2 p, vec2 b, float r, float thickness) {
   vec2 crownAxes = max(vec2(1.0)-uv*uv,vec2(0.0));
   float crown = crownAxes.x*crownAxes.y;
   vec2 crownGradient = -2.0*uv/max(b,vec2(1.0))*crownAxes.yx;
-  vec2 heightGradient = thickness*(capGradient*(1.0+.20*crown)+cap*.20*crownGradient);
-  return vec3(heightGradient,thickness*cap*(1.0+.20*crown));
+  vec2 heightGradient = thickness*(capGradient*(1.0+.30*crown)+cap*.30*crownGradient);
+  return vec3(heightGradient,thickness*cap*(1.0+.30*crown));
 }
 vec3 environment(vec3 ray) {
   float sky = smoothstep(-.55,.72,ray.y);
@@ -102,18 +102,21 @@ void main() {
   vec2 pixel = vec2(gl_FragCoord.x/uDPR, (uResolution.y-gl_FragCoord.y)/uDPR);
   vec2 halfSize = uRect.zw*.5;
   vec2 p = pixel-uRect.xy-halfSize;
-  float d = boxSDF(p,halfSize,uRadius);
+  // A soap volume needs a broad shoulder and rolled corners, rather than the
+  // narrow fillet of the original flat slab. Keep its bounding rectangle fixed.
+  float radius = min(min(halfSize.x,halfSize.y)*.95,max(uRadius*1.75,24.0));
+  float d = boxSDF(p,halfSize,radius);
   float aa = 1.25/uDPR;
   float coverage = 1.0-smoothstep(-aa,0.0,d);
   if (coverage <= 0.0) discard;
   float depth = -d;
-  float thickness = min(uGlass.y, min(halfSize.x,halfSize.y)*.25);
+  float thickness = min(uGlass.y*2.1, min(halfSize.x,halfSize.y)*.50);
   // Keep the exact rounded silhouette, but move all optical shading onto a
   // continuous face blend before the box SDF reaches its diagonal medial axes.
   float normalSoftness = max(9.0,thickness*1.35);
-  float blendEnd = max(3.0,min(uRadius*.55,thickness*.5));
+  float blendEnd = max(3.0,min(radius*.55,thickness*.5));
   float interiorBlend = smoothstep(.75,blendEnd,depth);
-  vec2 surfaceNormal = roundedSurfaceNormal(p,halfSize,uRadius);
+  vec2 surfaceNormal = roundedSurfaceNormal(p,halfSize,radius);
   vec2 innerNormal = continuousInnerNormal(p,halfSize,normalSoftness);
   vec2 grad = mix(surfaceNormal,innerNormal,interiorBlend);
   grad /= max(length(grad),.001);
@@ -130,7 +133,7 @@ void main() {
   );
   // Differentiate the actual height in CSS pixels. Face, sides and corners use
   // one surface; the analytic gradient avoids four extra geometry evaluations.
-  vec3 surface = soapSurface(p,halfSize,uRadius,thickness);
+  vec3 surface = soapSurface(p,halfSize,radius,thickness);
   float surfaceHeight = surface.z;
   // Preserve the existing stationary liquid microstructure, fading it smoothly
   // into the vertical sides so it cannot cut a crease into the outer silhouette.
