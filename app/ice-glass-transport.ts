@@ -1,79 +1,95 @@
-export type GlassRect = { left: number; top: number; right: number; bottom: number; width: number; height: number };
-export type Beam = { x: number; y: number; dx: number; dy: number; energy: number };
+import { add, dot, unit, snell, soapSample, intersectScene, intersectVolume, type GlassVolume, type Vec3 } from "./ice-glass-volume.ts";
 
-const unit = (x: number, y: number) => { const n = Math.hypot(x,y) || 1; return { x:x/n, y:y/n }; };
-const smoothstep = (a:number,b:number,value:number) => {
-  const t=Math.max(0,Math.min(1,(value-a)/(b-a)));
-  return t*t*(3-2*t);
-};
-function normal(x:number,y:number,r:GlassRect) {
-  const left=Math.abs(x-r.left),right=Math.abs(x-r.right),top=Math.abs(y-r.top),bottom=Math.abs(y-r.bottom);
-  const nearest=Math.min(left,right,top,bottom);
-  const softness=Math.max(9,Math.min(r.width,r.height)*.12);
-  const wl=Math.exp(-(left-nearest)/softness),wr=Math.exp(-(right-nearest)/softness);
-  const wt=Math.exp(-(top-nearest)/softness),wb=Math.exp(-(bottom-nearest)/softness);
-  return unit(wr-wl,wb-wt);
-}
-function crossingConfidence(x:number,y:number,dx:number,dy:number,r:GlassRect) {
-  const left=Math.abs(x-r.left),right=Math.abs(x-r.right),top=Math.abs(y-r.top),bottom=Math.abs(y-r.bottom);
-  const vertical=Math.min(left,right)<Math.min(top,bottom);
-  const cornerDistance=vertical ? Math.min(Math.abs(y-r.top),Math.abs(r.bottom-y)) : Math.min(Math.abs(x-r.left),Math.abs(r.right-x));
-  const cornerFade=Math.max(12,Math.min(r.width,r.height)*.14);
-  const n=normal(x,y,r);
-  const incidence=Math.abs(dx*n.x+dy*n.y);
-  return smoothstep(0,cornerFade,cornerDistance)*smoothstep(.035,.18,incidence);
-}
-function refract(dx:number,dy:number,nx:number,ny:number,ior:number) {
-  const cosine=-(dx*nx+dy*ny);
-  const k=1-ior*ior*(1-cosine*cosine);
-  if(k<0)return unit(dx,dy);
-  return unit(ior*dx+(ior*cosine-Math.sqrt(k))*nx,ior*dy+(ior*cosine-Math.sqrt(k))*ny);
-}
+export const PHOTON_TILE = { width: 96, height: 64, columns: 4 } as const;
+export type TransportOptions = { ior: number; dispersion: number; intensity: number; lightHeight: number; roughness: number; maxBounces: number; debug?: boolean };
+export type RaySegment = { from: Vec3; to: Vec3; energy: number; channel: number; card: number; kind: "incident"|"internal"|"secondary" };
+export type TransportStats = { emitted: number; intercepted: number; escaped: number; absorbed: number; deposited: number; terminated: number; entries: number[]; exits: number[]; secondary: number[]; internalReflections: number; segments: RaySegment[] };
+export type PhotonAtlas = { data: Float32Array; width: number; height: number; stats: TransportStats };
+type Path = { origin: Vec3; direction: Vec3; energy: number; medium: number; interactions: number; last: number; steps: number };
 
-// Screen-space slab approximation. The forward ray crosses up to maxBounces
-// different glass cards; its exit face bends its direction before the next hit.
-function crossing(x: number, y: number, dx: number, dy: number, r: GlassRect) {
-  const safeX=Math.abs(dx)<.0001 ? (dx<0 ? -.0001 : .0001) : dx;
-  const safeY=Math.abs(dy)<.0001 ? (dy<0 ? -.0001 : .0001) : dy;
-  const invX = 1/safeX;
-  const invY = 1/safeY;
-  const tx1=(r.left-x)*invX, tx2=(r.right-x)*invX;
-  const ty1=(r.top-y)*invY, ty2=(r.bottom-y)*invY;
-  const enter=Math.max(Math.min(tx1,tx2),Math.min(ty1,ty2),0);
-  const exit=Math.min(Math.max(tx1,tx2),Math.max(ty1,ty2));
-  return exit>enter && exit>0 ? {enter,exit,x:x+dx*exit,y:y+dy*exit} : null;
-}
-
-export function secondaryBeam(pointer: {x:number;y:number}, target: GlassRect, surfaces: GlassRect[], maxBounces = 2): Beam | null {
-  const center=unit(target.left+target.width*.5-pointer.x,target.top+target.height*.5-pointer.y);
-  let x=pointer.x,y=pointer.y,dx=center.x,dy=center.y,energy=1,through=0;
-  const visited=new Set<GlassRect>();
-  for(let step=0;step<=maxBounces;step++) {
-    const hits=surfaces.flatMap(r=>{
-      if(visited.has(r))return [];
-      const hit=crossing(x,y,dx,dy,r);
-      return hit ? [{r,...hit}] : [];
-    }).sort((a,b)=>a.enter-b.enter);
-    const hit=hits[0];
-    if(!hit)return null;
-    if(hit.r===target)return through>0 ? {x,y,dx,dy,energy} : null;
-    if(step===maxBounces)return null;
-    visited.add(hit.r);through++;
-    // Snell at entry and exit of the projected volume, with rounded-face
-    // normals and absorption before the next card receives the emergent ray.
-    const entryX=x+dx*hit.enter,entryY=y+dy*hit.enter;
-    const entrance=normal(entryX,entryY,hit.r);
-    const entranceConfidence=crossingConfidence(entryX,entryY,dx,dy,hit.r);
-    const inside=refract(dx,dy,entrance.x,entrance.y,1/1.5);
-    const insideHit=crossing(entryX+inside.x*.5,entryY+inside.y*.5,inside.x,inside.y,hit.r);
-    if(!insideHit)return null;
-    const out=normal(insideHit.x,insideHit.y,hit.r);
-    const exitConfidence=crossingConfidence(insideHit.x,insideHit.y,inside.x,inside.y,hit.r);
-    const turn=refract(inside.x,inside.y,-out.x,-out.y,1.5);
-    dx=turn.x;dy=turn.y;
-    const path=insideHit.exit;
-    energy*=.62*Math.exp(-path/Math.max(hit.r.width,hit.r.height))*entranceConfidence*exitConfidence;
-    x=insideHit.x+dx*1.5;y=insideHit.y+dy*1.5;
+export function traceGlassLight(pointer: {x:number;y:number},volumes:GlassVolume[],options:TransportOptions):PhotonAtlas {
+  const {width:tw,height:th,columns}=PHOTON_TILE,width=tw*columns,height=th*Math.max(1,Math.ceil(volumes.length/columns));
+  const data=new Float32Array(width*height*4),source:Vec3=[pointer.x,pointer.y,options.lightHeight];
+  // Flux per solid angle. Dilution follows the sampled angle and receiving
+  // footprint; distance is not applied a second time on every air segment.
+  const power=options.intensity*options.lightHeight*options.lightHeight;
+  const stats:TransportStats={emitted:4*Math.PI*power,intercepted:0,escaped:0,absorbed:0,deposited:0,terminated:0,entries:volumes.map(()=>0),exits:volumes.map(()=>0),secondary:volumes.map(()=>0),internalReflections:0,segments:[]};
+  const scatter=options.roughness*options.roughness;
+  const kernelIndices=new Int32Array(36),kernelWeights=new Float64Array(36);
+  const deposit=(card:number,p:Vec3,energy:number,channel:number)=>{
+    const r=volumes[card].surface.rect,cx=(p[0]-r.left)/r.width*tw-.5,cy=(p[1]-r.top)/r.height*th-.5;
+    const tileX=card%columns*tw,tileY=Math.floor(card/columns)*th,countStart=0;
+    let sum=0,count=countStart;
+    // Normalized reconstruction estimates photon flux / surface area. More
+    // rays in a smaller footprint brighten it without increasing energy.
+    for(let y=Math.max(0,Math.ceil(cy-2.5));y<=Math.min(th-1,Math.floor(cy+2.5));y++)for(let x=Math.max(0,Math.ceil(cx-2.5));x<=Math.min(tw-1,Math.floor(cx+2.5));x++) {
+      const px=(x+.5)/tw*r.width-r.width*.5,py=(y+.5)/th*r.height-r.height*.5;
+      const qx=Math.abs(px)-r.width*.5+volumes[card].radius,qy=Math.abs(py)-r.height*.5+volumes[card].radius;
+      if(Math.min(Math.max(qx,qy),0)+Math.hypot(Math.max(qx,0),Math.max(qy,0))>volumes[card].radius)continue;
+      const w=Math.exp(-((x-cx)**2+(y-cy)**2)*.65);sum+=w;kernelIndices[count]=((tileY+y)*width+tileX+x)*4+channel;kernelWeights[count++]=w;
+    }
+    if(!sum) { stats.escaped+=energy;return; }
+    const pixelArea=r.width*r.height/(tw*th);
+    for(let i=0;i<count;i++)data[kernelIndices[i]]+=energy*kernelWeights[i]/(sum*pixelArea);
+    stats.deposited+=energy;
+  };
+  // Surface quadrature importance-samples one isotropic point source. Only the
+  // nearest visible surface owns a solid angle; no target-centre beam is used.
+  const seeds:{card:number;point:Vec3;normal:Vec3;direction:Vec3;solidAngle:number}[]=[];
+  let totalAngle=0;
+  for(let card=0;card<volumes.length;card++)for(const triangle of volumes[card].triangles) {
+    const delta=add(triangle.center,source,-1),distance=Math.hypot(...delta),direction=unit(delta);
+    const volume=volumes[card],r=volume.surface.rect;
+    const sample=soapSample(triangle.center[0]-r.left-r.width*.5,triangle.center[1]-r.top-r.height*.5,r.width*.5,r.height*.5,volume.radius,volume.thickness);
+    const normal=unit([-sample[0],-sample[1],triangle.center[2]>=0 ? 1 : -1]);
+    const cosine=-dot(direction,normal);
+    if(cosine<=0)continue;
+    const blocker=intersectScene(source,direction,volumes,-1,distance-.04);
+    if(blocker)continue;
+    const solidAngle=cosine*triangle.area/(distance*distance);
+    totalAngle+=solidAngle;seeds.push({card,point:triangle.center,normal,direction,solidAngle});
   }
-  return null;
+  const normalization=Math.min(1,4*Math.PI/Math.max(totalAngle,1e-10));
+  for(const seed of seeds)for(let channel=0;channel<3;channel++) {
+    const energy=power*seed.solidAngle*normalization/3;
+    stats.intercepted+=energy;
+    const ior=options.ior+(channel-1)*options.dispersion;
+    const paths:Path[]=[{origin:source,direction:seed.direction,energy,medium:-1,interactions:0,last:-1,steps:0}];
+    let first=true;
+    while(paths.length) {
+      const path=paths.pop()!;
+      if(path.steps>=7 || (path.medium<0 && path.interactions>=options.maxBounces+1) || path.energy<1e-6) { stats.terminated+=path.energy;continue; }
+      const hit=first ? {point:seed.point,normal:seed.normal,volume:seed.card,distance:Math.hypot(...add(seed.point,source,-1))}
+        : path.medium>=0 ? intersectVolume(path.origin,path.direction,volumes[path.medium],path.medium)
+        : intersectScene(path.origin,path.direction,volumes,path.last);
+      first=false;
+      if(!hit) { stats.escaped+=path.energy;continue; }
+      const inside=path.medium>=0;
+      if(options.debug && stats.segments.length<6000)stats.segments.push({from:path.origin,to:hit.point,energy:path.energy,channel,card:hit.volume,kind:inside ? "internal" : path.interactions ? "secondary" : "incident"});
+      let incoming=path.energy;
+      if(inside) { incoming*=Math.exp(-[.09,.06,.035][channel]*.12*hit.distance);stats.absorbed+=path.energy-incoming;stats.exits[hit.volume]++; }
+      else { stats.entries[hit.volume]++;if(path.interactions)stats.secondary[hit.volume]++; }
+      const n=inside ? hit.normal.map(v=>-v) as Vec3 : hit.normal;
+      const optical=snell(path.direction,n,inside ? ior : 1,inside ? 1 : ior);
+      const reflected=unit(add(path.direction,n,-2*dot(path.direction,n)));
+      let rEnergy=incoming*optical.reflectance,tEnergy=incoming-rEnergy;
+      // Direct highlights stay untouched. Only scattering at exits or at later
+      // receivers contributes to this atlas, deducted from the outgoing flux.
+      if(inside || path.interactions>0) {
+        const diffuse=(rEnergy+tEnergy*.5)*scatter;
+        deposit(hit.volume,hit.point,diffuse,channel);
+        rEnergy*=1-scatter;tEnergy*=1-scatter*.5;
+      }
+      if(!optical.direction)stats.internalReflections++;
+      const interactions=path.interactions+(inside ? 0 : 1),steps=path.steps+1;
+      if(optical.direction) {
+        // Match the bounded GPU solver: follow transmission and remove the
+        // untraced reflected branch from its energy budget.
+        stats.terminated+=rEnergy;
+        paths.push({origin:add(hit.point,optical.direction,.04),direction:optical.direction,energy:tEnergy,medium:inside ? -1 : hit.volume,interactions,last:hit.volume,steps});
+      } else paths.push({origin:add(hit.point,reflected,.04),direction:reflected,energy:rEnergy,medium:path.medium,interactions,last:hit.volume,steps});
+    }
+  }
+  stats.escaped+=stats.emitted-stats.intercepted;
+  return {data,width,height,stats};
 }

@@ -10,24 +10,7 @@ void main() {
   gl_Position = vec4(clip.x,-clip.y,0,1);
 }`;
 
-// A convex 2.5D glass volume. The DOM remains sharp above this optical layer.
-export const glassFragment = `#version 300 es
-precision highp float;
-out vec4 outColor;
-uniform vec2 uResolution;
-uniform float uDPR;
-uniform vec4 uRect;
-uniform float uRadius;
-uniform vec3 uTint;
-uniform vec3 uLight;
-uniform vec4 uGlass; // IOR, thickness, roughness, opacity
-uniform vec4 uOptics; // Fresnel, dispersion, refraction, internal reflection
-uniform vec4 uEnergy; // ambient, intensity, light height, falloff
-uniform vec3 uFinish; // sharpness, bloom intensity, bloom radius
-uniform vec4 uSecondary; // previous slab exit and refracted direction
-uniform float uSecondaryEnergy;
-
-float boxSDF(vec2 p, vec2 b, float r) {
+export const glassGeometry = `float boxSDF(vec2 p, vec2 b, float r) {
   vec2 q = abs(p) - b + r;
   return min(max(q.x,q.y),0.0) + length(max(q,0.0)) - r;
 }
@@ -93,6 +76,26 @@ vec3 soapSurface(vec2 p, vec2 b, float r, float thickness) {
   vec2 heightGradient = thickness*(capGradient*(1.0+.30*crown)+cap*.30*crownGradient);
   return vec3(heightGradient,thickness*cap*(1.0+.30*crown));
 }
+`;
+
+// A convex 2.5D glass volume. The DOM remains sharp above this optical layer.
+export const glassFragment = `#version 300 es
+precision highp float;
+out vec4 outColor;
+uniform vec2 uResolution;
+uniform float uDPR;
+uniform vec4 uRect;
+uniform float uRadius;
+uniform vec3 uTint;
+uniform vec3 uLight;
+uniform vec4 uGlass; // IOR, thickness, roughness, opacity
+uniform vec4 uOptics; // Fresnel, dispersion, refraction, internal reflection
+uniform vec4 uEnergy; // ambient, intensity, light height, falloff
+uniform vec3 uFinish; // sharpness, bloom intensity, bloom radius
+uniform sampler2D uPhotonAtlas;
+uniform ivec2 uPhotonTile;
+
+${glassGeometry}
 vec3 environment(vec3 ray) {
   float sky = smoothstep(-.55,.72,ray.y);
   float cool = pow(max(0.0, .5 + .5 * ray.x), 2.4);
@@ -178,12 +181,6 @@ void main() {
   float sourceFocus = exp(-pow(alongEdge/(uEnergy.z*.72),2.0));
   float spectralFocus = exp(-pow(alongEdge/(uEnergy.z*1.8),2.0));
   float whiteCore = pow(attenuation,4.2)*sourceFocus*edge;
-  vec2 secondaryDelta=pixel-uSecondary.xy;
-  float travel=dot(secondaryDelta,uSecondary.zw);
-  float deviation=abs(secondaryDelta.x*uSecondary.w-secondaryDelta.y*uSecondary.z);
-  float beamWidth=14.0+max(travel,0.0)*.045+wave*3.0;
-  float bounced=uSecondaryEnergy*uLight.z*smoothstep(-beamWidth,beamWidth,travel)*
-    exp(-pow(deviation/max(beamWidth,2.0),2.0))*exp(-max(travel,0.0)/360.0);
   vec3 tint = mix(vec3(.48,.70,1.0),uTint,.22);
   vec3 absorption = exp(-vec3(.09,.06,.035)*thickness*.12);
   // The existing environment is reflected by the same convex surface, rather
@@ -194,17 +191,28 @@ void main() {
   face += refracted*frontSpread*(.12+.18*(1.0-bevel))*absorption;
   face += mix(vec3(.32,.53,.78),uTint,.25)*attenuation*exp(-opticalDepth/(thickness*3.3))*.20;
   face += mix(vec3(.23,.36,.54),uTint,.45)*light*exp(-opticalDepth/(thickness*4.8))*.14;
-  face += mix(vec3(.34,.55,.77),uTint,.35)*bounced*(.12+.24*bevel);
   face += vec3(.63,.76,.92)*attenuation*(1.0-bevel)*.035;
   vec3 edgeLight = light*(vec3(.93,.96,1.0)*specular + tint*shoulder*.18);
   float spectralReach = exp(-opticalDepth/(thickness*1.55));
   edgeLight += light*caustic*spectralReach*spectralFocus*uOptics.z*.92;
-  edgeLight += bounced*caustic*spectralReach*.34;
   edgeLight += vec3(.92,.98,1.0)*whiteCore*.31;
   edgeLight += light*tint*edge*uOptics.w*.08;
   vec3 color = face + edgeLight*(.32+.68*edge);
   color *= .72 + uOptics.x*fresnel;
   // Premultiplied, full-card material: no CSS-like stroke or external glow.
   float alpha = clamp((.24 + max(max(color.r,color.g),color.b)*uGlass.w)*coverage,0.0,.72);
+  // Surface irradiance from traced entry/exit/receiver intersections. Manual
+  // bilinear filtering needs no float-linear extension (including Safari).
+  vec2 photonUV=(pixel-uRect.xy)/uRect.zw*vec2(96,64)-.5;
+  ivec2 cell=ivec2(floor(photonUV));
+  vec2 fraction=fract(photonUV);
+  ivec2 lo=clamp(cell,ivec2(0),ivec2(95,63));
+  ivec2 hi=clamp(cell+1,ivec2(0),ivec2(95,63));
+  vec3 photons=mix(mix(texelFetch(uPhotonAtlas,uPhotonTile+lo,0).rgb,
+    texelFetch(uPhotonAtlas,uPhotonTile+ivec2(hi.x,lo.y),0).rgb,fraction.x),
+    mix(texelFetch(uPhotonAtlas,uPhotonTile+ivec2(lo.x,hi.y),0).rgb,
+    texelFetch(uPhotonAtlas,uPhotonTile+hi,0).rgb,fraction.x),fraction.y);
+  // Lighting changes radiance only: preserve the material's original alpha.
+  color+=photons*uLight.z;
   outColor = vec4(color*alpha,alpha);
 }`;

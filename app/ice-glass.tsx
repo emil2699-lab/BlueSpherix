@@ -3,7 +3,9 @@
 import { useEffect, useRef, type RefObject } from "react";
 import { ICE_GLASS as config } from "./ice-glass-config";
 import { glassFragment, glassVertex } from "./ice-glass-shader";
-import { secondaryBeam } from "./ice-glass-transport";
+import { PHOTON_TILE, traceGlassLight } from "./ice-glass-transport";
+import { createPhotonTransport } from "./ice-glass-photons";
+import { buildVolumes, type GlassVolume } from "./ice-glass-volume";
 
 type ViewportRect = { left: number; top: number; width: number; height: number };
 type GlassRect = ViewportRect & { right: number; bottom: number };
@@ -20,6 +22,10 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     if (!gl) return; // The original dark cards are the no-WebGL fallback.
     let program: WebGLProgram | null = null;
     let vao: WebGLVertexArrayObject | null = null;
+    let photonTransport: ReturnType<typeof createPhotonTransport> = null;
+    let fallbackPhotons: WebGLTexture | null = null;
+    let volumes: GlassVolume[] = [];
+    let geometryKey = "";
     let shaders: WebGLShader[] = [];
     let frame = 0;
     let dirty = true;
@@ -47,6 +53,9 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       shaders = [];
       if (program) gl.deleteProgram(program);
       if (vao) gl.deleteVertexArray(vao);
+      photonTransport?.dispose();photonTransport=null;
+      geometryKey = "";
+      if(fallbackPhotons)gl.deleteTexture(fallbackPhotons);fallbackPhotons=null;
       program = null;
       vao = null;
       locations.clear();
@@ -69,6 +78,14 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         vao = gl.createVertexArray();
         gl.bindVertexArray(vao);
         gl.useProgram(program);
+        photonTransport=createPhotonTransport(gl);
+        if(!photonTransport) {
+          // No renderable float textures: keep the existing glass material.
+          fallbackPhotons=gl.createTexture();gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,fallbackPhotons);
+          gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array(4));
+          gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+        }
+        gl.useProgram(program);gl.uniform1i(uniform("uPhotonAtlas"),0);
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
         root.dataset.iceGlass = "ready";
@@ -104,6 +121,18 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         const rect = { left, top, width: domRect.width, height: domRect.height, right: left+domRect.width, bottom: top+domRect.height };
         return { element, rect, radius: parseFloat(style.borderTopLeftRadius) || 14, tint };
       });
+      cards = cards.filter(card=>card.rect.width>0 && card.rect.height>0);
+      const nextGeometryKey=cards.map(({rect,radius})=>[rect.left,rect.top,rect.width,rect.height,radius].join(",")).join(";");
+      if(nextGeometryKey!==geometryKey) {
+        volumes = buildVolumes(cards,config.glassThickness);
+        photonTransport?.update(volumes);
+        if(fallbackPhotons) {
+          gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,fallbackPhotons);
+          const h=Math.max(PHOTON_TILE.height,Math.ceil(cards.length/PHOTON_TILE.columns)*PHOTON_TILE.height);
+          gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,PHOTON_TILE.width*PHOTON_TILE.columns,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+        }
+        geometryKey=nextGeometryKey;
+      }
       dirty = false;
     };
     const draw = (time: number) => {
@@ -131,9 +160,12 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       gl.uniform4f(uniform("uOptics"),config.fresnelStrength,config.chromaticDispersion,config.edgeRefraction,config.internalReflection);
       gl.uniform4f(uniform("uEnergy"),config.ambientReflection,config.lightIntensity,config.lightHeight,config.lightFalloff);
       gl.uniform3f(uniform("uFinish"),config.specularSharpness,config.bloomIntensity,config.bloomRadius);
-      gl.enable(gl.SCISSOR_TEST);
-      const surfaces = cards.map(card=>card.rect);
-      for (const { rect, radius, tint } of cards) {
+      const localPointer = { x: pointer.x-viewport.left, y: pointer.y-viewport.top };
+      const transportOptions={ior:config.glassIOR,dispersion:config.chromaticDispersion,intensity:config.lightIntensity,
+        lightHeight:config.lightHeight,roughness:config.glassRoughness,maxBounces:config.maxBounces};
+      photonTransport?.render(localPointer,!!pointer.presence && !reduced.matches,transportOptions);
+      gl.useProgram(program);gl.bindVertexArray(vao);gl.enable(gl.SCISSOR_TEST);
+      for (const [index,{ rect, radius, tint }] of cards.entries()) {
         if (rect.bottom <= 0 || rect.top >= viewHeight || rect.right <= 0 || rect.left >= viewWidth || !rect.width) continue;
         // A scissored full-card quad keeps the slab continuous while avoiding work outside it.
         gl.viewport(0,0,width,height);
@@ -141,10 +173,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         gl.uniform4f(uniform("uRect"),rect.left,rect.top,rect.width,rect.height);
         gl.uniform1f(uniform("uRadius"),radius);
         gl.uniform3f(uniform("uTint"),tint[0],tint[1],tint[2]);
-        const localPointer = { x: pointer.x-viewport.left, y: pointer.y-viewport.top };
-        const beam=pointer.presence ? secondaryBeam(localPointer,rect,surfaces,config.maxBounces) : null;
-        gl.uniform4f(uniform("uSecondary"),beam?.x ?? 0,beam?.y ?? 0,beam?.dx ?? 0,beam?.dy ?? 0);
-        gl.uniform1f(uniform("uSecondaryEnergy"),beam?.energy ?? 0);
+        gl.uniform2i(uniform("uPhotonTile"),index%PHOTON_TILE.columns*PHOTON_TILE.width,Math.floor(index/PHOTON_TILE.columns)*PHOTON_TILE.height);
         gl.drawArrays(gl.TRIANGLES,0,6);
       }
       if (debug) {
@@ -152,17 +181,11 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         const ctx=debug.getContext("2d");
         if (ctx) {
           ctx.scale(dpr,dpr);ctx.clearRect(0,0,viewWidth,viewHeight);
-          const localPointer = { x: pointer.x-viewport.left, y: pointer.y-viewport.top };
-          for (const {rect} of cards) {
-            const beam=secondaryBeam(localPointer,rect,surfaces,config.maxBounces);
-            if (!beam) continue;
-            ctx.strokeStyle="rgba(125,235,255,.8)";ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(localPointer.x,localPointer.y);ctx.lineTo(beam.x,beam.y);ctx.lineTo(beam.x+beam.dx*170,beam.y+beam.dy*170);ctx.stroke();
-            ctx.fillStyle="rgba(255,215,125,.95)";ctx.beginPath();ctx.arc(beam.x,beam.y,4,0,Math.PI*2);ctx.fill();
-            ctx.strokeStyle="rgba(136,169,255,.22)";ctx.lineWidth=26*beam.energy;ctx.beginPath();ctx.moveTo(beam.x,beam.y);ctx.lineTo(beam.x+beam.dx*170,beam.y+beam.dy*170);ctx.stroke();
-          }
-          for (const {rect} of cards) {
-            const x=rect.left+rect.width*.5,y=rect.top;
-            ctx.strokeStyle="rgba(135,255,171,.65)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,y-18);ctx.stroke();
+          const atlas=traceGlassLight(localPointer,volumes,{...transportOptions,debug:true});
+          for (const segment of atlas.stats.segments) {
+            if(segment.channel!==1)continue;
+            ctx.strokeStyle=segment.kind==="internal" ? "rgba(255,200,100,.5)" : segment.kind==="secondary" ? "rgba(125,235,255,.5)" : "rgba(160,170,190,.1)";
+            ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(segment.from[0],segment.from[1]);ctx.lineTo(segment.to[0],segment.to[1]);ctx.stroke();
           }
         }
       }
@@ -199,7 +222,12 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     };
     const leave = (event: PointerEvent) => { if (!event.relatedTarget) { pointer.presence = 0; schedule(); } };
     const visibility = () => { if (document.hidden) { cancelAnimationFrame(frame); frame = 0; } else invalidate(); };
-    const contextLost = (event: Event) => { event.preventDefault(); lost = true; cancelAnimationFrame(frame); frame = 0; delete root.dataset.iceGlass; };
+    const contextLost = (event: Event) => {
+      event.preventDefault();lost=true;cancelAnimationFrame(frame);frame=0;
+      // Release references while the context is lost. After restoration these
+      // handles belong to the old generation and must not be deleted again.
+      dispose();delete root.dataset.iceGlass;
+    };
     const contextRestored = () => { dispose(); lost = false; initialize(); invalidate(); };
     initialize();
     resize = new ResizeObserver(settleLayout);

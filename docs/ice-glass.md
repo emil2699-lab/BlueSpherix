@@ -15,14 +15,17 @@ deformate da una curvatura stabile a bassa frequenza. La superficie interna
 riceve trasmissione e riflessi più diffusi. Nessuna texture dello screenshot.
 I parametri sono in `app/ice-glass-config.ts`.
 
-`app/ice-glass-transport.ts` proietta raggi nel piano delle card: intersezione
-con una prima superficie, rifrazione all'ingresso e all'uscita, attenuazione
-del percorso e fino a due passaggi prima della card ricevente. La card
-successiva riceve una caustica centrata sulla direzione del raggio emergente.
-È un'approssimazione 2.5D dello scambio luminoso tra card quasi complanari,
-non un path tracer 3D. Per vedere i raggi, le normali e la larghezza dei fasci
-in sviluppo, aprire `?iceGlassDebug=1#overview`; il livello di debug non viene
-creato nella build di produzione.
+Il trasporto fra card usa un photon mapper forward 2.5D sullo stesso contesto
+WebGL. `app/ice-glass-volume.ts` tessella il campo di altezza a saponetta già
+esistente e prepara una BVH; `app/ice-glass-photon-shader.ts` traccia sulla GPU
+le interfacce attraversate. `app/ice-glass-photons.ts` gestisce transform feedback
+e un atlas di irradianza. `app/ice-glass-transport.ts` conserva il corrispondente
+modello numerico CPU per verifiche e debug, senza eseguirlo nel percorso normale
+del cursore. Il precedente raggio 2D verso il centro della card e la relativa
+fascia gaussiana programmata sono stati eliminati.
+
+In sviluppo `?iceGlassDebug=1#overview` mostra i percorsi del modello numerico.
+Le traiettorie di debug non sono create nella build di produzione.
 
 L'ambiente ottico è procedurale. La rifrazione **non campiona il DOM**: testo,
 icone, valori e grafici conservano il rendering HTML/SVG originale. Il modello
@@ -214,3 +217,70 @@ misurata nell'area interna resta al 68,75%; 1917 pixel di testo bianco pieno
 restano identici cambiando lo sfondo diagnostico. Verificati anche normali,
 layout, sezioni e formati compatti senza errori console. Il p95 headless con
 GPU software è 315 ms; la fluidità su Safari/macOS resta da confermare.
+
+
+## Propagazione fra volumi (2026-11-01, punto 3)
+
+Le due facce del volume sono il campo `soapSurface` esistente e la sua immagine
+speculare posteriore. La superficie visibile, i raggi, la bombatura e le normali
+del materiale non sono stati ricalibrati. Il trasporto interseca una mesh di
+40 campioni di contorno e sei anelli per faccia; le normali alle interfacce
+vengono rivalutate analiticamente con lo stesso GLSL della superficie visibile.
+È una discretizzazione del volume ottico, non una nuova geometria della UI.
+
+I campioni di superficie rappresentano angoli solidi della singola sorgente
+isotropa globale. La visibilità seleziona soltanto la prima interfaccia raggiunta,
+inclusa l'auto-occlusione. Ogni campione RGB mantiene posizione, direzione,
+flusso, mezzo attraversato e numero di card raggiunte. Snell e Fresnel dielettrico
+sono valutati a ingresso e uscita, con gli stessi indici `1,5 ± 0,05` già in uso.
+L'assorbimento Beer–Lambert usa i coefficienti RGB preesistenti per la lunghezza
+realmente percorsa. La diluizione geometrica deriva dall'angolo solido e dalla
+superficie ricevente: non si moltiplica nuovamente per un decadimento arbitrario
+ad ogni attraversamento dello spazio vuoto.
+
+La densità del flusso nei punti raggiunti produce concentrazione o divergenza.
+Una piccola frazione di scattering superficiale, determinata dalla roughness
+esistente, alimenta un atlas RGBA16F con ricostruzione normalizzata di 7×7 texel.
+Questa energia viene sottratta al flusso uscente. L'atlas viene composto soltanto
+all'interno delle superfici originali; nessun raggio è disegnato nello spazio.
+La luce può continuare verso altre due card, con sei iterazioni GPU successive
+all'ingresso iniziale. Geometria e BVH vengono caricate solo quando cambiano;
+nessuna lettura GPU, integrazione temporale o interpolazione del cursore nel
+rendering ordinario.
+
+Il solver segue il cammino trasmesso dominante e le riflessioni interne totali.
+Le altre diramazioni speculari sono escluse dal budget trasmesso, non duplicate
+né convertite in energia aggiuntiva. È un'approssimazione forward con profondità
+limitata, non un path tracer completo con tutte le diramazioni. La rifrazione
+dello sfondo DOM resta fuori da questo punto; nessuno sfondo nuovo è stato creato.
+Senza `EXT_color_buffer_float` rimane il materiale esistente senza il nuovo
+contributo di propagazione.
+
+Il contributo diretto del materiale è identico pixel per pixel in cinque
+posizioni della luce con atlas nullo: geometria, riflessi, colore e dispersione
+precedenti preservati. Anche con atlas illuminato l'alpha rimane identico:
+la nuova irradianza modifica il colore emesso, non la trasparenza.
+
+Verifiche numeriche riproducibili:
+`node --no-warnings --experimental-strip-types scripts/check-glass-transport.mjs`.
+Coprono Snell nelle due direzioni, riflessione interna totale, derivate della
+superficie, propagazione secondaria, assorbimento, diluizione con distanza e
+integrale del flusso ricostruito. Errore relativo del bilancio energetico sotto
+`1e-10`; nessun passaggio GPU aumenta il flusso del singolo campione.
+
+Le acquisizioni prima/dopo alle stesse coordinate, il readback diagnostico dei
+passaggi GPU, le impronte dei raggi, il confronto del materiale e le verifiche
+Playwright sono in `/workspace/artifacts/glass-propagation/`. Nel caso di tre
+card allineate la GPU registra 41 arrivi sulla seconda card e 15 sulla terza,
+con 11 campioni che raggiungono la terza dopo tre interazioni con card distinte.
+La deviazione massima dalla direzione Snell del riferimento è inferiore a
+`4e-5`; le impronte rifratte possono sia allargarsi sia concentrarsi e cambiano
+con la sorgente. Layout, opacità dei contenuti, navigazione e viewport mobile
+verificati; un solo canvas, errore GL zero.
+
+Il p95 di 12 aggiornamenti del cursore è circa 357 ms su SwiftShader (GPU
+simulata dalla CPU), rispetto ai circa 315 ms del precedente controllo: non è
+una misura delle prestazioni Safari su GPU reale e non dimostra 60 FPS. Safari
+macOS, Retina e fluidità effettiva rimangono da confermare sul dispositivo.
+Fermarsi alla revisione del punto 3: nessun intervento sulla curvatura dinamica
+dei riflessi, sugli altri punti o sullo sfondo.
