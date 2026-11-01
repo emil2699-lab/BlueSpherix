@@ -1,6 +1,6 @@
 # BlueSpherix — memoria operativa
 
-Ultimo aggiornamento: 2026-10-30
+Ultimo aggiornamento: 2026-11-01
 
 ## Obiettivo
 
@@ -13,7 +13,7 @@ Web app moderna per analisi di trading, ispirata alle funzioni di Myfxbook ma co
 - Stack: Next.js 16.4.3, React 19.3.1, TypeScript, export statico su GitHub Pages.
 - Sezioni già sviluppate: Dashboard, Portfolio, Analytics, Operazioni, Rischio e Strategy Lab.
 - La sezione Oggi usa ora lo stesso linguaggio visivo delle sezioni recenti: stato live, avviso demo, periodo integrato nel grafico, sfera dello stato del rischio con nodi dinamici per rischio aperto, margine e drawdown, e KPI strutturati. Ogni nodo segue una propria orbita concentrica con palette acqua/viola/blu; valori e soglie restano in una legenda interna. I tre KPI restano affiancati alle larghezze intermedie e, quando lo spazio si riduce, il mini-grafico scorre fisicamente dalla posizione laterale a quella centrale sotto il numero con curva fluida; su mobile i riquadri passano in colonna. Sugli schermi larghi i mini-grafici crescono progressivamente fino a 132×46 px.
-- In Oggi è in prova Ice Glass WebGL 2: un canvas condiviso, luce globale del cursore senza interpolazione, superficie continua con SDF/Snell/Fresnel, dispersione e trasmissione. Trasporto secondario 2.5D con fino a due passaggi in `app/ice-glass-transport.ts`. Dispersione calibrata a 0,0765 (+70%) con sei bande spettrali localizzate. Config in `app/ice-glass-config.ts`; dettagli e limiti in `docs/ice-glass.md`. Rifrazione dell'ambiente procedurale, non dei pixel DOM. Backup precedenti invariati. 60 FPS su Safari/macOS e fedeltà 90% non confermati dal cloud software.
+- Ice Glass WebGL 2 è applicato a tutte le viste: canvas condiviso, luce globale senza interpolazione, SDF/Snell/Fresnel, dispersione RGB 0,05 e trasporto secondario 2.5D fino a due passaggi. Base ripristinata a `7f42d25` tramite `5fdc748`; esperimenti successivi conservati in `/workspace/Desktop/bluespherix layout backup/vetro_rgb`. La superficie ora è trasparente: canvas sotto il DOM e nessun riempimento CSS aggiuntivo; contenuti opachi. Shader e parametri ottici invariati. Non è stato aggiunto alcuno sfondo dinamico. Safari/macOS non verificabile dal cloud.
 - La sezione Rischio è completa: budget di rischio, stress test, simulatore pre-trade, correlazioni, drawdown, protezioni, Monte Carlo e guardrail.
 - Strategy Lab include tre ipotesi interattive con parametri specifici, confronto Digital Twin, costi reali, rischio variabile, validazione walk-forward, Out-of-Sample Gate 70/30, Execution Friction Test, Parameter Space con risultati reali e archivio dei benchmark salvati nella sessione.
 
@@ -48,7 +48,7 @@ Web app moderna per analisi di trading, ispirata alle funzioni di Myfxbook ma co
 
 ## Prossimo passo consigliato
 
-Consolidare il prossimo blocco principale dopo la revisione utente dello Strategy Lab; evitare nuove estensioni della sezione Rischio salvo richieste specifiche.
+Attendere la verifica utente del punto 1 (trasparenza delle card) nella preview. Non avviare altri punti né creare lo sfondo dinamico senza le specifiche dell’utente.
 
 ### Preferenza jumpcard
 - Il micro-movimento 3D della singola card al passaggio del cursore è temporaneamente disattivato.

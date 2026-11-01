@@ -65,7 +65,7 @@ nav button b { margin-left: auto; font-size: 8px; color: #091110; background: va
 .icon-button i { position: absolute; right: 6px; top: 5px; width: 5px; height: 5px; border-radius: 50%; background: var(--amber); border: 1px solid var(--bg); }
 .user-avatar { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-size: 9px; font-weight: 700; color: #11191c; background: linear-gradient(145deg, #dffdf9, #70d6ca); }
 
-.content { max-width: 1480px; margin: 0 auto; padding: 34px 32px 70px; }
+.content { max-width: 1480px; margin: 0 auto; padding: 34px 32px 70px; isolation: isolate; }
 .welcome { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 26px; scroll-margin-top: 90px; }
 .date-line, .eyebrow { color: #7a8794; text-transform: uppercase; letter-spacing: 1.25px; font-size: 9px; font-weight: 700; margin: 0 0 8px; }
 .welcome h1 { font-size: clamp(25px, 3vw, 38px); letter-spacing: -1.3px; margin: 0; font-weight: 630; }
@@ -128,7 +128,7 @@ nav button b { margin-left: auto; font-size: 8px; color: #091110; background: va
 .metric-card { padding: 17px 18px; display: flex; justify-content: space-between; align-items: flex-end; min-height: 116px; }
 .metric-card strong { font-size: 20px; letter-spacing: -.6px; font-weight: 620; }
 .metric-detail { font-size: 8px; color: #71808c; margin: 7px 0 0; }
-.mini-chart { width: 95px; height: 38px; opacity: .9; }
+.mini-chart { width: 95px; height: 38px; opacity: 1; }
 .today-welcome { margin-bottom: 20px; }
 .today-notice { color: #aebbc2; border-color: rgba(86,217,202,.16); background: linear-gradient(90deg,rgba(86,217,202,.065),rgba(86,217,202,.018)); }
 .content .glass-card {
@@ -139,8 +139,11 @@ nav button b { margin-left: auto; font-size: 8px; color: #091110; background: va
   backdrop-filter: blur(18px) saturate(112%);
   -webkit-backdrop-filter: blur(18px) saturate(112%);
 }
-.ice-glass-canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; z-index: 8; }
-.content[data-ice-glass="ready"] :is(.glass-card, .calendar-strip, .demo-notice) { background-image: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+/* The isolated content stack keeps the glass above the page background and
+   below all DOM content. Only the material transmits the backdrop. */
+.ice-glass-canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; z-index: -1; }
+.content[data-ice-glass="ready"] :is(.glass-card, .calendar-strip, .demo-notice) { background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.content:not([data-ice-glass="ready"]) :is(.glass-card, .calendar-strip, .demo-notice) { background: rgba(17,27,40,.26); }
 .content[data-ice-glass="ready"] .glass-card:hover { transform: none; }
 .content .glass-card:not(.timeline-card):not(.trade-inspector):hover { transform: none !important; }
 .today-notice svg { color: var(--aqua); }

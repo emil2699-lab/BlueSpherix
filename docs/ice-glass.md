@@ -154,3 +154,17 @@ card. I dati esatti sono nel manifest `results.json`.
 Queste misure **non dimostrano 60 FPS**: il test Safari/macOS con GPU reale resta
 necessario per confermare fluidità, Retina e gestione del colore. I dati esatti
 dell'ultima esecuzione sono nel manifest `results.json`.
+
+## Trasparenza della superficie (2026-11-01)
+
+Il canvas vive dietro al contenuto DOM, nello stacking context isolato di
+`.content`. Le superfici gestite da WebGL hanno background CSS trasparente:
+la tinta e la copertura della lastra provengono solo dallo shader esistente,
+senza un secondo riempimento scuro. Testi, numeri, icone e grafici sono
+composti sopra il materiale; nessuna opacity viene applicata ai contenitori.
+Il fallback senza WebGL usa una tinta scura con alpha 0,26.
+
+Shader, parametri ottici e trasporto secondario restano invariati. Non è stato
+aggiunto uno sfondo dinamico. Verifiche e confronti locali sono archiviati in
+`/workspace/artifacts/glass-transparency/`; Safari/macOS non è disponibile nel
+runtime di verifica. Il prossimo punto richiede la revisione dell'utente.
