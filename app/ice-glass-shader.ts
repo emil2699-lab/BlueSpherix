@@ -61,6 +61,20 @@ vec3 environment(vec3 ray) {
   float cool = pow(max(0.0, .5 + .5 * ray.x), 2.4);
   return vec3(.008,.016,.024) + vec3(.025,.055,.085)*sky + vec3(.010,.026,.044)*cool;
 }
+float rayConcentration(vec2 surface, vec3 ray, float pathLength) {
+  // Follow the refracted ray to the receiving plane inside the slab. The
+  // Jacobian of this map measures the actual contraction of a ray bundle.
+  // Its zeros move with incidence, local curvature and wavelength; no UV band
+  // or prescribed focal depth is involved. Finite aperture regularizes folds.
+  vec2 landing = surface + ray.xy/max(-ray.z,.12)*pathLength;
+  vec2 dx = dFdx(landing)*uDPR;
+  vec2 dy = -dFdy(landing)*uDPR;
+  float determinant = dx.x*dy.y-dx.y*dy.x;
+  float footprint = dot(dx,dx)+dot(dy,dy);
+  float aperture = .16 + uGlass.z*.35;
+  return exp(-determinant*determinant/(aperture*aperture)) /
+    sqrt(1.0+footprint*.12);
+}
 void main() {
   vec2 pixel = vec2(gl_FragCoord.x/uDPR, (uResolution.y-gl_FragCoord.y)/uDPR);
   vec2 halfSize = uRect.zw*.5;
@@ -68,7 +82,6 @@ void main() {
   float d = boxSDF(p,halfSize,uRadius);
   float aa = 1.25/uDPR;
   float coverage = 1.0-smoothstep(-aa,0.0,d);
-  if (coverage <= 0.0) discard;
   float depth = -d;
   float thickness = min(uGlass.y, min(halfSize.x,halfSize.y)*.25);
   // Keep the exact rounded silhouette, but move all optical shading onto a
@@ -83,19 +96,21 @@ void main() {
   float opticalDepth = mix(depth,continuousInnerDepth(p,halfSize,normalSoftness),interiorBlend);
   float bevel = exp(-opticalDepth/max(thickness,1.0));
   // A stable, low-frequency liquid normal varies the optical path, not the DOM.
-  float phaseA = pixel.x*.018+sin(pixel.y*.023)*1.4;
-  float phaseB = pixel.y*.016+pixel.x*.009;
+  float phaseA = p.x*.018+sin(p.y*.023)*1.4;
+  float phaseB = p.y*.016+p.x*.009;
   float wave = sin(phaseA)*sin(phaseB);
   // The height field is fixed in space: its gradient bends the local normal.
   vec2 waveGradient = vec2(
     .018*cos(phaseA)*sin(phaseB)+.009*sin(phaseA)*cos(phaseB),
-    .0322*cos(pixel.y*.023)*cos(phaseA)*sin(phaseB)+.016*sin(phaseA)*cos(phaseB)
+    .0322*cos(p.y*.023)*cos(phaseA)*sin(phaseB)+.016*sin(phaseA)*cos(phaseB)
   );
   float slope = .76*bevel*(1.0+.075*wave);
   vec2 normalXY = grad*slope + waveGradient*3.2*bevel;
   vec3 N = normalize(vec3(normalXY,sqrt(max(.015,1.0-dot(normalXY,normalXY)))));
-  vec3 V = vec3(0,0,1);
-  vec3 delta = vec3(uLight.xy-pixel,uEnergy.z);
+  float surfaceHeight = thickness*(1.0-bevel);
+  // A distant observer gives a gentle perspective, stable under page zoom.
+  vec3 V = normalize(vec3(uResolution/uDPR*.5-pixel,2400.0));
+  vec3 delta = vec3(uLight.xy-pixel,uEnergy.z-surfaceHeight);
   float distanceXY = length(delta.xy);
   vec3 L = normalize(delta);
   vec3 H = normalize(L+V);
@@ -116,22 +131,18 @@ void main() {
   vec3 transmittedG = refract(-L,N,1.0/uGlass.x);
   vec3 transmittedB = refract(-L,N,1.0/(uGlass.x+uOptics.y));
   vec3 refracted = vec3(environment(transmittedR).r,environment(transmittedG).g,environment(transmittedB).b);
-  // Refraction creates the RGB separation; there is no fixed spectral palette.
-  // A wider focus profile thickens the previous delicate dispersion.
-  float focus = opticalDepth/thickness + dot(transmittedG.xy,N.xy)*.34 + wave*.16*bevel;
+  // Two traversals through the slab, plus the existing internal reflection
+  // contribution. Each wavelength has its own landing map and concentration.
+  float pathLength = thickness*(2.0+uOptics.w*2.0);
+  vec3 caustic = vec3(rayConcentration(pixel,transmittedR,pathLength),
+    rayConcentration(pixel,transmittedG,pathLength),
+    rayConcentration(pixel,transmittedB,pathLength));
+  if (coverage <= 0.0) discard;
   vec2 tangent = vec2(-grad.y,grad.x);
-  float incidence = dot(L.xy,tangent);
-  // Signed incidence moves the channels through each other continuously.
-  float spread = uOptics.y*(4.2+.55*wave)*bevel*(.25+.75*incidence);
-  vec3 focalDepth = vec3(.42+spread+dot(transmittedR.xy-transmittedG.xy,N.xy)*.3,
-    .42,.42-spread+dot(transmittedB.xy-transmittedG.xy,N.xy)*.3);
-  float bandWidth = .15+.018*wave*wave;
-  vec3 caustic = exp(-pow((vec3(focus)-focalDepth)/bandWidth,vec3(2.0)));
   float facing = .11+.89*max(dot(N.xy,normalize(delta.xy+vec2(.001))),0.0);
   float light = attenuation*uEnergy.y*facing;
   float alongEdge = dot(delta.xy,tangent) + wave*thickness*.85;
   float sourceFocus = exp(-pow(alongEdge/(uEnergy.z*.72),2.0));
-  float spectralFocus = exp(-pow(alongEdge/(uEnergy.z*1.8),2.0));
   float whiteCore = pow(attenuation,4.2)*sourceFocus*edge;
   vec2 secondaryDelta=pixel-uSecondary.xy;
   float travel=dot(secondaryDelta,uSecondary.zw);
@@ -151,7 +162,7 @@ void main() {
   face += vec3(.63,.76,.92)*attenuation*(1.0-bevel)*.035;
   vec3 edgeLight = light*(vec3(.93,.96,1.0)*specular + tint*shoulder*.18);
   float spectralReach = exp(-opticalDepth/(thickness*1.55));
-  edgeLight += light*caustic*spectralReach*spectralFocus*uOptics.z*.92;
+  edgeLight += light*caustic*spectralReach*uOptics.z*1.15;
   edgeLight += bounced*caustic*spectralReach*.34;
   edgeLight += vec3(.92,.98,1.0)*whiteCore*.31;
   edgeLight += light*tint*edge*uOptics.w*.08;

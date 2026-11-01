@@ -15,6 +15,47 @@ deformate da una curvatura stabile a bassa frequenza. La superficie interna
 riceve trasmissione e riflessi più diffusi. Nessuna texture dello screenshot.
 I parametri sono in `app/ice-glass-config.ts`.
 
+### Distribuzione dinamica delle caustiche
+
+La fascia RGB non usa più un centro a profondità fissa. Per ciascun canale,
+Snell determina il raggio incidente rifratto; la proiezione attraverso lo
+spessore della lastra produce una mappa dei punti di arrivo. Il determinante
+del Jacobiano di questa mappa misura la concentrazione locale dei raggi.
+Un'apertura finita, legata alla rugosità, regolarizza le caustiche senza soglie
+di accensione o inversioni del segno. Le derivate sono valutate prima del
+discard della silhouette, per mantenere validi i gruppi di frammenti GPU.
+
+La sorgente considera l'altezza della superficie e l'osservatore una prospettiva
+debole. Le irregolarità del materiale sono ancorate alle coordinate locali
+della card, senza tempo o noise animato. Restano lo speculare bianco e il
+trasporto secondario esistente. Questo rimane un modello ottico 2.5D locale,
+non una simulazione volumetrica completa dei raggi.
+
+Verifica Chromium/SwiftShader sulla build statica a 1440×1000: tre distanze
+lungo la verticale della card, tre angoli a raggio costante e attraversamento
+lento della diagonale; renderer attivo, nessun errore console, coordinate del
+puntatore coincidenti entro la precisione float. Screenshot e manifest:
+`/tmp/glass-dashboard-dynamic/`.
+
+Il confronto isolato del medesimo shader, con e senza la correzione, separa la
+forma delle caustiche da illuminazione e contenuti. In una card 360×240, la
+profondità media delle frange cromatiche sul bordo superiore passa da
+4,33 a 6,52 a 13,40 px nelle tre distanze; la larghezza passa da 0,94 a 1,93
+a 2,70 px. Sono momenti del profilo cromatico, escludendo campioni senza
+segnale: non misure dello spessore del materiale. Il precedente aveva
+profondità 5,02/5,55/5,80 px e larghezza 1,78/1,72/1,68 px. I confronti
+sono in `/tmp/glass-isolated-before/` e `/tmp/glass-isolated-after/`;
+gli screenshot completi del materiale in `/tmp/glass-dynamic-before/` e
+`/tmp/glass-dynamic-after/`. La variazione riguarda anche curvatura e
+distribuzione, non solo intensità.
+Anche dopo il miglior adattamento tramite traslazione e scala della profondità,
+i profili conservano un residuo RMS di 1,84 px fra distanza media/lontana e
+1,82 px fra due angoli: la forma non coincide con lo stesso profilo spostato.
+
+La GPU software nel test della dashboard produce intervalli di frame di circa
+99–150 ms: non certifica la fluidità su GPU reale. Safari/macOS non è disponibile
+in questo ambiente e richiede ancora una verifica diretta.
+
 `app/ice-glass-transport.ts` proietta raggi nel piano delle card: intersezione
 con una prima superficie, rifrazione all'ingresso e all'uscita, attenuazione
 del percorso e fino a due passaggi prima della card ricevente. La card
