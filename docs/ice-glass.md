@@ -15,6 +15,52 @@ deformate da una curvatura stabile a bassa frequenza. La superficie interna
 riceve trasmissione e riflessi più diffusi. Nessuna texture dello screenshot.
 I parametri sono in `app/ice-glass-config.ts`.
 
+### Esperimento con volume 3D, solo Oggi
+
+`app/ice-glass-volume-shader.ts` è una variante separata. `IceGlass` la seleziona
+solo per `#overview`; cambiando sezione ripristina lo shader precedente,
+liberando programma e shader GPU. Non cambia layout, testi, grafici o jumpcard.
+
+Le card sono volumi tridimensionali chiusi con facce anteriori/posteriori e
+pareti raccordate. La normale è il gradiente della medesima geometria usata
+per le intersezioni. Un campo di altezza stabile deforma entrambe le facce;
+la zona centrale è piana. I raggi attraversano il volume mediante Snell,
+Fresnel dielettrico non polarizzato esatto, riflessione totale interna e
+assorbimento Beer–Lambert proporzionale al cammino effettivo. Sono ammessi
+due rimbalzi interni oltre alla prima uscita; l'energia residua non viene
+convertita in luce. La dispersione usa Cauchy a 450, 550 e 650 nm. Lo speculare
+usa GGX e Smith. Le zone piane usano la soluzione analitica della lastra,
+con la serie delle riflessioni interne, mentre i raccordi usano un solutore
+di intersezione vincolato da un box 3D. Il DPR massimo della prova è 1,5.
+
+La sorgente è calibrata separatamente a intensità quadrupla, perché lo
+speculare usa ora il coefficiente Fresnel invece del precedente rinforzo
+artistico. Non viene moltiplicata la luminosità ambientale della card.
+
+**Limiti:** non è una riproduzione completa di una scena reale. Lo sfondo
+ottico è ancora un ambiente analitico; il DOM non viene acquisito in texture
+né rifratto. Le caustiche usano il Jacobiano locale dei raggi usciti,
+non un accumulo globale di fotoni. Lo scambio tra card conserva il precedente
+modello nel piano dello schermo. Il compositing mantiene l'alpha della UI;
+non include polarizzazione, interferenza o uno spettro continuo.
+
+Verifica: `node scripts/check-glass-volume.mjs` compila lo shader effettivo e
+controlla 64 campioni GPU: Snell, Fresnel a incidenza normale, riflessione totale,
+normali confrontate con differenze finite, chiusura del volume, intersezioni
+curve/radenti, ordine spettrale degli indici e bilancio energetico. I test di
+integrazione hanno confermato `overview=volume`, `risk=surface`, ritorno a
+`overview=volume`, senza errori console; tre distanze, tre angoli e diagonale
+sono archiviati in `/tmp/glass-dashboard-volume/`.
+La verifica finale ha incluso anche Portafoglio, Analisi, Operazioni e Lab
+(`surface`), un solo canvas dopo i cambi di sezione e il puntatore Retina:
+viewport CSS 1024 px, backing store 1536 px, posizione osservata 540,320.
+
+Su Chromium/SwiftShader la versione ottimizzata registra circa 900–1.010 ms
+per frame contro 1.650–1.830 ms del primo prototipo volumetrico: è ancora molto
+più costosa del renderer precedente e non raggiunge il tempo reale su GPU
+software. Non è stata verificata su GPU hardware o Safari/macOS; nessuna
+garanzia di 60 fps. Il cursore non ha interpolazione o easing spaziale.
+
 ### Distribuzione dinamica delle caustiche
 
 La fascia RGB non usa più un centro a profondità fissa. Per ciascun canale,
