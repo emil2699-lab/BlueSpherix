@@ -15,17 +15,15 @@ deformate da una curvatura stabile a bassa frequenza. La superficie interna
 riceve trasmissione e riflessi più diffusi. Nessuna texture dello screenshot.
 I parametri sono in `app/ice-glass-config.ts`.
 
-Il trasporto fra card usa un photon mapper forward 2.5D sullo stesso contesto
-WebGL. `app/ice-glass-volume.ts` tessella il campo di altezza a saponetta già
-esistente e prepara una BVH; `app/ice-glass-photon-shader.ts` traccia sulla GPU
-le interfacce attraversate. `app/ice-glass-photons.ts` gestisce transform feedback
-e un atlas di irradianza. `app/ice-glass-transport.ts` conserva il corrispondente
-modello numerico CPU per verifiche e debug, senza eseguirlo nel percorso normale
-del cursore. Il precedente raggio 2D verso il centro della card e la relativa
-fascia gaussiana programmata sono stati eliminati.
+Il renderer attivo disegna il materiale e la fascia cromatica, senza l'atlas di
+fotoni del precedente esperimento di propagazione. Il feedback successivo ha
+richiesto di eliminare i punti luminosi: il photon mapper e il relativo modello
+numerico restano nei sorgenti per riferimento, ma non sono montati né eseguiti
+nella dashboard. Non è presente un overlay di traiettorie o punti in produzione.
 
-In sviluppo `?iceGlassDebug=1#overview` mostra i percorsi del modello numerico.
-Le traiettorie di debug non sono create nella build di produzione.
+Il canvas è assoluto nel contenitore `.content`, con overscan limitato a due
+altezze di viewport. Materiale e contenuto condividono quindi lo stesso livello
+di scorrimento; non occorre attendere un frame JavaScript per mantenerli uniti.
 
 L'ambiente ottico è procedurale. La rifrazione **non campiona il DOM**: testo,
 icone, valori e grafici conservano il rendering HTML/SVG originale. Il modello
@@ -284,3 +282,50 @@ una misura delle prestazioni Safari su GPU reale e non dimostra 60 FPS. Safari
 macOS, Retina e fluidità effettiva rimangono da confermare sul dispositivo.
 Fermarsi alla revisione del punto 3: nessun intervento sulla curvatura dinamica
 dei riflessi, sugli altri punti o sullo sfondo.
+
+
+## Correzione scroll, punti e fascia cromatica (2026-11-01)
+
+Il feedback successivo al punto 3 modifica la priorità: eliminare i punti
+luminosi e rendere dritta la forma di base della fascia arcobaleno, lasciandola
+curvare in risposta al cursore.
+
+- Il canvas passa da fixed ad absolute nel contenitore del contenuto. Una fascia
+  di overscan alta al massimo due viewport segue lo scroll nel compositor e si
+  riposiziona per coprire le sezioni lunghe. Le mutazioni di stile del canvas
+  stesso vengono ignorate dagli osservatori per evitare cicli di invalidazione.
+- Rimossi dal renderer attivo il photon atlas, i passaggi di transform feedback
+  e la composizione dei campioni puntiformi. Il modello sperimentale resta nei
+  file dedicati, inattivo, senza costo per ogni movimento del cursore.
+- I picchi GGX sono confinati al bordo esterno; il nucleo bianco è una fascia
+  più estesa lungo il bordo, senza glint isolati sulla faccia o sulla spalla.
+- La profondità base della fascia usa la distanza dal contorno, rettilinea sui
+  lati rettilinei. Rimossi la curva UV e il termine sinusoidale fisso dal percorso
+  della frangia. La differenza fra i raggi Snell locali e un riferimento parallelo
+  alla direzione centrale della sorgente genera la deformazione. Il campo si
+  annulla nel limite di sorgente lontana; non usa un'animazione temporale o una
+  funzione che imposta direttamente una curvatura in base alla distanza.
+- I canali RGB seguono differenze di percorso separate. Il parametro di
+  dispersione rimane 0,05; IOR, colori, guadagni luminosi e geometria a saponetta
+  sono preservati. La quota centrale viene calcolata una volta alla misura della
+  card, non nuovamente per ogni frammento. La microstruttura del materiale usa
+  coordinate locali della card, così non cambia fase durante scroll e rebase.
+
+Verifiche in `/workspace/artifacts/glass-scroll-band/`. Con rendering fermo e
+scroll di 268 px, il vecchio canvas fixed rimaneva disallineato di 268 px; il nuovo
+canvas absolute rimane allineato con errore zero prima di qualsiasi ridisegno.
+Il test GLSL isolato su un tratto rettilineo misura una variazione di profondità
+della fascia verde di 7,44 px nella versione precedente anche con luce lontana;
+ora è 0,008 px. Con sorgente a distanza intermedia diventa 0,57 px, a 50 px dal
+bordo 2,96 px; posizione laterale e distanza cambiano il percorso continuamente.
+La misura riguarda la geometria della fascia a intensità isolata, non il glow.
+
+Layout e contenuti non sono modificati; nessuno sfondo nuovo e jumpcard ancora
+disabilitato. I test headless non sostituiscono la verifica di Safari sul Mac.
+
+Il controllo finale copre 21 posizioni di scroll in Oggi, Rischio e Operazioni:
+errore di allineamento zero anche dopo il rebase della fascia canvas, nessun
+passaggio GL_POINTS e nessun errore WebGL. Navigazione delle sei viste, contenuti
+opachi, layout invariato e viewport 1024/390 px verificati. Su SwiftShader il p95
+di 12 aggiornamenti del cursore è circa 268 ms, rispetto ai circa 357 ms del
+precedente esperimento: questa misura su GPU simulata non dimostra 60 FPS su Mac.

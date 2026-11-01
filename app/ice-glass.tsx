@@ -3,13 +3,11 @@
 import { useEffect, useRef, type RefObject } from "react";
 import { ICE_GLASS as config } from "./ice-glass-config";
 import { glassFragment, glassVertex } from "./ice-glass-shader";
-import { PHOTON_TILE, traceGlassLight } from "./ice-glass-transport";
-import { createPhotonTransport } from "./ice-glass-photons";
-import { buildVolumes, type GlassVolume } from "./ice-glass-volume";
+import { soapSample } from "./ice-glass-volume";
 
 type ViewportRect = { left: number; top: number; width: number; height: number };
 type GlassRect = ViewportRect & { right: number; bottom: number };
-type Measurement = { element: HTMLElement; rect: GlassRect; radius: number; tint: number[] };
+type Measurement = { element: HTMLElement; rect: GlassRect; radius: number; tint: number[]; crownHeight: number };
 const GLASS_SURFACE_SELECTOR = ".glass-card, .calendar-strip, .demo-notice";
 
 export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }) {
@@ -22,10 +20,6 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     if (!gl) return; // The original dark cards are the no-WebGL fallback.
     let program: WebGLProgram | null = null;
     let vao: WebGLVertexArrayObject | null = null;
-    let photonTransport: ReturnType<typeof createPhotonTransport> = null;
-    let fallbackPhotons: WebGLTexture | null = null;
-    let volumes: GlassVolume[] = [];
-    let geometryKey = "";
     let shaders: WebGLShader[] = [];
     let frame = 0;
     let dirty = true;
@@ -41,8 +35,6 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     const observedSurfaces = new Set<Element>();
     const pointer = { x: -10000, y: -10000, presence: 0 };
     const reduced = matchMedia("(prefers-reduced-motion: reduce)");
-    const debug = process.env.NODE_ENV === "development" && new URLSearchParams(location.search).get("iceGlassDebug") === "1" ? document.createElement("canvas") : null;
-    if (debug) { debug.className = "ice-glass-canvas"; debug.style.zIndex = "9"; root.appendChild(debug); }
     const locations = new Map<string, WebGLUniformLocation | null>();
     const uniform = (name: string) => {
       if (!locations.has(name)) locations.set(name, gl.getUniformLocation(program!, name));
@@ -53,9 +45,6 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       shaders = [];
       if (program) gl.deleteProgram(program);
       if (vao) gl.deleteVertexArray(vao);
-      photonTransport?.dispose();photonTransport=null;
-      geometryKey = "";
-      if(fallbackPhotons)gl.deleteTexture(fallbackPhotons);fallbackPhotons=null;
       program = null;
       vao = null;
       locations.clear();
@@ -78,14 +67,6 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         vao = gl.createVertexArray();
         gl.bindVertexArray(vao);
         gl.useProgram(program);
-        photonTransport=createPhotonTransport(gl);
-        if(!photonTransport) {
-          // No renderable float textures: keep the existing glass material.
-          fallbackPhotons=gl.createTexture();gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,fallbackPhotons);
-          gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array(4));
-          gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
-        }
-        gl.useProgram(program);gl.uniform1i(uniform("uPhotonAtlas"),0);
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
         root.dataset.iceGlass = "ready";
@@ -96,6 +77,17 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       }
     };
     const readViewport = (): ViewportRect => {
+      // The canvas shares the content's scrolling layer. Overscan keeps glass
+      // attached even while Safari scrolls without waiting for JavaScript.
+      const bounds=root.getBoundingClientRect();
+      const screenHeight=Math.max(1,window.visualViewport?.height || innerHeight);
+      const height=Math.max(1,Math.min(bounds.height,screenHeight*2));
+      const visibleTop=Math.max(0,-bounds.top+(window.visualViewport?.offsetTop || 0));
+      const step=screenHeight*.25;
+      const top=Math.max(0,Math.min(Math.floor((visibleTop-screenHeight*.5)/step)*step,bounds.height-height));
+      const cssHeight=`${height}px`,cssTop=`${top}px`;
+      if(canvas.style.height!==cssHeight)canvas.style.height=cssHeight;
+      if(canvas.style.top!==cssTop)canvas.style.top=cssTop;
       const rect = canvas.getBoundingClientRect();
       return {
         left: rect.left,
@@ -119,20 +111,14 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         const left = domRect.left-nextViewport.left;
         const top = domRect.top-nextViewport.top;
         const rect = { left, top, width: domRect.width, height: domRect.height, right: left+domRect.width, bottom: top+domRect.height };
-        return { element, rect, radius: parseFloat(style.borderTopLeftRadius) || 14, tint };
+        const radius=parseFloat(style.borderTopLeftRadius) || 14;
+        const halfWidth=rect.width*.5,halfHeight=rect.height*.5;
+        const opticalRadius=Math.min(Math.min(halfWidth,halfHeight)*.95,Math.max(radius*1.75,24));
+        const thickness=Math.min(config.glassThickness*2.1,Math.min(halfWidth,halfHeight)*.5);
+        const crownHeight=rect.width && rect.height ? soapSample(0,0,halfWidth,halfHeight,opticalRadius,thickness)[2] : 0;
+        return { element, rect, radius, tint, crownHeight };
       });
       cards = cards.filter(card=>card.rect.width>0 && card.rect.height>0);
-      const nextGeometryKey=cards.map(({rect,radius})=>[rect.left,rect.top,rect.width,rect.height,radius].join(",")).join(";");
-      if(nextGeometryKey!==geometryKey) {
-        volumes = buildVolumes(cards,config.glassThickness);
-        photonTransport?.update(volumes);
-        if(fallbackPhotons) {
-          gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,fallbackPhotons);
-          const h=Math.max(PHOTON_TILE.height,Math.ceil(cards.length/PHOTON_TILE.columns)*PHOTON_TILE.height);
-          gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,PHOTON_TILE.width*PHOTON_TILE.columns,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
-        }
-        geometryKey=nextGeometryKey;
-      }
       dirty = false;
     };
     const draw = (time: number) => {
@@ -160,34 +146,17 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       gl.uniform4f(uniform("uOptics"),config.fresnelStrength,config.chromaticDispersion,config.edgeRefraction,config.internalReflection);
       gl.uniform4f(uniform("uEnergy"),config.ambientReflection,config.lightIntensity,config.lightHeight,config.lightFalloff);
       gl.uniform3f(uniform("uFinish"),config.specularSharpness,config.bloomIntensity,config.bloomRadius);
-      const localPointer = { x: pointer.x-viewport.left, y: pointer.y-viewport.top };
-      const transportOptions={ior:config.glassIOR,dispersion:config.chromaticDispersion,intensity:config.lightIntensity,
-        lightHeight:config.lightHeight,roughness:config.glassRoughness,maxBounces:config.maxBounces};
-      photonTransport?.render(localPointer,!!pointer.presence && !reduced.matches,transportOptions);
-      gl.useProgram(program);gl.bindVertexArray(vao);gl.enable(gl.SCISSOR_TEST);
-      for (const [index,{ rect, radius, tint }] of cards.entries()) {
+      gl.enable(gl.SCISSOR_TEST);
+      for (const { rect, radius, tint, crownHeight } of cards) {
         if (rect.bottom <= 0 || rect.top >= viewHeight || rect.right <= 0 || rect.left >= viewWidth || !rect.width) continue;
         // A scissored full-card quad keeps the slab continuous while avoiding work outside it.
         gl.viewport(0,0,width,height);
         gl.scissor(Math.max(0,Math.floor(rect.left*dpr)),Math.max(0,Math.floor((viewHeight-rect.bottom)*dpr)),Math.ceil(Math.min(rect.right,viewWidth)*dpr)-Math.max(0,Math.floor(rect.left*dpr)),Math.ceil(Math.min(rect.bottom,viewHeight)*dpr)-Math.max(0,Math.floor(rect.top*dpr)));
         gl.uniform4f(uniform("uRect"),rect.left,rect.top,rect.width,rect.height);
         gl.uniform1f(uniform("uRadius"),radius);
+        gl.uniform1f(uniform("uCrownHeight"),crownHeight);
         gl.uniform3f(uniform("uTint"),tint[0],tint[1],tint[2]);
-        gl.uniform2i(uniform("uPhotonTile"),index%PHOTON_TILE.columns*PHOTON_TILE.width,Math.floor(index/PHOTON_TILE.columns)*PHOTON_TILE.height);
         gl.drawArrays(gl.TRIANGLES,0,6);
-      }
-      if (debug) {
-        debug.width=width;debug.height=height;
-        const ctx=debug.getContext("2d");
-        if (ctx) {
-          ctx.scale(dpr,dpr);ctx.clearRect(0,0,viewWidth,viewHeight);
-          const atlas=traceGlassLight(localPointer,volumes,{...transportOptions,debug:true});
-          for (const segment of atlas.stats.segments) {
-            if(segment.channel!==1)continue;
-            ctx.strokeStyle=segment.kind==="internal" ? "rgba(255,200,100,.5)" : segment.kind==="secondary" ? "rgba(125,235,255,.5)" : "rgba(160,170,190,.1)";
-            ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(segment.from[0],segment.from[1]);ctx.lineTo(segment.to[0],segment.to[1]);ctx.stroke();
-          }
-        }
       }
       canvas.dataset.pointer = `${pointer.x},${pointer.y}`;
       // Adapt resolution only under sustained activity, never interpolate position.
@@ -233,7 +202,10 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     resize = new ResizeObserver(settleLayout);
     resize.observe(root);
     syncObservedSurfaces();
-    const mutation = new MutationObserver(() => { syncObservedSurfaces(); settleLayout(); });
+    const mutation = new MutationObserver(records => {
+      if(records.every(record=>record.target===canvas))return;
+      syncObservedSurfaces();settleLayout();
+    });
     mutation.observe(root,{ childList: true, subtree: true, attributes: true, attributeFilter: ["hidden", "class", "style"] });
     window.addEventListener("pointermove",move,{passive:true});
     window.addEventListener("pointerrawupdate",move,{passive:true});
@@ -257,7 +229,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       window.visualViewport?.removeEventListener("resize",settleLayout); window.visualViewport?.removeEventListener("scroll",invalidate);
       document.removeEventListener("visibilitychange",visibility); reduced.removeEventListener("change",schedule);
       canvas.removeEventListener("webglcontextlost",contextLost); canvas.removeEventListener("webglcontextrestored",contextRestored);
-      debug?.remove(); delete root.dataset.iceGlass; dispose();
+      delete root.dataset.iceGlass;dispose();
     };
   },[rootRef]);
   return <canvas ref={canvasRef} className="ice-glass-canvas" aria-hidden="true" />;
