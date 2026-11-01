@@ -189,6 +189,11 @@ void main() {
   // white glow over the coloured material.
   vec3 caustic = exp(-pow((vec3(focus)-focalDepth)/reflectionWidth,vec3(2.0)))
     *(bandWidth/reflectionWidth);
+  // A sharper neutral crest grows only where the same RGB paths overlap.
+  // Keep the soft reflection and all three spectral fringes underneath it.
+  vec3 channelOverlap=caustic*(reflectionWidth/bandWidth);
+  float polishedCore=pow(channelOverlap.r*channelOverlap.g*channelOverlap.b,1.5)
+    *(1.0-separation)*(1.0-separation);
   float facing = .11+.89*max(dot(N.xy,normalize(delta.xy+vec2(.001))),0.0);
   float light = attenuation*uEnergy.y*facing;
   float alongEdge = dot(delta.xy,tangent);
@@ -211,6 +216,7 @@ void main() {
   vec3 edgeLight = light*(vec3(.93,.96,1.0)*specular*rim + tint*shoulder*.18);
   float spectralReach = exp(-opticalDepth/(thickness*1.55));
   edgeLight += light*caustic*spectralReach*spectralFocus*uOptics.z*.92;
+  edgeLight += vec3(1.0)*light*polishedCore*spectralReach*spectralFocus*uOptics.z*.55;
   edgeLight += vec3(.92,.98,1.0)*whiteCore*.31;
   edgeLight += light*tint*edge*uOptics.w*.08;
   vec3 color = face + edgeLight*(.32+.68*edge);

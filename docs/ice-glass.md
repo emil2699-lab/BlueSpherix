@@ -368,3 +368,20 @@ Tre casi interamente oltre la distanza di transizione sono identici pixel per
 pixel al riferimento. Corpo, normali e altezza hanno errore numerico zero;
 trasmissione centrale invariata. Confronti e script temporanei sono archiviati
 in `/workspace/artifacts/glass-gloss-spectrum/`.
+
+## Nucleo bianco più lucido (2026-11-01)
+
+Una cresta bianca più definita si fonde con il riflesso precedente senza
+modificarne la fascia morbida o i percorsi RGB. Il prodotto continuo dei tre
+profili cromatici normalizzati individua la zona dove i colori si sovrappongono;
+elevandolo a 1,5 si concentra il nuovo contributo nello stesso percorso ottico.
+Il contributo svanisce con il quadrato del fattore di prossimità già usato dalla
+fusione bianco/RGB. Non vengono aggiunti stati temporali, aloni o punti sulla
+faccia del vetro.
+
+Il readback GLSL misura errore zero sulla fascia RGB originale, sul materiale
+di base e sulla geometria. Il contributo aggiunto è neutro e non sottrae luce
+preesistente. Nel campione vicino la sua larghezza standard passa a circa
+1,32 px, rispetto ai 2,65 px del profilo morbido mantenuto sotto di esso.
+I campioni lontani sono identici al riferimento; opacità centrale invariata.
+Confronti e verifiche in `/workspace/artifacts/glass-polished-core/`.

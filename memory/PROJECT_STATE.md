@@ -53,3 +53,7 @@ Dopo il feedback sul punto 3: eliminati dall'interfaccia il photon atlas e i pun
 ### Preferenza jumpcard
 - Il micro-movimento 3D della singola card al passaggio del cursore è temporaneamente disattivato.
 - Parola chiave per riattivarlo: `jumpcard`.
+
+### Riflesso bianco lucido
+- La variante `a6400e2` è salvata in `/workspace/Desktop/bluespherix layout backup/riflessi bianco rgb dinamici_a6400e2`.
+- Dopo il backup, l'utente ha chiesto un bianco più netto mantenendo tutto l'effetto precedente. Aggiunta una cresta neutra sul prodotto continuo dei profili RGB sovrapposti: circa metà larghezza del riflesso morbido, che rimane presente. La cresta svanisce verso la dispersione lontana. Nessuna modifica a RGB, materiale, geometria o movimento del cursore. Verifiche in `/workspace/artifacts/glass-polished-core/`.
