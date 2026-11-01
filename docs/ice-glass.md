@@ -385,32 +385,3 @@ preesistente. Nel campione vicino la sua larghezza standard passa a circa
 1,32 px, rispetto ai 2,65 px del profilo morbido mantenuto sotto di esso.
 I campioni lontani sono identici al riferimento; opacità centrale invariata.
 Confronti e verifiche in `/workspace/artifacts/glass-polished-core/`.
-
-## Prova: base 7f42d25 con fusione RGB e inarcamento attuali (2026-11-01)
-
-Su richiesta dell'utente, il materiale attivo torna alla lastra 2.5D di
-`7f42d25`: normali, spessore 14, raggio originale, Fresnel, GGX, riflesso bianco,
-composizione e opacità originali. La configurazione ottica coincide con quella
-del commit. Anche l'approssimazione di trasporto secondario è quella originale,
-copiata senza modifiche in `ice-glass-slab-transport.ts`; il trasporto a fotoni
-rimane inattivo.
-
-Sono integrate soltanto la fusione RGB per prossimità e la distribuzione
-dinamica della fascia basata sulla differenza fra rifrazione locale e riferimento
-parallelo. Il riferimento usa l'altezza della luce della lastra originale. La
-fascia è dritta nel limite lontano e si inarca con la sorgente vicina; i canali
-coincidono da vicino e si separano progressivamente. Non è importata la cresta
-bianca aggiuntiva di `6e722db` né il volume convesso a saponetta.
-
-Restano la risposta diretta al cursore, il canvas nello stesso livello di scroll
-delle card, la microstruttura ancorata alla card, i contenuti DOM opachi e la
-correzione della sovrapposizione del dettaglio operazioni. Nessun cambio di layout.
-L'export GLSL della geometria convessa è conservato soltanto per i moduli
-sperimentali inattivi.
-
-Il readback GLSL confrontato con il commit originale misura errore zero su corpo
-del materiale e normali, usando coordinate locali uguali. La separazione dei
-profili RGB passa da 0 a 0,37, 1,64 e 2,31 px lungo una sequenza obliqua della
-sorgente. L'inarcamento varia da circa 0,004 px con sorgente molto lontana a
-1,49 px nel campione vicino. Riferimenti e verifiche sono conservati in
-`/workspace/artifacts/glass-base7f-rgb/`. Safari/macOS non disponibile nel cloud.
