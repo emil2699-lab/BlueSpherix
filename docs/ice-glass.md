@@ -29,25 +29,48 @@ Fresnel dielettrico non polarizzato esatto, riflessione totale interna e
 assorbimento Beer–Lambert proporzionale al cammino effettivo. Sono ammessi
 due rimbalzi interni oltre alla prima uscita; l'energia residua non viene
 convertita in luce. La dispersione usa Cauchy a 450, 550 e 650 nm. Lo speculare
-usa GGX e Smith. Le zone piane usano la soluzione analitica della lastra,
+usa GGX e Smith sui raccordi, con un lobo più ampio e attenuazione a zero sulla
+faccia piatta per eliminare il pallino speculare. Le zone piane usano la soluzione analitica della lastra,
 con la serie delle riflessioni interne, mentre i raccordi usano un solutore
 di intersezione vincolato da un box 3D. Il DPR massimo della prova è 1,5.
 
-La sorgente è calibrata separatamente a intensità quadrupla, perché lo
-speculare usa ora il coefficiente Fresnel invece del precedente rinforzo
-artistico. Non viene moltiplicata la luminosità ambientale della card.
+`TODAY_GLASS` in `app/ice-glass-config.ts` calibra la sola prova: spessore 20 px,
+intensità 7,8. Non viene moltiplicata la luminosità ambientale della card.
+La dispersione Cauchy passa da coefficiente 0,14 a 0,23 per rendere più leggibili
+le frange. Nessuna palette arcobaleno viene assegnata alle superfici.
+
+`app/ice-glass-caustics.ts` accumula ora i fasci sulla GPU. Il cursore è una
+sorgente puntiforme invisibile e omnidirezionale, con irradiamento inversamente
+proporzionale alla distanza al quadrato, coseno d'incidenza e area superficiale.
+Il passaggio forward calcola tre lunghezze d'onda per ciascun vertice della
+superficie e conserva tutti e tre i raggi d'uscita tramite transform feedback.
+I fasci vengono poi rasterizzati in triangoli nella loro effettiva posizione
+di arrivo: il rapporto fra area d'origine e area ricevente determina la densità
+energetica. Le sovrapposizioni dei fasci si sommano. Non vengono disegnati
+segmenti dal cursore, né punti luminosi indipendenti o sagome traslate.
+
+Il piano ricevente è comune, sotto le lastre; la mappa HDR contiene contributi
+di tutte le card visibili. Il successivo passaggio dal vetro all'osservatore
+campiona questa mappa lungo i raggi rifratti, anche per le caustiche generate
+da altre card. La rugosità diffonde l'irradiamento con un filtro normalizzato
+di cinque campioni. Le risorse GPU vengono eliminate al cambio di modalità.
+Su dispositivi privi di blending float si usa una mappa RGBA8 con scala energetica.
 
 **Limiti:** non è una riproduzione completa di una scena reale. Lo sfondo
 ottico è ancora un ambiente analitico; il DOM non viene acquisito in texture
-né rifratto. Le caustiche usano il Jacobiano locale dei raggi usciti,
-non un accumulo globale di fotoni. Lo scambio tra card conserva il precedente
-modello nel piano dello schermo. Il compositing mantiene l'alpha della UI;
+né rifratto. Il trasporto è limitato alle superfici campionate e al piano
+ricevente condiviso: non viene risolta la collisione diretta di ogni raggio
+d'uscita con tutti gli altri volumi della scena. In Oggi il precedente fascio
+secondario nel piano dello schermo è disattivato. Il compositing mantiene l'alpha della UI;
 non include polarizzazione, interferenza o uno spettro continuo.
 
 Verifica: `node scripts/check-glass-volume.mjs` compila lo shader effettivo e
 controlla 64 campioni GPU: Snell, Fresnel a incidenza normale, riflessione totale,
 normali confrontate con differenze finite, chiusura del volume, intersezioni
-curve/radenti, ordine spettrale degli indici e bilancio energetico. I test di
+curve/radenti, ordine spettrale degli indici e bilancio energetico. Compila
+anche i passaggi forward/accumulo. Un test del rasterizzatore verifica che
+quadruplicando l'area ricevente la luminosità scenda a un quarto (128→32),
+con energia totale invariata (128,502 in entrambi i casi). I test di
 integrazione hanno confermato `overview=volume`, `risk=surface`, ritorno a
 `overview=volume`, senza errori console; tre distanze, tre angoli e diagonale
 sono archiviati in `/tmp/glass-dashboard-volume/`.
@@ -55,13 +78,25 @@ La verifica finale ha incluso anche Portafoglio, Analisi, Operazioni e Lab
 (`surface`), un solo canvas dopo i cambi di sezione e il puntatore Retina:
 viewport CSS 1024 px, backing store 1536 px, posizione osservata 540,320.
 
-Su Chromium/SwiftShader la versione ottimizzata registra circa 900–1.010 ms
+Il precedente prototipo su Chromium/SwiftShader registrava circa 900–1.010 ms
 per frame contro 1.650–1.830 ms del primo prototipo volumetrico: è ancora molto
 più costosa del renderer precedente e non raggiunge il tempo reale su GPU
 software. Non è stata verificata su GPU hardware o Safari/macOS; nessuna
 garanzia di 60 fps. Il cursore non ha interpolazione o easing spaziale.
 
+Confronto finale della variante con accumulo: `/tmp/glass-stage-before/` e
+`/tmp/glass-stage-after/`, quattro posizioni del cursore a viewport 1440×1000.
+Nella regione 21×21 attorno alla precedente immagine della sorgente, i pixel
+bianchi (tutti i canali >200) passano da 104 a zero; il picco passa da 255 a 73.
+Nessun errore console e ritorno a `surface` in Rischio. Il riuso GPU dei percorsi
+riduce il tempo software da circa 4.600–4.800 ms del primo accumulo diretto a
+1.040–1.210 ms per i campioni attivi: rimane una prova costosa su SwiftShader,
+con prestazioni hardware e Safari da verificare.
+
 ### Distribuzione dinamica delle caustiche
+
+Questa descrizione riguarda il renderer precedente, mantenuto nelle sezioni
+diverse da Oggi.
 
 La fascia RGB non usa più un centro a profondità fissa. Per ciascun canale,
 Snell determina il raggio incidente rifratto; la proiezione attraverso lo

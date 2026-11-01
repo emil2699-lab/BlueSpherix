@@ -11,9 +11,8 @@ uniform vec3 uLight;
 uniform vec4 uGlass; // IOR, thickness, roughness, opacity
 uniform vec4 uOptics; // Fresnel, dispersion, refraction, internal reflection
 uniform vec4 uEnergy; // ambient, intensity, light height, falloff
-uniform vec3 uFinish; // sharpness, bloom intensity, bloom radius
-uniform vec4 uSecondary; // previous slab exit and refracted direction
-uniform float uSecondaryEnergy;
+uniform sampler2D uCausticMap;
+uniform float uCausticDecode;
 
 float boxSDF(vec2 p, vec2 b, float r) {
   vec2 q = abs(p) - b + r;
@@ -23,18 +22,6 @@ vec2 roundedSurfaceNormal(vec2 p, vec2 b, float r) {
   vec2 q = abs(p)-b+r;
   if (q.x > 0.0 && q.y > 0.0) return normalize(q)*sign(p);
   return q.x > q.y ? vec2(sign(p.x),0.0) : vec2(0.0,sign(p.y));
-}
-vec2 innerFaceWeights(vec2 p, vec2 b, float softness) {
-  vec2 faceDistance = max(b-abs(p),vec2(.001));
-  float nearest = min(faceDistance.x,faceDistance.y);
-  return exp(-(faceDistance-vec2(nearest))/softness);
-}
-float continuousInnerDepth(vec2 p, vec2 b, float softness) {
-  vec2 faceDistance = max(b-abs(p),vec2(0.0));
-  vec2 weights = innerFaceWeights(p,b,softness);
-  // A normalized weighted average preserves the local depth at equal-distance
-  // diagonals instead of creating a bright or dark ridge there.
-  return dot(faceDistance,weights)/max(weights.x+weights.y,.0001);
 }
 vec3 environment(vec3 ray) {
   float sky = smoothstep(-.55,.72,ray.y);
@@ -98,7 +85,7 @@ float dielectricFresnel(float cosine, float n1, float n2) {
 }
 float wavelengthIOR(float wavelength) {
   // Cauchy dispersion, wavelengths in micrometres, calibrated at 550 nm.
-  return uGlass.x+uOptics.y*.14*(1.0/(wavelength*wavelength)-1.0/(.55*.55));
+  return uGlass.x+uOptics.y*.23*(1.0/(wavelength*wavelength)-1.0/(.55*.55));
 }
 bool nextBoundary(vec3 origin, vec3 direction, out vec3 hit, out vec3 normal) {
   // Away from the bevel this volume has two parallel, gently warped faces.
@@ -183,7 +170,7 @@ SlabTrace traceSlab(vec3 entry, vec3 normal, vec3 incident, float ior, float abs
     // A zero vector from refract at TIR never becomes a spurious environment ray.
     if(transmitted>0.0) result.radiance+=transmitted*environment(outgoing)[channel];
     float towardReceiver=smoothstep(.0,.15,-outgoing.z);
-    float travel=max(0.0,(hit.z+slabThickness()*1.5)/max(-outgoing.z,.015));
+    float travel=max(0.0,(hit.z+uGlass.y*1.5)/max(-outgoing.z,.015));
     vec2 landing=hit.xy+outgoing.xy*travel;
     result.energy[bounce]=transmitted*towardReceiver;
     if(bounce==0) result.landing0=landing;
@@ -208,21 +195,42 @@ float parallelPlate(vec3 view, float ior, float absorption, int channel) {
   return transmission*environment(-view)[channel]+
     reflection*environment(reflect(-view,vec3(0,0,1)))[channel];
 }
-float rayConcentration(vec2 landing, float energy) {
-  // This local ray-footprint estimate is still a screen-space approximation
-  // of the irradiance on the receiver, rather than a global photon gather.
-  vec2 dx = dFdx(landing)*uDPR;
-  vec2 dy = -dFdy(landing)*uDPR;
-  float determinant = dx.x*dy.y-dx.y*dy.x;
-  float footprint = dot(dx,dx)+dot(dy,dy);
-  float aperture = .16 + uGlass.z*.35;
-  return energy*exp(-determinant*determinant/(aperture*aperture)) /
-    sqrt(1.0+footprint*.12);
+vec3 receiverRadiance(vec2 localPoint) {
+  vec2 worldPoint=localPoint+uRect.xy+uRect.zw*.5;
+  vec2 uv=worldPoint/(uResolution/uDPR);
+  float inside=step(0.0,uv.x)*step(uv.x,1.0)*step(0.0,uv.y)*step(uv.y,1.0);
+  // A matte receiver below the slabs converts accumulated irradiance into
+  // radiance. The texture stores WHERE rays land, not a translated light mask.
+  vec2 at=vec2(uv.x,1.0-uv.y);
+  vec2 spread=vec2(1.0+uGlass.z*5.0)/(uResolution/uDPR);
+  // Finite roughness spreads receiver irradiance with normalized weights.
+  vec3 irradiance=texture(uCausticMap,at).rgb*.4+
+    (texture(uCausticMap,at+vec2(spread.x,0)).rgb+
+     texture(uCausticMap,at-vec2(spread.x,0)).rgb+
+     texture(uCausticMap,at+vec2(0,spread.y)).rgb+
+     texture(uCausticMap,at-vec2(0,spread.y)).rgb)*.15;
+  return irradiance*uCausticDecode*inside*.3/3.141593;
 }
-float traceConcentration(SlabTrace ray) {
-  return rayConcentration(ray.landing0,ray.energy.x)+
-    rayConcentration(ray.landing1,ray.energy.y)+
-    rayConcentration(ray.landing2,ray.energy.z);
+vec3 transmittedCaustic(SlabTrace ray) {
+  return receiverRadiance(ray.landing0)*ray.energy.x+
+    receiverRadiance(ray.landing1)*ray.energy.y+
+    receiverRadiance(ray.landing2)*ray.energy.z;
+}
+float parallelCaustic(vec3 point,vec3 view,float ior,float absorption,int channel) {
+  float f=dielectricFresnel(view.z,1.0,ior);
+  vec3 inside=refract(-view,vec3(0,0,1),1.0/ior);
+  vec2 crossing=inside.xy*slabThickness()/max(-inside.z,.001);
+  float receiverDistance=uGlass.y*1.5-slabThickness()*.5;
+  vec2 landing=point.xy+crossing-view.xy*receiverDistance/max(view.z,.001);
+  float absorb=exp(-absorption*slabThickness()/max(-inside.z,.001));
+  float energy=(1.0-f)*(1.0-f)*absorb;
+  float result=0.0;
+  for(int pass=0;pass<3;pass++) {
+    result+=receiverRadiance(landing)[channel]*energy;
+    energy*=f*f*absorb*absorb;
+    landing+=crossing*2.0;
+  }
+  return result;
 }
 void main() {
   vec2 pixel = vec2(gl_FragCoord.x/uDPR, (uResolution.y-gl_FragCoord.y)/uDPR);
@@ -233,17 +241,6 @@ void main() {
   float coverage = 1.0-smoothstep(-aa,0.0,d);
   float depth = -d;
   float thickness = slabThickness();
-  // Keep the exact rounded silhouette, but move all optical shading onto a
-  // continuous face blend before the box SDF reaches its diagonal medial axes.
-  float normalSoftness = max(9.0,thickness*1.35);
-  float blendEnd = max(3.0,min(uRadius*.55,thickness*.5));
-  float interiorBlend = smoothstep(.75,blendEnd,depth);
-  float opticalDepth = mix(depth,continuousInnerDepth(p,halfSize,normalSoftness),interiorBlend);
-  float bevel = exp(-opticalDepth/max(thickness,1.0));
-  // A stable, low-frequency liquid normal varies the optical path, not the DOM.
-  float phaseA = p.x*.018+sin(p.y*.023)*1.4;
-  float phaseB = p.y*.016+p.x*.009;
-  float wave = sin(phaseA)*sin(phaseB);
   vec3 entry=slabFront(p);
   vec3 N;
   slabDistance(entry,N);
@@ -259,7 +256,9 @@ void main() {
   float ndl = max(dot(N,L),0.0);
   float ndh = max(dot(N,H),0.0);
   float fresnel = dielectricFresnel(dot(N,V),1.0,uGlass.x);
-  float a2 = pow(uGlass.z,4.0);
+  // A broad reflection on the polished shoulder, with no point highlight on
+  // the flat face. Concentrated light inside comes from the photon receiver.
+  float a2 = pow(max(uGlass.z,.38),4.0);
   float denominator = ndh*ndh*(a2-1.0)+1.0;
   float ggx = a2/max(3.141593*denominator*denominator,.0000001);
   float ndv=max(dot(N,V),.001);
@@ -269,39 +268,99 @@ void main() {
   float specular=ggx*smithL*smithV*reflectionF/max(4.0*ndl*ndv,.001);
   vec3 absorption=mix(vec3(.018),vec3(.005),uTint)*uGlass.w;
   vec3 ior=vec3(wavelengthIOR(.65),wavelengthIOR(.55),wavelengthIOR(.45));
-  SlabTrace lightR=emptyTrace(entry.xy),lightG=emptyTrace(entry.xy),lightB=emptyTrace(entry.xy);
-  vec3 refracted;
+  vec3 refracted,caustic;
   if(depth<thickness*2.5) {
-    lightR=traceSlab(entry,N,-L,ior.r,absorption.r,0);
-    lightG=traceSlab(entry,N,-L,ior.g,absorption.g,1);
-    lightB=traceSlab(entry,N,-L,ior.b,absorption.b,2);
     SlabTrace viewR=traceSlab(entry,N,-V,ior.r,absorption.r,0);
     SlabTrace viewG=traceSlab(entry,N,-V,ior.g,absorption.g,1);
     SlabTrace viewB=traceSlab(entry,N,-V,ior.b,absorption.b,2);
     refracted=vec3(viewR.radiance,viewG.radiance,viewB.radiance);
+    caustic=vec3(transmittedCaustic(viewR).r,transmittedCaustic(viewG).g,transmittedCaustic(viewB).b);
   } else {
     refracted=vec3(parallelPlate(V,ior.r,absorption.r,0),
       parallelPlate(V,ior.g,absorption.g,1),parallelPlate(V,ior.b,absorption.b,2));
+    caustic=vec3(parallelCaustic(entry,V,ior.r,absorption.r,0),
+      parallelCaustic(entry,V,ior.g,absorption.g,1),parallelCaustic(entry,V,ior.b,absorption.b,2));
   }
-  vec3 caustic=vec3(traceConcentration(lightR),traceConcentration(lightG),traceConcentration(lightB));
   if (coverage <= 0.0) discard;
-  float facing = .11+.89*max(dot(N.xy,normalize(delta.xy+vec2(.001))),0.0);
-  float light = attenuation*uEnergy.y*facing;
-  vec2 secondaryDelta=pixel-uSecondary.xy;
-  float travel=dot(secondaryDelta,uSecondary.zw);
-  float deviation=abs(secondaryDelta.x*uSecondary.w-secondaryDelta.y*uSecondary.z);
-  float beamWidth=14.0+max(travel,0.0)*.045+wave*3.0;
-  float bounced=uSecondaryEnergy*uLight.z*smoothstep(-beamWidth,beamWidth,travel)*
-    exp(-pow(deviation/max(beamWidth,2.0),2.0))*exp(-max(travel,0.0)/360.0);
   vec3 face = refracted + uTint*.008;
   face += environment(reflect(-V,N))*fresnel;
-  face += mix(vec3(.34,.55,.77),uTint,.35)*bounced*(.12+.24*bevel);
-  vec3 edgeLight = vec3(1.0)*attenuation*uEnergy.y*specular*ndl;
-  float spectralReach = exp(-opticalDepth/(thickness*1.55));
-  edgeLight += light*caustic*spectralReach*uOptics.z*1.15;
-  edgeLight += bounced*caustic*spectralReach*.34;
+  float polish=smoothstep(.06,.55,length(N.xy));
+  vec3 edgeLight = vec3(1.0)*attenuation*uEnergy.y*specular*ndl*polish;
+  edgeLight += caustic;
   vec3 color = face + edgeLight;
   // Premultiplied, full-card material: no CSS-like stroke or external glow.
   float alpha = clamp((.24 + max(max(color.r,color.g),color.b)*uGlass.w)*coverage,0.0,.72);
   outColor = vec4(color*alpha,alpha);
+}`;
+
+// Share the actual volume, Snell/Fresnel and boundary solver with forward rays.
+const photonOptics = volumeGlassFragment.slice(0,volumeGlassFragment.indexOf("vec3 receiverRadiance"))
+  .replace("out vec4 outColor;", "");
+
+export const causticTraceVertex = photonOptics + `
+layout(location=0) in vec3 aSample; // normalized entry xy
+uniform float uFluxScale;
+out vec3 outMap0;out vec3 outMap1;out vec3 outMap2;out vec2 outSource;
+void main() {
+  int channel=gl_InstanceID;
+  vec2 p=(aSample.xy-.5)*uRect.zw;
+  vec3 entry=slabFront(p),normal;
+  slabDistance(entry,normal);
+  vec3 delta=vec3(uLight.xy-uRect.xy-uRect.zw*.5-entry.xy,uEnergy.z-entry.z);
+  vec3 incoming=-normalize(delta);
+  float wavelength=channel==0 ? .65 : (channel==1 ? .55 : .45);
+  float absorption=mix(.018,.005,uTint[channel])*uGlass.w;
+  SlabTrace ray=traceSlab(entry,normal,incoming,wavelengthIOR(wavelength),absorption,channel);
+  vec2 center=uRect.xy+uRect.zw*.5;
+  gl_Position=vec4(0,0,0,1);
+  float incident=max(dot(normal,-incoming),0.0)*uEnergy.y*uEnergy.z*uEnergy.z/
+    (max(dot(delta,delta),1.0)*max(normal.z,.06));
+  float power=incident*uLight.z*uFluxScale;
+  outMap0=vec3(ray.landing0+center,ray.energy.x*power);
+  outMap1=vec3(ray.landing1+center,ray.energy.y*power);
+  outMap2=vec3(ray.landing2+center,ray.energy.z*power);
+  outSource=p;
+}`;
+
+export const causticTraceFragment = `#version 300 es
+precision highp float;
+out vec4 outColor;
+void main(){outColor=vec4(0);}`;
+
+export const causticVertex = `#version 300 es
+precision highp float;
+layout(location=0) in vec3 aMap0;
+layout(location=1) in vec3 aMap1;
+layout(location=2) in vec3 aMap2;
+layout(location=3) in vec2 aSource;
+uniform vec2 uResolution;
+uniform float uDPR;
+uniform int uChannel;
+out vec3 vFlux;
+out vec2 vSourcePoint;
+void main(){
+  vec3 mapped=gl_InstanceID==0 ? aMap0 : (gl_InstanceID==1 ? aMap1 : aMap2);
+  vec2 clip=mapped.xy*uDPR/uResolution*2.0-1.0;
+  gl_Position=vec4(clip.x,-clip.y,0,1);
+  vFlux=vec3(0);vFlux[uChannel]=mapped.z;
+  vSourcePoint=aSource;
+}`;
+
+export const causticFragment = `#version 300 es
+precision highp float;
+in vec3 vFlux;
+in vec2 vSourcePoint;
+uniform float uDPR;
+uniform vec4 uRect;
+uniform float uRadius;
+out vec4 outColor;
+void main() {
+  vec2 dx=dFdx(vSourcePoint),dy=dFdy(vSourcePoint);
+  float density=min(abs(dx.x*dy.y-dx.y*dy.x)*uDPR*uDPR,64.0);
+  vec2 q=abs(vSourcePoint)-uRect.zw*.5+uRadius;
+  float sourceDistance=min(max(q.x,q.y),0.0)+length(max(q,vec2(0)))-uRadius;
+  if(sourceDistance>0.0) discard;
+  // Folded bundles overlap through additive blending. Energy is concentrated
+  // by the actual area contraction, not by independent luminous sample dots.
+  outColor=vec4(vFlux*density,0.0);
 }`;
