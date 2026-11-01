@@ -3,11 +3,11 @@
 import { useEffect, useRef, type RefObject } from "react";
 import { ICE_GLASS as config } from "./ice-glass-config";
 import { glassFragment, glassVertex } from "./ice-glass-shader";
-import { soapSample } from "./ice-glass-volume";
+import { secondaryBeam } from "./ice-glass-slab-transport";
 
 type ViewportRect = { left: number; top: number; width: number; height: number };
 type GlassRect = ViewportRect & { right: number; bottom: number };
-type Measurement = { element: HTMLElement; rect: GlassRect; radius: number; tint: number[]; crownHeight: number };
+type Measurement = { element: HTMLElement; rect: GlassRect; radius: number; tint: number[] };
 const GLASS_SURFACE_SELECTOR = ".glass-card, .calendar-strip, .demo-notice";
 
 export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }) {
@@ -112,11 +112,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         const top = domRect.top-nextViewport.top;
         const rect = { left, top, width: domRect.width, height: domRect.height, right: left+domRect.width, bottom: top+domRect.height };
         const radius=parseFloat(style.borderTopLeftRadius) || 14;
-        const halfWidth=rect.width*.5,halfHeight=rect.height*.5;
-        const opticalRadius=Math.min(Math.min(halfWidth,halfHeight)*.95,Math.max(radius*1.75,24));
-        const thickness=Math.min(config.glassThickness*2.1,Math.min(halfWidth,halfHeight)*.5);
-        const crownHeight=rect.width && rect.height ? soapSample(0,0,halfWidth,halfHeight,opticalRadius,thickness)[2] : 0;
-        return { element, rect, radius, tint, crownHeight };
+        return { element, rect, radius, tint };
       });
       cards = cards.filter(card=>card.rect.width>0 && card.rect.height>0);
       dirty = false;
@@ -143,20 +139,23 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       gl.uniform1f(uniform("uDPR"),dpr);
       gl.uniform3f(uniform("uLight"),pointer.x-viewport.left,pointer.y-viewport.top,reduced.matches ? 0 : pointer.presence);
       gl.uniform4f(uniform("uGlass"),config.glassIOR,config.glassThickness,config.glassRoughness,config.glassOpacity);
-      gl.uniform1f(uniform("uBodyOpacity"),config.glassBodyOpacity);
       gl.uniform4f(uniform("uOptics"),config.fresnelStrength,config.chromaticDispersion,config.edgeRefraction,config.internalReflection);
       gl.uniform4f(uniform("uEnergy"),config.ambientReflection,config.lightIntensity,config.lightHeight,config.lightFalloff);
       gl.uniform3f(uniform("uFinish"),config.specularSharpness,config.bloomIntensity,config.bloomRadius);
       gl.enable(gl.SCISSOR_TEST);
-      for (const { rect, radius, tint, crownHeight } of cards) {
+      const surfaces=cards.map(card=>card.rect);
+      const localPointer={ x:pointer.x-viewport.left,y:pointer.y-viewport.top };
+      for (const { rect, radius, tint } of cards) {
         if (rect.bottom <= 0 || rect.top >= viewHeight || rect.right <= 0 || rect.left >= viewWidth || !rect.width) continue;
         // A scissored full-card quad keeps the slab continuous while avoiding work outside it.
         gl.viewport(0,0,width,height);
         gl.scissor(Math.max(0,Math.floor(rect.left*dpr)),Math.max(0,Math.floor((viewHeight-rect.bottom)*dpr)),Math.ceil(Math.min(rect.right,viewWidth)*dpr)-Math.max(0,Math.floor(rect.left*dpr)),Math.ceil(Math.min(rect.bottom,viewHeight)*dpr)-Math.max(0,Math.floor(rect.top*dpr)));
         gl.uniform4f(uniform("uRect"),rect.left,rect.top,rect.width,rect.height);
         gl.uniform1f(uniform("uRadius"),radius);
-        gl.uniform1f(uniform("uCrownHeight"),crownHeight);
         gl.uniform3f(uniform("uTint"),tint[0],tint[1],tint[2]);
+        const beam=pointer.presence ? secondaryBeam(localPointer,rect,surfaces,config.maxBounces) : null;
+        gl.uniform4f(uniform("uSecondary"),beam?.x ?? 0,beam?.y ?? 0,beam?.dx ?? 0,beam?.dy ?? 0);
+        gl.uniform1f(uniform("uSecondaryEnergy"),beam?.energy ?? 0);
         gl.drawArrays(gl.TRIANGLES,0,6);
       }
       canvas.dataset.pointer = `${pointer.x},${pointer.y}`;

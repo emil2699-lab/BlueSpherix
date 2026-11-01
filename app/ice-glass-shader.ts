@@ -78,7 +78,7 @@ vec3 soapSurface(vec2 p, vec2 b, float r, float thickness) {
 }
 `;
 
-// A convex 2.5D glass volume. The DOM remains sharp above this optical layer.
+// One continuous 2.5D slab. The DOM remains sharp above this optical layer.
 export const glassFragment = `#version 300 es
 precision highp float;
 out vec4 outColor;
@@ -86,16 +86,44 @@ uniform vec2 uResolution;
 uniform float uDPR;
 uniform vec4 uRect;
 uniform float uRadius;
-uniform float uCrownHeight;
 uniform vec3 uTint;
 uniform vec3 uLight;
 uniform vec4 uGlass; // IOR, thickness, roughness, opacity
-uniform float uBodyOpacity;
 uniform vec4 uOptics; // Fresnel, dispersion, refraction, internal reflection
 uniform vec4 uEnergy; // ambient, intensity, light height, falloff
 uniform vec3 uFinish; // sharpness, bloom intensity, bloom radius
+uniform vec4 uSecondary; // previous slab exit and refracted direction
+uniform float uSecondaryEnergy;
 
-${glassGeometry}
+float boxSDF(vec2 p, vec2 b, float r) {
+  vec2 q = abs(p) - b + r;
+  return min(max(q.x,q.y),0.0) + length(max(q,0.0)) - r;
+}
+vec2 roundedSurfaceNormal(vec2 p, vec2 b, float r) {
+  vec2 q = abs(p)-b+r;
+  if (q.x > 0.0 && q.y > 0.0) return normalize(q)*sign(p);
+  return q.x > q.y ? vec2(sign(p.x),0.0) : vec2(0.0,sign(p.y));
+}
+vec2 innerFaceWeights(vec2 p, vec2 b, float softness) {
+  vec2 faceDistance = max(b-abs(p),vec2(.001));
+  float nearest = min(faceDistance.x,faceDistance.y);
+  return exp(-(faceDistance-vec2(nearest))/softness);
+}
+vec2 continuousInnerNormal(vec2 p, vec2 b, float softness) {
+  // Both adjacent faces contribute through continuous weights. There is no
+  // nearest-face switch when the cursor crosses a diagonal medial axis.
+  vec2 weights = innerFaceWeights(p,b,softness);
+  vec2 softSign = p/sqrt(p*p+vec2(softness*softness*.04));
+  vec2 field = softSign*weights;
+  return field/sqrt(dot(field,field)+.000001);
+}
+float continuousInnerDepth(vec2 p, vec2 b, float softness) {
+  vec2 faceDistance = max(b-abs(p),vec2(0.0));
+  vec2 weights = innerFaceWeights(p,b,softness);
+  // A normalized weighted average preserves the local depth at equal-distance
+  // diagonals instead of creating a bright or dark ridge there.
+  return dot(faceDistance,weights)/max(weights.x+weights.y,.0001);
+}
 vec3 environment(vec3 ray) {
   float sky = smoothstep(-.55,.72,ray.y);
   float cool = pow(max(0.0, .5 + .5 * ray.x), 2.4);
@@ -105,42 +133,38 @@ void main() {
   vec2 pixel = vec2(gl_FragCoord.x/uDPR, (uResolution.y-gl_FragCoord.y)/uDPR);
   vec2 halfSize = uRect.zw*.5;
   vec2 p = pixel-uRect.xy-halfSize;
-  // A soap volume needs a broad shoulder and rolled corners, rather than the
-  // narrow fillet of the original flat slab. Keep its bounding rectangle fixed.
-  float radius = min(min(halfSize.x,halfSize.y)*.95,max(uRadius*1.75,24.0));
-  float d = boxSDF(p,halfSize,radius);
+  float d = boxSDF(p,halfSize,uRadius);
   float aa = 1.25/uDPR;
   float coverage = 1.0-smoothstep(-aa,0.0,d);
   if (coverage <= 0.0) discard;
   float depth = -d;
-  float thickness = min(uGlass.y*2.1, min(halfSize.x,halfSize.y)*.50);
+  float thickness = min(uGlass.y, min(halfSize.x,halfSize.y)*.25);
   // Keep the exact rounded silhouette, but move all optical shading onto a
   // continuous face blend before the box SDF reaches its diagonal medial axes.
   float normalSoftness = max(9.0,thickness*1.35);
-  float blendEnd = max(3.0,min(radius*.55,thickness*.5));
+  float blendEnd = max(3.0,min(uRadius*.55,thickness*.5));
   float interiorBlend = smoothstep(.75,blendEnd,depth);
-  vec2 surfaceNormal = roundedSurfaceNormal(p,halfSize,radius);
+  vec2 surfaceNormal = roundedSurfaceNormal(p,halfSize,uRadius);
+  vec2 innerNormal = continuousInnerNormal(p,halfSize,normalSoftness);
+  vec2 grad = mix(surfaceNormal,innerNormal,interiorBlend);
+  grad /= max(length(grad),.001);
   float opticalDepth = mix(depth,continuousInnerDepth(p,halfSize,normalSoftness),interiorBlend);
   float bevel = exp(-opticalDepth/max(thickness,1.0));
   // A stable, low-frequency liquid normal varies the optical path, not the DOM.
   vec2 materialPixel=p+halfSize;
   float phaseA = materialPixel.x*.018+sin(materialPixel.y*.023)*1.4;
   float phaseB = materialPixel.y*.016+materialPixel.x*.009;
+  float wave = sin(phaseA)*sin(phaseB);
   // The height field is fixed in space: its gradient bends the local normal.
   vec2 waveGradient = vec2(
     .018*cos(phaseA)*sin(phaseB)+.009*sin(phaseA)*cos(phaseB),
     .0322*cos(materialPixel.y*.023)*cos(phaseA)*sin(phaseB)+.016*sin(phaseA)*cos(phaseB)
   );
-  // Differentiate the actual height in CSS pixels. Face, sides and corners use
-  // one surface; the analytic gradient avoids four extra geometry evaluations.
-  vec3 surface = soapSurface(p,halfSize,radius,thickness);
-  float surfaceHeight = surface.z;
-  // Preserve the existing stationary liquid microstructure, fading it smoothly
-  // into the vertical sides so it cannot cut a crease into the outer silhouette.
-  vec2 normalXY = -surface.xy + waveGradient*3.2*bevel*smoothstep(0.0,thickness*.4,depth);
-  vec3 N = normalize(vec3(normalXY,1.0));
+  float slope = .76*bevel*(1.0+.075*wave);
+  vec2 normalXY = grad*slope + waveGradient*3.2*bevel;
+  vec3 N = normalize(vec3(normalXY,sqrt(max(.015,1.0-dot(normalXY,normalXY)))));
   vec3 V = vec3(0,0,1);
-  vec3 delta = vec3(uLight.xy-pixel,max(uEnergy.z-surfaceHeight,1.0));
+  vec3 delta = vec3(uLight.xy-pixel,uEnergy.z);
   float distanceXY = length(delta.xy);
   vec3 L = normalize(delta);
   vec3 H = normalize(L+V);
@@ -164,7 +188,7 @@ void main() {
   // A parallel source produces an edge-parallel, straight spectral band.
   // Only the difference between local Snell paths and that parallel reference
   // bends it. There is no UV/noise curve or distance-driven bend animation.
-  vec3 referenceL=normalize(vec3(uLight.xy-uRect.xy-halfSize,max(uEnergy.z-uCrownHeight,1.0)));
+  vec3 referenceL=normalize(vec3(uLight.xy-uRect.xy-halfSize,uEnergy.z));
   vec3 referenceR=refract(-referenceL,N,1.0/(uGlass.x-uOptics.y));
   vec3 referenceG=refract(-referenceL,N,1.0/uGlass.x);
   vec3 referenceB=refract(-referenceL,N,1.0/(uGlass.x+uOptics.y));
@@ -189,42 +213,37 @@ void main() {
   // white glow over the coloured material.
   vec3 caustic = exp(-pow((vec3(focus)-focalDepth)/reflectionWidth,vec3(2.0)))
     *(bandWidth/reflectionWidth);
-  // A sharper neutral crest grows only where the same RGB paths overlap.
-  // Keep the soft reflection and all three spectral fringes underneath it.
-  vec3 channelOverlap=caustic*(reflectionWidth/bandWidth);
-  float polishedCore=pow(channelOverlap.r*channelOverlap.g*channelOverlap.b,1.5)
-    *(1.0-separation)*(1.0-separation);
   float facing = .11+.89*max(dot(N.xy,normalize(delta.xy+vec2(.001))),0.0);
   float light = attenuation*uEnergy.y*facing;
   float alongEdge = dot(delta.xy,tangent);
+  float sourceFocus = exp(-pow(alongEdge/(uEnergy.z*.72),2.0));
   float spectralFocus = exp(-pow(alongEdge/(uEnergy.z*1.8),2.0));
-  float rim=exp(-depth/max(1.5,thickness*.07));
-  // Keep the white reflection on the rim as a broad streak, without isolated
-  // GGX dots on the front or rounded shoulders of neighbouring cards.
-  float whiteCore=pow(attenuation,4.2)*spectralFocus*exp(-depth/max(2.0,thickness*.14));
+  float whiteCore = pow(attenuation,4.2)*sourceFocus*edge;
+  vec2 secondaryDelta=pixel-uSecondary.xy;
+  float travel=dot(secondaryDelta,uSecondary.zw);
+  float deviation=abs(secondaryDelta.x*uSecondary.w-secondaryDelta.y*uSecondary.z);
+  float beamWidth=14.0+max(travel,0.0)*.045+wave*3.0;
+  float bounced=uSecondaryEnergy*uLight.z*smoothstep(-beamWidth,beamWidth,travel)*
+    exp(-pow(deviation/max(beamWidth,2.0),2.0))*exp(-max(travel,0.0)/360.0);
   vec3 tint = mix(vec3(.48,.70,1.0),uTint,.22);
   vec3 absorption = exp(-vec3(.09,.06,.035)*thickness*.12);
-  // The existing environment is reflected by the same convex surface, rather
-  // than by a flat UV-based direction unrelated to the material's geometry.
-  vec3 ambient = environment(reflect(-V,N));
+  vec3 ambient = environment(normalize(vec3(p/max(halfSize,vec2(1.0))*.18,1.0)));
   float frontSpread = attenuation*(.20+.80*max(dot(N,L),0.0));
   vec3 face = ambient*(1.75+.35*(1.0-bevel)) + uTint*.018;
   face += refracted*frontSpread*(.12+.18*(1.0-bevel))*absorption;
   face += mix(vec3(.32,.53,.78),uTint,.25)*attenuation*exp(-opticalDepth/(thickness*3.3))*.20;
   face += mix(vec3(.23,.36,.54),uTint,.45)*light*exp(-opticalDepth/(thickness*4.8))*.14;
+  face += mix(vec3(.34,.55,.77),uTint,.35)*bounced*(.12+.24*bevel);
   face += vec3(.63,.76,.92)*attenuation*(1.0-bevel)*.035;
-  vec3 edgeLight = light*(vec3(.93,.96,1.0)*specular*rim + tint*shoulder*.18);
+  vec3 edgeLight = light*(vec3(.93,.96,1.0)*specular + tint*shoulder*.18);
   float spectralReach = exp(-opticalDepth/(thickness*1.55));
   edgeLight += light*caustic*spectralReach*spectralFocus*uOptics.z*.92;
-  edgeLight += vec3(1.0)*light*polishedCore*spectralReach*spectralFocus*uOptics.z*.55;
+  edgeLight += bounced*caustic*spectralReach*.34;
   edgeLight += vec3(.92,.98,1.0)*whiteCore*.31;
   edgeLight += light*tint*edge*uOptics.w*.08;
   vec3 color = face + edgeLight*(.32+.68*edge);
   color *= .72 + uOptics.x*fresnel;
-  // Reduce only the material's coverage. Preserve the existing premultiplied
-  // reflection radiance, so clarity does not dim or reshape the spectral rim.
-  float opticalAlpha=clamp((.24+max(max(color.r,color.g),color.b)*uGlass.w)*coverage,0.0,.72);
-  float alpha=mix(uBodyOpacity*coverage,opticalAlpha,exp(-depth/(thickness*.45)));
-  vec3 body=face*(.72+uOptics.x*fresnel);
-  outColor=vec4(color*opticalAlpha-body*(opticalAlpha-alpha),alpha);
+  // Premultiplied, full-card material: no CSS-like stroke or external glow.
+  float alpha = clamp((.24 + max(max(color.r,color.g),color.b)*uGlass.w)*coverage,0.0,.72);
+  outColor = vec4(color*alpha,alpha);
 }`;
