@@ -168,3 +168,31 @@ Shader, parametri ottici e trasporto secondario restano invariati. Non è stato
 aggiunto uno sfondo dinamico. Verifiche e confronti locali sono archiviati in
 `/workspace/artifacts/glass-transparency/`; Safari/macOS non è disponibile nel
 runtime di verifica. Il prossimo punto richiede la revisione dell'utente.
+
+## Geometria a saponetta (2026-11-01, punto 2)
+
+Il materiale usa un campo di altezza continuo in pixel CSS: raccordo arrotondato
+fra lato e faccia, con una bombatura centrale pari al 20% dello spessore nominale.
+La silhouette SDF e i raggi misurati dal DOM restano invariati. Nell'interno,
+un minimo morbido delle quattro distanze sostituisce la scelta del lato più
+vicino, raccordandosi prima degli assi mediani diagonali. Le normali sono il
+gradiente analitico dello stesso campo di altezza, calcolato una sola volta per
+frammento. La microstruttura spaziale preesistente resta sul materiale.
+
+La quota della superficie entra nel vettore verso la sorgente; l'ambiente
+preesistente viene riflesso dalla normale del volume. Snell, Fresnel, GGX e
+dispersione ricevono la nuova normale senza modifiche ai loro parametri o alle
+formule delle caustiche. Il trasporto fra card resta invariato. Non sono stati
+aggiunti CSS di rilievo, luci, bloom, sfondi o trasformazioni dei contenuti.
+Il modello rimane un volume ottico 2.5D, senza deformazione del DOM.
+
+Confronti e screenshot: `/workspace/artifacts/glass-soap/`, inclusi bordo,
+angolo, faccia, spazio fra card e cursore lontano. `geometry.json` misura
+altezza e normali direttamente con gli shader GLSL, anche su una superficie
+bassa: nessun valore non finito, normali unitarie e nessun salto interno.
+`dashboard.json` registra layout invariato, contenuti opachi, trasparenza in
+tutte le sezioni e assenza di overflow a 1024 e 390 px. Compilazione e rendering
+verificati in Chromium/SwiftShader; Safari/macOS resta da verificare. Nel test
+headless il tempo di risposta al frame è 212 ms p50 e 289 ms p95, misurato con
+GPU software: non rappresenta la fluidità di Safari con GPU reale.
+Il lavoro si ferma al punto 2 in attesa della revisione della geometria.

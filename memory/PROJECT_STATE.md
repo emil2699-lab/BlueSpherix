@@ -48,7 +48,7 @@ Web app moderna per analisi di trading, ispirata alle funzioni di Myfxbook ma co
 
 ## Prossimo passo consigliato
 
-Attendere la verifica utente del punto 1 (trasparenza delle card) nella preview. Non avviare altri punti né creare lo sfondo dinamico senza le specifiche dell’utente.
+Punto 2 applicato: superficie ottica a saponetta, con campo di altezza convesso e normali analitiche continue; la quota entra nel vettore luce e nella riflessione dell'ambiente esistente. Trasparenza e DOM preservati, nessuna modifica a parametri cromatici o trasporto. Confronti in `/workspace/artifacts/glass-soap/`. Attendere la verifica utente della geometria nella preview. Non avviare altri punti né creare lo sfondo dinamico senza le specifiche dell’utente.
 
 ### Preferenza jumpcard
 - Il micro-movimento 3D della singola card al passaggio del cursore è temporaneamente disattivato.

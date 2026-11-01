@@ -10,7 +10,7 @@ void main() {
   gl_Position = vec4(clip.x,-clip.y,0,1);
 }`;
 
-// One continuous 2.5D slab. The DOM remains sharp above this optical layer.
+// A convex 2.5D glass volume. The DOM remains sharp above this optical layer.
 export const glassFragment = `#version 300 es
 precision highp float;
 out vec4 outColor;
@@ -56,6 +56,43 @@ float continuousInnerDepth(vec2 p, vec2 b, float softness) {
   // diagonals instead of creating a bright or dark ridge there.
   return dot(faceDistance,weights)/max(weights.x+weights.y,.0001);
 }
+// Returns the analytic height gradient (xy) and surface height (z).
+vec3 soapSurface(vec2 p, vec2 b, float r, float thickness) {
+  float depth = max(-boxSDF(p,b,r),0.0);
+  // Smooth minimum of all four face distances. Opposite faces participate too:
+  // no abs/nearest-face crease survives on the centre axes or diagonals.
+  float softness = max(1.0,min(r*.28,thickness*.5));
+  vec2 opposite = exp(-2.0*abs(p)/softness);
+  vec2 axisDepth = b-abs(p)-softness*log(vec2(1.0)+opposite);
+  vec2 axisGradient = -sign(p)*(vec2(1.0)-opposite)/(vec2(1.0)+opposite);
+  float nearest = min(axisDepth.x,axisDepth.y);
+  vec2 weights = exp(-(axisDepth-vec2(nearest))/softness);
+  float weightSum = weights.x+weights.y;
+  float innerDepth = nearest-softness*log(weightSum);
+  vec2 innerGradient = axisGradient*weights/weightSum;
+  // Retain the exact projected contour, joining the smooth interior before the
+  // rounded-box distance reaches its medial axes. Both ends have zero slope.
+  float join = max(1.0,min(r*.85,min(b.x,b.y)*.7));
+  float t = clamp((depth-join*.18)/(join*.82),0.0,1.0);
+  float blend = t*t*(3.0-2.0*t);
+  float blendDerivative = 6.0*t*(1.0-t)/(join*.82);
+  vec2 depthGradient = -roundedSurfaceNormal(p,b,r);
+  float bodyDepth = max(mix(depth,innerDepth,blend),0.0);
+  vec2 bodyGradient = mix(depthGradient,innerGradient,blend)
+    +(innerDepth-depth)*blendDerivative*depthGradient;
+  float rollWidth = max(thickness*1.6,r*.9);
+  // Rounded roll: a vertical side at the silhouette becomes the convex face
+  // progressively, rather than a flat front with a separate exponential rim.
+  float decay = exp(-2.0*bodyDepth/rollWidth);
+  float cap = sqrt(max(1.0-decay,0.0));
+  vec2 capGradient = bodyGradient*decay/(rollWidth*max(cap,.001));
+  vec2 uv = p/max(b,vec2(1.0));
+  vec2 crownAxes = max(vec2(1.0)-uv*uv,vec2(0.0));
+  float crown = crownAxes.x*crownAxes.y;
+  vec2 crownGradient = -2.0*uv/max(b,vec2(1.0))*crownAxes.yx;
+  vec2 heightGradient = thickness*(capGradient*(1.0+.20*crown)+cap*.20*crownGradient);
+  return vec3(heightGradient,thickness*cap*(1.0+.20*crown));
+}
 vec3 environment(vec3 ray) {
   float sky = smoothstep(-.55,.72,ray.y);
   float cool = pow(max(0.0, .5 + .5 * ray.x), 2.4);
@@ -91,11 +128,16 @@ void main() {
     .018*cos(phaseA)*sin(phaseB)+.009*sin(phaseA)*cos(phaseB),
     .0322*cos(pixel.y*.023)*cos(phaseA)*sin(phaseB)+.016*sin(phaseA)*cos(phaseB)
   );
-  float slope = .76*bevel*(1.0+.075*wave);
-  vec2 normalXY = grad*slope + waveGradient*3.2*bevel;
-  vec3 N = normalize(vec3(normalXY,sqrt(max(.015,1.0-dot(normalXY,normalXY)))));
+  // Differentiate the actual height in CSS pixels. Face, sides and corners use
+  // one surface; the analytic gradient avoids four extra geometry evaluations.
+  vec3 surface = soapSurface(p,halfSize,uRadius,thickness);
+  float surfaceHeight = surface.z;
+  // Preserve the existing stationary liquid microstructure, fading it smoothly
+  // into the vertical sides so it cannot cut a crease into the outer silhouette.
+  vec2 normalXY = -surface.xy + waveGradient*3.2*bevel*smoothstep(0.0,thickness*.4,depth);
+  vec3 N = normalize(vec3(normalXY,1.0));
   vec3 V = vec3(0,0,1);
-  vec3 delta = vec3(uLight.xy-pixel,uEnergy.z);
+  vec3 delta = vec3(uLight.xy-pixel,max(uEnergy.z-surfaceHeight,1.0));
   float distanceXY = length(delta.xy);
   vec3 L = normalize(delta);
   vec3 H = normalize(L+V);
@@ -141,7 +183,9 @@ void main() {
     exp(-pow(deviation/max(beamWidth,2.0),2.0))*exp(-max(travel,0.0)/360.0);
   vec3 tint = mix(vec3(.48,.70,1.0),uTint,.22);
   vec3 absorption = exp(-vec3(.09,.06,.035)*thickness*.12);
-  vec3 ambient = environment(normalize(vec3(p/max(halfSize,vec2(1.0))*.18,1.0)));
+  // The existing environment is reflected by the same convex surface, rather
+  // than by a flat UV-based direction unrelated to the material's geometry.
+  vec3 ambient = environment(reflect(-V,N));
   float frontSpread = attenuation*(.20+.80*max(dot(N,L),0.0));
   vec3 face = ambient*(1.75+.35*(1.0-bevel)) + uTint*.018;
   face += refracted*frontSpread*(.12+.18*(1.0-bevel))*absorption;
