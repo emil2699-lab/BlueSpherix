@@ -844,6 +844,7 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
 .focus-workspace { display: grid; grid-template-columns: minmax(0,1.65fr) minmax(310px,.75fr); align-items: start; gap: 15px; margin-top: 16px; }
 .timeline-card { padding: 22px; min-width: 0; }
 .contained-stream .timeline-card { height: var(--focus-panel-height,578px); min-height: var(--focus-panel-height,578px); display: flex; flex-direction: column; overflow: hidden; }
+.contained-stream .trade-inspector { position: static; }
 .contained-stream .trade-timeline { min-height: 0; flex: 1; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; padding-right: 8px; margin-right: -8px; scrollbar-color: rgba(86,217,202,.28) transparent; scrollbar-width: thin; -webkit-mask-image: linear-gradient(to bottom,transparent 0,#000 34px,#000 calc(100% - 58px),transparent 100%); mask-image: linear-gradient(to bottom,transparent 0,#000 34px,#000 calc(100% - 58px),transparent 100%); }
 .contained-stream .trade-timeline::-webkit-scrollbar { width: 5px; }
 .contained-stream .trade-timeline::-webkit-scrollbar-track { background: transparent; }
