@@ -329,3 +329,19 @@ passaggio GL_POINTS e nessun errore WebGL. Navigazione delle sei viste, contenut
 opachi, layout invariato e viewport 1024/390 px verificati. Su SwiftShader il p95
 di 12 aggiornamenti del cursore è circa 268 ms, rispetto ai circa 357 ms del
 precedente esperimento: questa misura su GPU simulata non dimostra 60 FPS su Mac.
+
+
+## Sola riduzione dell'opacità (2026-11-01)
+
+Dopo l'approvazione di effetto, scroll e fascia cromatica, è stata modificata
+soltanto la copertura del corpo del materiale. `glassBodyOpacity` è 0,14, con
+raccordo progressivo alla copertura preesistente sul bordo. La radiance
+premoltiplicata dei riflessi resta separata: abbassare l'opacità non attenua
+l'arcobaleno né cambia la sua forma. Nessuna modifica a roughness, geometria,
+dispersione, luce, layout, contenuti o comportamento del cursore.
+
+Nel test GLSL su cinque posizioni della sorgente, la trasmissione centrale del
+fondale passa dal 64–68% a circa l'86%; il contributo dei riflessi è numericamente
+identico (errore massimo zero). Screenshot prima/dopo e readback in
+`/workspace/artifacts/glass-clarity/`. Contenuti opachi e geometrie DOM identiche,
+build e lint verificati, nessun errore WebGL/browser.

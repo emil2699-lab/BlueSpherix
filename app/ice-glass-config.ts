@@ -4,6 +4,7 @@ export const ICE_GLASS = {
   glassThickness: 14,
   glassRoughness: .21,
   glassOpacity: .58,
+  glassBodyOpacity: .14,
   ambientReflection: .055,
   lightIntensity: 1.95,
   lightHeight: 48,

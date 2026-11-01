@@ -90,6 +90,7 @@ uniform float uCrownHeight;
 uniform vec3 uTint;
 uniform vec3 uLight;
 uniform vec4 uGlass; // IOR, thickness, roughness, opacity
+uniform float uBodyOpacity;
 uniform vec4 uOptics; // Fresnel, dispersion, refraction, internal reflection
 uniform vec4 uEnergy; // ambient, intensity, light height, falloff
 uniform vec3 uFinish; // sharpness, bloom intensity, bloom radius
@@ -205,7 +206,10 @@ void main() {
   edgeLight += light*tint*edge*uOptics.w*.08;
   vec3 color = face + edgeLight*(.32+.68*edge);
   color *= .72 + uOptics.x*fresnel;
-  // Premultiplied, full-card material: no CSS-like stroke or external glow.
-  float alpha = clamp((.24 + max(max(color.r,color.g),color.b)*uGlass.w)*coverage,0.0,.72);
-  outColor = vec4(color*alpha,alpha);
+  // Reduce only the material's coverage. Preserve the existing premultiplied
+  // reflection radiance, so clarity does not dim or reshape the spectral rim.
+  float opticalAlpha=clamp((.24+max(max(color.r,color.g),color.b)*uGlass.w)*coverage,0.0,.72);
+  float alpha=mix(uBodyOpacity*coverage,opticalAlpha,exp(-depth/(thickness*.45)));
+  vec3 body=face*(.72+uOptics.x*fresnel);
+  outColor=vec4(color*opticalAlpha-body*(opticalAlpha-alpha),alpha);
 }`;
