@@ -17,7 +17,7 @@ Web app moderna per analisi di trading, ispirata alle funzioni di Myfxbook ma co
 - La sezione Rischio è completa: budget di rischio, stress test, simulatore pre-trade, correlazioni, drawdown, protezioni, Monte Carlo e guardrail.
 - Strategy Lab include tre ipotesi interattive con parametri specifici, confronto Digital Twin, costi reali, rischio variabile, validazione walk-forward, Out-of-Sample Gate 70/30, Execution Friction Test, Parameter Space con risultati reali e archivio dei benchmark salvati nella sessione.
 
-- Diario ora ha una vista dedicata `#journal`: revisioni trade e giornate, ricerca/filtri, checklist, emozioni, tag, qualità, screenshot reali ed export JSON. Editor e archivio persistente locale condivisi con Operazioni; salvataggio esplicito, bozze conservate in memoria durante la navigazione, errori di quota visibili. Dettagli e test in `docs/journal.md`. Nessun backend o collegamento MT5 introdotto.
+- Diario ora ha una vista dedicata `#journal`: revisioni trade e giornate, ricerca/filtri, checklist, emozioni, tag, qualità, screenshot reali ed export JSON. Editor e archivio persistente locale condivisi con Operazioni; salvataggio esplicito, bozze conservate in memoria durante la navigazione, errori di quota visibili. Stile uniformato alle altre sezioni: controlli condivisi per periodo/export/filtri/ricerca/tag, badge KPI e selettore Trade/Giornate scorrevole; eliminato l’override del font che ingrandiva i pulsanti. Dettagli e test in `docs/journal.md`. Nessun backend o collegamento MT5 introdotto.
 
 ## Preferenze UI vincolanti
 

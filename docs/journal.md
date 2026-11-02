@@ -12,6 +12,10 @@ La voce Diario apre `#journal`. Le revisioni dei trade condividono l'editor e l'
 - Screenshot PNG/JPEG reali, visualizzabili e rimovibili: massimo 3 da 750 KB per revisione.
 - Esportazione JSON delle revisioni salvate dei trade filtrati oppure di tutte le pagine giornaliere, inclusi gli allegati. Le bozze non salvate non sono esportate.
 
+## Stile condiviso
+
+Periodo ed esportazione usano gli stessi controlli di Operazioni. Filtri, ricerca, tag e azione di salvataggio riutilizzano le classi condivise; nessun override generale del font dei pulsanti. I riepiloghi seguono misure, badge e gerarchia dei KPI delle altre sezioni. Trade/Giornate usa un indicatore scorrevole con le curve Apple comuni e rispetta reduced motion. Su mobile i controlli mantengono aree di interazione adeguate.
+
 ## Persistenza
 
 `localStorage["bluespherix.journal.v1"]` conserva le revisioni esplicitamente salvate. Un errore di accesso, archivio corrotto o quota esaurita viene mostrato senza dichiarare un salvataggio riuscito. Gli aggiornamenti da altre schede vengono riletti attraverso l'evento `storage`; ogni scrittura rilegge l'archivio per non eliminare revisioni di altri trade.
