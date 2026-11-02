@@ -90,6 +90,8 @@ uniform float uCrownHeight;
 // x: radial coverage, y: control flag, z: deselection fade, w: convex volume.
 uniform vec4 uCoating;
 uniform vec2 uCoatingOrigin;
+// Oggi selection experiment: strength and seconds since selection.
+uniform vec2 uUnderlight;
 uniform vec3 uTint;
 uniform vec3 uLight;
 uniform vec4 uGlass; // IOR, thickness, roughness, opacity
@@ -103,6 +105,35 @@ vec3 environment(vec3 ray) {
   float sky = smoothstep(-.55,.72,ray.y);
   float cool = pow(max(0.0, .5 + .5 * ray.x), 2.4);
   return vec3(.008,.016,.024) + vec3(.025,.055,.085)*sky + vec3(.010,.026,.044)*cool;
+}
+float underlightNoise(vec2 p) {
+  vec2 cell=floor(p), f=fract(p);
+  f=f*f*(3.0-2.0*f);
+  vec4 h=fract(sin(vec4(dot(cell,vec2(127.1,311.7)),
+    dot(cell+vec2(1,0),vec2(127.1,311.7)),
+    dot(cell+vec2(0,1),vec2(127.1,311.7)),
+    dot(cell+vec2(1,1),vec2(127.1,311.7))))*43758.5453);
+  return mix(mix(h.x,h.y,f.x),mix(h.z,h.w,f.x),f.y);
+}
+vec3 softUnderlight(vec2 localPixel, float depth, float fresnel, float volume) {
+  // Broad, continuously advected pools, with no per-frame randomness, sharp
+  // caustics or moving surface normals. This is light beneath the existing glass.
+  vec2 uv=localPixel/vec2(max(90.0,uRect.z*.24),max(40.0,uRect.w));
+  float t=uUnderlight.y;
+  vec2 seed=uCoatingOrigin*7.3+uRect.zw*.013;
+  float drift=underlightNoise(uv*.65+seed+vec2(t*.043,-t*.031));
+  float pool=underlightNoise(uv*1.45+seed+vec2(-t*.064,t*.047)+drift*.8);
+  float wave=.5+.5*sin(uv.x*3.1+uv.y*2.3+drift*3.0-t*.24);
+  float strength=smoothstep(.18,.82,pool*.72+wave*.28);
+  float chroma=max(max(uTint.r,uTint.g),uTint.b)-min(min(uTint.r,uTint.g),uTint.b);
+  vec3 pigment=uTint/max(max(uTint.r,uTint.g),max(uTint.b,.001));
+  vec3 transmission=mix(vec3(1.0),pigment,smoothstep(.18,.32,chroma));
+  // The dim pools retain the material hue; the stronger crests softly approach
+  // white, rather than making every part of the transmitted light monochrome.
+  transmission=mix(transmission,vec3(1.0),smoothstep(.35,.95,strength)*.72);
+  float softEdge=smoothstep(0.0,min(14.0,uRect.w*.27),depth);
+  return transmission*(.008+.13*strength)*softEdge*(1.0-fresnel)
+    *smoothstep(.2,1.0,volume)*uUnderlight.x;
 }
 void main() {
   vec2 pixel = vec2(gl_FragCoord.x/uDPR, (uResolution.y-gl_FragCoord.y)/uDPR);
@@ -248,6 +279,10 @@ void main() {
   float alpha=mix(uBodyOpacity*coverage,opticalAlpha,exp(-depth/(thickness*.45)));
   vec3 body=face*(.72+uOptics.x*fresnel);
   outColor=vec4(color*opticalAlpha-body*(opticalAlpha-alpha),alpha);
+  if(uUnderlight.x>0.0 && uCoating.y>.5) {
+    // Add only transmitted radiance: opacity, geometry and rim optics stay fixed.
+    outColor.rgb+=softUnderlight(materialPixel,depth,fresnel,volume)*coverage;
+  }
   if(uCoating.y>.5) {
     vec2 origin=uCoatingOrigin*uRect.zw;
     // CSS-pixel distance keeps the spreading front circular on wide controls.

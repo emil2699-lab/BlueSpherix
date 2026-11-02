@@ -24,6 +24,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     let vao: WebGLVertexArrayObject | null = null;
     let shaders: WebGLShader[] = [];
     let frame = 0;
+    let underlightTimer: ReturnType<typeof setTimeout> | undefined;
     let dirty = true;
     let lost = false;
     let cards: Measurement[] = [];
@@ -151,6 +152,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       gl.uniform3f(uniform("uFinish"),config.specularSharpness,config.bloomIntensity,config.bloomRadius);
       gl.enable(gl.SCISSOR_TEST);
       let coatingMoving = false;
+      let underlightMoving = false;
       for (const { element, rect, radius, tint, crownHeight } of cards) {
         if (rect.bottom <= 0 || rect.top >= viewHeight || rect.right <= 0 || rect.left >= viewWidth || !rect.width) continue;
         // A scissored full-card quad keeps the slab continuous while avoiding work outside it.
@@ -159,6 +161,11 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         const coating = coatings.current.get(element);
         const [reveal, isControl, opacity, moving, volume] = coating ? coatingProgress(coating, time, reduced.matches) : [1, 0, 1, 0, 1];
         coatingMoving ||= moving > 0;
+        const today = element.closest<HTMLElement>('.today-dashboard');
+        const underlight = coating && today && !today.hidden ? 1 : 0;
+        underlightMoving ||= underlight > 0 && !reduced.matches && coating?.exiting === undefined;
+        gl.uniform2f(uniform("uUnderlight"), underlight,
+          reduced.matches ? 0 : coating ? (time-coating.started)/1000 : 0);
         gl.uniform4f(uniform("uCoating"), reveal, isControl, opacity, volume);
         gl.uniform2f(uniform("uCoatingOrigin"), ...(coating?.origin ?? [.5, .5] as [number, number]));
         gl.uniform4f(uniform("uRect"),rect.left,rect.top,rect.width,rect.height);
@@ -170,7 +177,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       canvas.dataset.pointer = `${pointer.x},${pointer.y}`;
       // Adapt resolution only under sustained activity, never interpolate position.
       const settling = time < settleUntil;
-      if (!settling && lastRender && time-lastRender < 120 && time-lastRender > 30) slowFrames++;
+      if (!settling && !underlightMoving && lastRender && time-lastRender < 120 && time-lastRender > 30) slowFrames++;
       else slowFrames = Math.max(0,slowFrames-1);
       lastRender = time;
       if (slowFrames > 15 && dprCap > 1) { dprCap = 1; slowFrames = 0; }
@@ -178,8 +185,14 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       // and font metrics settle. ResizeObserver sees size changes, not every
       // positional shift caused by siblings, so remeasure briefly after zoom.
       if (settling || coatingMoving) { if (settling) dirty = true; schedule(); }
+      // Slow under-glass motion needs only about 30 fps at rest. Pointer/layout
+      // events bypass the timer and still render on the next available frame.
+      else if (underlightMoving) underlightTimer = setTimeout(schedule, 16);
     };
-    const schedule = () => { if (!frame && !lost && !document.hidden) frame = requestAnimationFrame(draw); };
+    const schedule = () => {
+      if (underlightTimer !== undefined) { clearTimeout(underlightTimer); underlightTimer = undefined; }
+      if (!frame && !lost && !document.hidden) frame = requestAnimationFrame(draw);
+    };
     const invalidate = () => { dirty = true; schedule(); };
     const settleLayout = () => { settleUntil = performance.now()+700; invalidate(); };
     const syncObservedSurfaces = () => {
@@ -199,9 +212,9 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       schedule();
     };
     const leave = (event: PointerEvent) => { if (!event.relatedTarget) { pointer.presence = 0; schedule(); } };
-    const visibility = () => { if (document.hidden) { cancelAnimationFrame(frame); frame = 0; } else invalidate(); };
+    const visibility = () => { if (document.hidden) { clearTimeout(underlightTimer); underlightTimer = undefined; cancelAnimationFrame(frame); frame = 0; } else invalidate(); };
     const contextLost = (event: Event) => {
-      event.preventDefault();lost=true;cancelAnimationFrame(frame);frame=0;
+      event.preventDefault();lost=true;clearTimeout(underlightTimer);underlightTimer=undefined;cancelAnimationFrame(frame);frame=0;
       // Release references while the context is lost. After restoration these
       // handles belong to the old generation and must not be deleted again.
       dispose();delete root.dataset.iceGlass;
@@ -234,7 +247,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     canvas.addEventListener("webglcontextrestored",contextRestored);
     invalidate();
     return () => {
-      cancelAnimationFrame(frame); resize?.disconnect(); mutation.disconnect();
+      clearTimeout(underlightTimer); cancelAnimationFrame(frame); resize?.disconnect(); mutation.disconnect();
       window.removeEventListener("pointermove",move); window.removeEventListener("pointerrawupdate",move);
       window.removeEventListener("pointerout",leave); window.removeEventListener("resize",settleLayout);
       window.removeEventListener("scroll",invalidate,true); root.removeEventListener("transitionrun",settleLayout); root.removeEventListener("transitionend",invalidate);
