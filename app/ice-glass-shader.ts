@@ -87,6 +87,8 @@ uniform float uDPR;
 uniform vec4 uRect;
 uniform float uRadius;
 uniform float uCrownHeight;
+// x: coating reveal, y: selectable control, z: fade on deselection.
+uniform vec3 uCoating;
 uniform vec3 uTint;
 uniform vec3 uLight;
 uniform vec4 uGlass; // IOR, thickness, roughness, opacity
@@ -183,6 +185,9 @@ void main() {
   // Evaluate proximity at the surface, so only the nearby part becomes glossy;
   // the distant band retains its exact Snell paths, width and colour balance.
   float separation=smoothstep(uEnergy.z*1.25,uEnergy.z*4.0,length(delta));
+  // A brief, source-dependent spectral split accompanies the material coating.
+  // Ordinary cards keep their exact existing optical paths and parameters.
+  separation=max(separation,uCoating.y*sin(clamp(uCoating.x,0.0,1.0)*3.14159265)*.85);
   focalDepth=mix(vec3(.42),focalDepth,separation);
   float reflectionWidth=bandWidth*mix(.72,1.0,separation);
   // Normalize the narrower channel profiles, rather than placing an unrelated
@@ -227,4 +232,9 @@ void main() {
   float alpha=mix(uBodyOpacity*coverage,opticalAlpha,exp(-depth/(thickness*.45)));
   vec3 body=face*(.72+uOptics.x*fresnel);
   outColor=vec4(color*opticalAlpha-body*(opticalAlpha-alpha),alpha);
+  if(uCoating.y>.5) {
+    float front=mix(-.08,1.08,uCoating.x);
+    float coat=1.0-smoothstep(front-.06,front+.06,materialPixel.x/uRect.z);
+    outColor*=coat*uCoating.z;
+  }
 }`;

@@ -3,15 +3,17 @@
 import { useEffect, useRef, type RefObject } from "react";
 import { ICE_GLASS as config } from "./ice-glass-config";
 import { glassFragment, glassVertex } from "./ice-glass-shader";
+import { coatingProgress, useGlassSelection } from "./glass-selection";
 import { soapSample } from "./ice-glass-volume";
 
 type ViewportRect = { left: number; top: number; width: number; height: number };
 type GlassRect = ViewportRect & { right: number; bottom: number };
 type Measurement = { element: HTMLElement; rect: GlassRect; radius: number; tint: number[]; crownHeight: number };
-const GLASS_SURFACE_SELECTOR = ".glass-card, .calendar-strip, .demo-notice";
+const GLASS_SURFACE_SELECTOR = ".glass-card, .calendar-strip, .demo-notice, [data-glass-selection]";
 
 export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const coatings = useGlassSelection(rootRef);
   useEffect(() => {
     const canvas = canvasRef.current;
     const root = rootRef.current;
@@ -103,7 +105,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       viewport = nextViewport;
       cards = Array.from(root.querySelectorAll<HTMLElement>(GLASS_SURFACE_SELECTOR)).map((element) => {
         const style = getComputedStyle(element);
-        const tint = element.matches(".negative-surface, .negative-strong, .critical, .risk-critical, .failed") ? [1,.34,.43]
+        const tint = element.matches(".negative-surface, .negative-strong, .critical, .risk-critical, .failed, .loss, .diary-loss, .negative-row") ? [1,.34,.43]
           : element.matches(".violet, .insight-card, .lab-validation") ? [.64,.46,1]
           : element.matches(".amber, .calendar-strip, .warning, .risk-warning") ? [1,.62,.24]
           : [.31,.77,.87];
@@ -148,11 +150,16 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       gl.uniform4f(uniform("uEnergy"),config.ambientReflection,config.lightIntensity,config.lightHeight,config.lightFalloff);
       gl.uniform3f(uniform("uFinish"),config.specularSharpness,config.bloomIntensity,config.bloomRadius);
       gl.enable(gl.SCISSOR_TEST);
-      for (const { rect, radius, tint, crownHeight } of cards) {
+      let coatingMoving = false;
+      for (const { element, rect, radius, tint, crownHeight } of cards) {
         if (rect.bottom <= 0 || rect.top >= viewHeight || rect.right <= 0 || rect.left >= viewWidth || !rect.width) continue;
         // A scissored full-card quad keeps the slab continuous while avoiding work outside it.
         gl.viewport(0,0,width,height);
         gl.scissor(Math.max(0,Math.floor(rect.left*dpr)),Math.max(0,Math.floor((viewHeight-rect.bottom)*dpr)),Math.ceil(Math.min(rect.right,viewWidth)*dpr)-Math.max(0,Math.floor(rect.left*dpr)),Math.ceil(Math.min(rect.bottom,viewHeight)*dpr)-Math.max(0,Math.floor(rect.top*dpr)));
+        const coating = coatings.current.get(element);
+        const [reveal, isControl, opacity, moving] = coating ? coatingProgress(coating, time, reduced.matches) : [1, 0, 1, 0];
+        coatingMoving ||= moving > 0;
+        gl.uniform3f(uniform("uCoating"), reveal, isControl, opacity);
         gl.uniform4f(uniform("uRect"),rect.left,rect.top,rect.width,rect.height);
         gl.uniform1f(uniform("uRadius"),radius);
         gl.uniform1f(uniform("uCrownHeight"),crownHeight);
@@ -169,7 +176,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       // A browser zoom can move a card for several frames while responsive CSS
       // and font metrics settle. ResizeObserver sees size changes, not every
       // positional shift caused by siblings, so remeasure briefly after zoom.
-      if (settling) { dirty = true; schedule(); }
+      if (settling || coatingMoving) { if (settling) dirty = true; schedule(); }
     };
     const schedule = () => { if (!frame && !lost && !document.hidden) frame = requestAnimationFrame(draw); };
     const invalidate = () => { dirty = true; schedule(); };
@@ -205,9 +212,12 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     syncObservedSurfaces();
     const mutation = new MutationObserver(records => {
       if(records.every(record=>record.target===canvas))return;
-      syncObservedSurfaces();settleLayout();
+      syncObservedSurfaces();
+      // A coating changes material coverage, not layout. Reuse cached rectangles.
+      if (records.every(record => record.attributeName === "data-glass-selection")) invalidate();
+      else settleLayout();
     });
-    mutation.observe(root,{ childList: true, subtree: true, attributes: true, attributeFilter: ["hidden", "class", "style"] });
+    mutation.observe(root,{ childList: true, subtree: true, attributes: true, attributeFilter: ["hidden", "class", "style", "data-glass-selection"] });
     window.addEventListener("pointermove",move,{passive:true});
     window.addEventListener("pointerrawupdate",move,{passive:true});
     window.addEventListener("pointerout",leave,{passive:true});
@@ -232,6 +242,6 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       canvas.removeEventListener("webglcontextlost",contextLost); canvas.removeEventListener("webglcontextrestored",contextRestored);
       delete root.dataset.iceGlass;dispose();
     };
-  },[rootRef]);
+  },[rootRef, coatings]);
   return <canvas ref={canvasRef} className="ice-glass-canvas" aria-hidden="true" />;
 }

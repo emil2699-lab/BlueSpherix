@@ -52,6 +52,9 @@ Web app moderna per analisi di trading, ispirata alle funzioni di Myfxbook ma co
 
 Dopo il feedback sul punto 3: eliminati dall'interfaccia il photon atlas e i punti speculari interni; il modello sperimentale rimane nei sorgenti ma è inattivo. Canvas absolute nello stesso contenitore delle card, con overscan di due viewport, per evitare distacco durante lo scroll asincrono. Fascia arcobaleno rettilinea di base: si deforma secondo differenze fra percorsi Snell locali e sorgente parallela di riferimento, senza curva UV o onde prefissate. Geometria a saponetta, dispersione 0,05, trasparenza, layout e contenuti preservati. Test e screenshot in `/workspace/artifacts/glass-scroll-band/`. Corpo del vetro regolato a 0,14 dopo l'approvazione dell'effetto. L'ultima richiesta fonde un riflesso bianco lucido vicino al cursore con l'arcobaleno esistente: gli stessi canali RGB si sovrappongono da vicino e si separano progressivamente allontanando la sorgente; oltre 192 px dal frammento torna esattamente il risultato precedente. Nessun alone, modifica alla curva centrale, opacità o ritardo aggiunto. Verifiche in `/workspace/artifacts/glass-gloss-spectrum/`. Preservare tutto il resto dell'effetto approvato. Non creare uno sfondo dinamico o altri effetti non richiesti. Safari su Mac non verificabile dal cloud.
 
+### Vetro sui controlli selezionati
+- I controlli selezionabili delle sezioni condividono il renderer delle card. Rivestimento progressivo di 420 ms con passaggio RGB, uscita di 200 ms su altro controllo/click fuori/Escape; valori funzionali preservati. I toggle spenti perdono il vetro. Un solo canvas, fallback CSS e reduced motion. Ottica delle card invariata (confronto pixel = 0). Implementazione e test in `docs/glass-selection.md`.
+
 ### Preferenza jumpcard
 - Il micro-movimento 3D della singola card al passaggio del cursore è temporaneamente disattivato.
 - Parola chiave per riattivarlo: `jumpcard`.

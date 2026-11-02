@@ -1680,3 +1680,22 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
 
 .diary-summary, .diary-tools, .diary-workspace { animation: surface-in .46s var(--ease-apple-layout) both; }
 .diary-chips button.active, .diary-review.active { animation: switch-select .46s var(--ease-apple-spring); }
+
+/* Selected controls use the same WebGL material as cards; DOM content stays sharp. */
+.content[data-ice-glass="ready"] [data-glass-selection] {
+  background-color: transparent !important;
+  background-image: none !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+[data-glass-selection="entering"] { animation: glass-coat-arrive .42s var(--ease-apple-layout) both; }
+[data-glass-selection="leaving"] { animation: glass-coat-leave .2s var(--ease-apple-fade) both; }
+@keyframes glass-coat-arrive {
+  from { border-color: rgba(201,226,242,.08); }
+  45% { border-color: rgba(201,226,242,.32); }
+}
+@keyframes glass-coat-leave { from { border-color: rgba(201,226,242,.24); } }
+.content:not([data-ice-glass="ready"]) [data-glass-selection] {
+  background: linear-gradient(135deg,rgba(203,226,246,.11),rgba(17,27,40,.26)) !important;
+  box-shadow: inset 0 1px rgba(235,247,255,.18), inset 0 -1px rgba(157,139,255,.13);
+}
