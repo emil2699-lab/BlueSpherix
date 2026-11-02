@@ -153,6 +153,21 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       gl.enable(gl.SCISSOR_TEST);
       let coatingMoving = false;
       let underlightMoving = false;
+      // One selected area emits; retain a fading selection only during its exit.
+      // Reuse measured rectangles so this adds no layout reads to pointer frames.
+      const emitter = cards.find(({element}) => coatings.current.has(element)
+        && coatings.current.get(element)?.exiting === undefined
+        && element.closest<HTMLElement>('.today-dashboard')?.hidden === false)
+        ?? cards.find(({element}) => coatings.current.has(element)
+          && element.closest<HTMLElement>('.today-dashboard')?.hidden === false);
+      const emission = emitter && coatings.current.get(emitter.element);
+      const power = emitter ? Math.max(0,Math.min(1,Number(emitter.element.dataset.glassUnderlight ?? 1)||0)) : 0;
+      const emissionPhase = emission ? coatingProgress(emission,time,reduced.matches) : [0,0,0,0,0];
+      coatingMoving ||= emissionPhase[3]>0;
+      const emissionTint = emission?.tint ?? [1,1,1];
+      gl.uniform4f(uniform("uSpillRect"), emitter?.rect.left ?? 0,emitter?.rect.top ?? 0,emitter?.rect.width ?? 1,emitter?.rect.height ?? 1);
+      gl.uniform2f(uniform("uSpillOrigin"),...(emission?.origin ?? [.5,.5] as [number,number]));
+      gl.uniform3f(uniform("uSpillTint"),emissionTint[0],emissionTint[1],emissionTint[2]);
       for (const { element, rect, radius, tint, crownHeight } of cards) {
         if (rect.bottom <= 0 || rect.top >= viewHeight || rect.right <= 0 || rect.left >= viewWidth || !rect.width) continue;
         // A scissored full-card quad keeps the slab continuous while avoiding work outside it.
@@ -162,7 +177,13 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         const [reveal, isControl, opacity, moving, volume] = coating ? coatingProgress(coating, time, reduced.matches) : [1, 0, 1, 0, 1];
         coatingMoving ||= moving > 0;
         const today = element.closest<HTMLElement>('.today-dashboard');
-        const underlight = coating && today && !today.hidden ? 1 : 0;
+        const receivesSpill = !!(emitter && power > .35 && today && !today.hidden && element.matches('.glass-card')
+          && !element.contains(emitter.element) && !emitter.element.contains(element));
+        gl.uniform4f(uniform("uSpill"),power,reduced.matches ? 0 : emission ? (time-emission.started)/1000 : 0,
+          emissionPhase[0]*emissionPhase[2]*emissionPhase[4],receivesSpill ? 1 : 0);
+        underlightMoving ||= receivesSpill && power > .35 && !reduced.matches && emission?.exiting === undefined;
+        const underlight = coating && today && !today.hidden
+          ? Math.max(0, Math.min(1, Number(element.dataset.glassUnderlight ?? 1) || 0)) : 0;
         underlightMoving ||= underlight > 0 && !reduced.matches && coating?.exiting === undefined;
         gl.uniform2f(uniform("uUnderlight"), underlight,
           reduced.matches ? 0 : coating ? (time-coating.started)/1000 : 0);
@@ -231,7 +252,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       if (records.every(record => record.attributeName === "data-glass-selection")) invalidate();
       else settleLayout();
     });
-    mutation.observe(root,{ childList: true, subtree: true, attributes: true, attributeFilter: ["hidden", "class", "style", "data-glass-selection"] });
+    mutation.observe(root,{ childList: true, subtree: true, attributes: true, attributeFilter: ["hidden", "class", "style", "data-glass-selection", "data-glass-underlight"] });
     window.addEventListener("pointermove",move,{passive:true});
     window.addEventListener("pointerrawupdate",move,{passive:true});
     window.addEventListener("pointerout",leave,{passive:true});

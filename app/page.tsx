@@ -36,6 +36,7 @@ import Journal from "./journal";
 import { ALPHA_ACCOUNT, BEST_RECENT_TRADE, BEST_SESSION_30D, DASHBOARD_RANGE_STATS, DEMO_BALANCE_SERIES, DEMO_EQUITY_SERIES, DEMO_PERIOD_STATS, OPEN_PNL, OPEN_TRADES, type DashboardRange } from "./demo-data";
 import { valueSign } from "./value-sign";
 import { IceGlass } from "./ice-glass";
+import { positionUnderlight } from "./glass-underlight";
 
 type Range = DashboardRange;
 const equitySeries = DEMO_EQUITY_SERIES;
@@ -264,7 +265,7 @@ export default function Home() {
               <div className="section-head"><div><p className="eyebrow">Posizioni aperte</p><h2>{positions.length} posizioni · <span data-sign={valueSign(OPEN_PNL)}>{signedMoney(OPEN_PNL)}</span></h2></div><button className="quiet-button">Vedi tutte <ArrowRight size={14} /></button></div>
               <div className="position-table">
                 <div className="table-row table-header"><span>Strumento</span><span>Direzione</span><span>Volume</span><span>Apertura</span><span>Corrente</span><span>P&amp;L</span></div>
-                {positions.map((position) => <button type="button" className={`table-row ${position.trend === "down" ? "negative-row" : ""}`} key={position.symbol}><span className="symbol"><i>{position.symbol.slice(0, 2)}</i><strong>{position.symbol}</strong></span><span className={position.side === "Long" ? "long" : "short"}>{position.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{position.side}</span><span>{position.volumeLabel}</span><span>{position.open}</span><span>{position.currentPrice}</span><strong className={position.trend}>{position.pnl}</strong></button>)}
+                {positions.map((position) => <button type="button" className={`table-row ${position.trend === "down" ? "negative-row" : ""}`} key={position.symbol} data-glass-underlight={positionUnderlight(position.result, ALPHA_ACCOUNT.balance)}><span className="symbol"><i>{position.symbol.slice(0, 2)}</i><strong>{position.symbol}</strong></span><span className={position.side === "Long" ? "long" : "short"}>{position.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{position.side}</span><span>{position.volumeLabel}</span><span>{position.open}</span><span>{position.currentPrice}</span><strong className={position.trend}>{position.pnl}</strong></button>)}
               </div>
             </article>
 

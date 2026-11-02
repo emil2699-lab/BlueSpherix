@@ -9,11 +9,12 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 const instrument = () => {
   window.underlightFrames = [];
   const proto = WebGL2RenderingContext.prototype;
-  const get = proto.getUniformLocation, put = proto.uniform2f, draw = proto.drawArrays;
-  const locations = new WeakMap(); let underlight = [0, 0];
+  const get = proto.getUniformLocation, put = proto.uniform2f, put4 = proto.uniform4f, draw = proto.drawArrays;
+  const locations = new WeakMap(); let underlight = [0, 0], spill = [0,0,0,0];
   proto.getUniformLocation = function (program, name) { const l = get.call(this, program, name); if (l) locations.set(l, name); return l; };
   proto.uniform2f = function (location, ...values) { if (locations.get(location) === 'uUnderlight') underlight = values; return put.call(this, location, ...values); };
-  proto.drawArrays = function (...args) { window.underlightFrames.push({ time: performance.now(), values: [...underlight] }); return draw.call(this, ...args); };
+  proto.uniform4f = function(location,...values) { if(locations.get(location)==='uSpill') spill=values; return put4.call(this,location,...values); };
+  proto.drawArrays = function (...args) { window.underlightFrames.push({ time: performance.now(), values: [...underlight], spill: [...spill] }); return draw.call(this, ...args); };
 };
 await page.addInitScript(instrument); page.on('pageerror', e => errors.push(e.message));
 const url = process.env.GLASS_SELECTION_URL || 'http://127.0.0.1:3001/';
@@ -28,15 +29,31 @@ await page.mouse.move(260, 90); await step(500);
 await page.screenshot({ path: `${dir}/red-00.png` });
 await step(7000); await page.screenshot({ path: `${dir}/red-07.png` });
 await step(7000); await page.screenshot({ path: `${dir}/red-14.png` });
-const active = await page.evaluate(() => window.underlightFrames.filter(f => f.values[0] === 1));
+const active = await page.evaluate(() => window.underlightFrames.filter(f => f.values[0] > 0));
+const expected = Number(await negative.getAttribute('data-glass-underlight'));
+assert(expected >= .25 && expected <= 1);
+assert(active.every(f=>Math.abs(f.values[0]-expected)<1e-6),'negative P&L ceiling reaches shader');
 assert(active.length > 2); assert(active.at(-1).values[1] - active[0].values[1] > 12);
+// Other position ceilings are read from their own numerical result, not labels.
+for (const row of await page.locator('.position-table button.table-row').all()) {
+  await row.click(); await page.clock.runFor(2); await step(1000);
+  await page.evaluate(()=>{window.underlightFrames=[];}); await step(100);
+  const ceiling=Number(await row.getAttribute('data-glass-underlight'));
+  assert(await page.evaluate(v=>window.underlightFrames.some(f=>Math.abs(f.values[0]-v)<1e-6),ceiling));
+}
+// A full-strength neutral control can illuminate neighbouring card rims.
+await page.getByRole('button',{name:'3M',exact:true}).click(); await page.clock.runFor(2); await step(1000);
+assert(await page.evaluate(()=>window.underlightFrames.some(f=>f.spill[0]===1 && f.spill[3]===1)),'neighbour receivers use selected emitter');
+await page.screenshot({path:`${dir}/neighbour-rims.png`});
+await step(7000); await page.screenshot({path:`${dir}/neighbour-rims-07.png`});
+await step(7000); await page.screenshot({path:`${dir}/neighbour-rims-14.png`});
 await page.keyboard.press('Escape'); await step(1000); await step(1000);
 await page.evaluate(() => { window.underlightFrames = []; }); await page.clock.runFor(200);
 assert.equal(await page.evaluate(() => window.underlightFrames.length), 0, 'no idle animation after deselection');
 await page.locator('nav').getByRole('button', { name: 'Diario', exact: true }).click(); await step(1200);
 await page.getByRole('button', { name: '90G', exact: true }).click(); await page.clock.runFor(2); await step(1000);
 await page.evaluate(() => { window.underlightFrames = []; }); await page.mouse.move(500, 100); await step(200);
-assert(await page.evaluate(() => window.underlightFrames.every(f => f.values[0] === 0)), 'only Oggi receives underlight');
+assert(await page.evaluate(() => window.underlightFrames.every(f => f.values[0] === 0 && f.spill[3] === 0)), 'only Oggi receives underlight');
 assert.equal(await page.locator('canvas').count(), 1);
 const reduced = await browser.newPage({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
 await reduced.addInitScript(instrument); reduced.on('pageerror', e => errors.push(e.message));
