@@ -1581,7 +1581,7 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
 .diary-list > .section-head, .diary-detail > .section-head { margin-bottom: 22px; gap: 10px; }
 .diary-list h2, .diary-detail h2 { font-size: 17px; }
 .diary-trade { display: grid; grid-template-columns: 38px minmax(0,1fr) auto; align-items: center; gap: 12px; width: 100%; border: 1px solid transparent; border-top-color: var(--stroke); background: transparent; color: var(--text); padding: 18px 10px; border-radius: 12px; text-align: left; }
-.diary-trade.selected { background: rgba(86,217,202,.045); border-color: rgba(86,217,202,.18); }
+.diary-trade.selected:not(.diary-loss) { background: rgba(86,217,202,.045); border-color: rgba(86,217,202,.18); }
 .diary-trade:not(.diary-loss):hover { background: rgba(86,217,202,.035); }
 .diary-trade.diary-loss:not(.selected):not(.severe) { border-color: var(--stroke); }
 .diary-trade.diary-loss:not(.selected):hover { border-color: rgba(255,111,125,.28); }
@@ -1681,21 +1681,28 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
 .diary-summary, .diary-tools, .diary-workspace { animation: surface-in .46s var(--ease-apple-layout) both; }
 .diary-chips button.active, .diary-review.active { animation: switch-select .46s var(--ease-apple-spring); }
 
-/* Selected controls use the same WebGL material as cards; DOM content stays sharp. */
+/* Selected controls: a tinted optical surface, without a selection frame.
+   Keep keyboard focus outlines and the original semantic colours of content. */
+.content :is(button.active, button.selected, button[aria-pressed="true"], button[aria-selected="true"]),
+.content :is(.diary-tab-indicator, .focus-tab-indicator) {
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+.content [data-glass-selection] {
+  border-color: transparent !important;
+  box-shadow: none !important;
+  transition-property: color, transform, scale !important;
+  animation: none !important;
+}
 .content[data-ice-glass="ready"] [data-glass-selection] {
   background-color: transparent !important;
   background-image: none !important;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
-[data-glass-selection="entering"] { animation: glass-coat-arrive .42s var(--ease-apple-layout) both; }
-[data-glass-selection="leaving"] { animation: glass-coat-leave .2s var(--ease-apple-fade) both; }
-@keyframes glass-coat-arrive {
-  from { border-color: rgba(201,226,242,.08); }
-  45% { border-color: rgba(201,226,242,.32); }
-}
-@keyframes glass-coat-leave { from { border-color: rgba(201,226,242,.24); } }
+/* These older sliding plates would cover the shared glass drawn behind them. */
+.content :is(.diary-segment,.focus-tabs):has([data-glass-selection]) > :is(.diary-tab-indicator,.focus-tab-indicator) { visibility: hidden; }
 .content:not([data-ice-glass="ready"]) [data-glass-selection] {
-  background: linear-gradient(135deg,rgba(203,226,246,.11),rgba(17,27,40,.26)) !important;
-  box-shadow: inset 0 1px rgba(235,247,255,.18), inset 0 -1px rgba(157,139,255,.13);
+  background: linear-gradient(135deg,rgb(var(--glass-control-tint) / .16),rgb(var(--glass-control-tint) / .07)) !important;
+  backdrop-filter: blur(8px);
 }

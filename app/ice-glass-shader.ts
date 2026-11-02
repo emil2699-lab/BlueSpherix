@@ -87,8 +87,9 @@ uniform float uDPR;
 uniform vec4 uRect;
 uniform float uRadius;
 uniform float uCrownHeight;
-// x: coating reveal, y: selectable control, z: fade on deselection.
-uniform vec3 uCoating;
+// x: radial coverage, y: control flag, z: deselection fade, w: convex volume.
+uniform vec4 uCoating;
+uniform vec2 uCoatingOrigin;
 uniform vec3 uTint;
 uniform vec3 uLight;
 uniform vec4 uGlass; // IOR, thickness, roughness, opacity
@@ -136,11 +137,14 @@ void main() {
   // Differentiate the actual height in CSS pixels. Face, sides and corners use
   // one surface; the analytic gradient avoids four extra geometry evaluations.
   vec3 surface = soapSurface(p,halfSize,radius,thickness);
-  float surfaceHeight = surface.z;
+  // Stage one is a planar polished sheet. Stage two grows the actual height
+  // field and its analytic normal; DOM geometry and card optics stay unchanged.
+  float volume = uCoating.y>.5 ? uCoating.w : 1.0;
+  float surfaceHeight = mix(.6,surface.z,volume);
   // Preserve the existing stationary liquid microstructure, fading it smoothly
   // into the vertical sides so it cannot cut a crease into the outer silhouette.
   vec2 normalXY = -surface.xy + waveGradient*3.2*bevel*smoothstep(0.0,thickness*.4,depth);
-  vec3 N = normalize(vec3(normalXY,1.0));
+  vec3 N = normalize(vec3(normalXY*volume,1.0));
   vec3 V = vec3(0,0,1);
   vec3 delta = vec3(uLight.xy-pixel,max(uEnergy.z-surfaceHeight,1.0));
   float distanceXY = length(delta.xy);
@@ -166,7 +170,7 @@ void main() {
   // A parallel source produces an edge-parallel, straight spectral band.
   // Only the difference between local Snell paths and that parallel reference
   // bends it. There is no UV/noise curve or distance-driven bend animation.
-  vec3 referenceL=normalize(vec3(uLight.xy-uRect.xy-halfSize,max(uEnergy.z-uCrownHeight,1.0)));
+  vec3 referenceL=normalize(vec3(uLight.xy-uRect.xy-halfSize,max(uEnergy.z-mix(.6,uCrownHeight,volume),1.0)));
   vec3 referenceR=refract(-referenceL,N,1.0/(uGlass.x-uOptics.y));
   vec3 referenceG=refract(-referenceL,N,1.0/uGlass.x);
   vec3 referenceB=refract(-referenceL,N,1.0/(uGlass.x+uOptics.y));
@@ -224,6 +228,18 @@ void main() {
   edgeLight += vec3(1.0)*light*polishedCore*spectralReach*spectralFocus*uOptics.z*.55;
   edgeLight += vec3(.92,.98,1.0)*whiteCore*.31;
   edgeLight += light*tint*edge*uOptics.w*.08;
+  if(uCoating.y>.5) {
+    // Keep the original control hue throughout the glass and lightly filter its
+    // existing reflection, without flattening the spectral separation to one hue.
+    vec3 pigment=uTint/max(max(uTint.r,uTint.g),max(uTint.b,.001));
+    float faceLuminance=dot(face,vec3(.2126,.7152,.0722));
+    face=mix(face,vec3(faceLuminance)*mix(vec3(1.0),pigment,.72)+uTint*.025,.92);
+    edgeLight*=mix(vec3(1.0),pigment,.25);
+    // The flat sheet uses the same incident light/specular calculation; the
+    // curved optical shoulder emerges only when the volume grows.
+    edgeLight=mix(vec3(.93,.96,1.0)*mix(vec3(1.0),pigment,.25)
+      *attenuation*uEnergy.y*specular*.18,edgeLight,volume);
+  }
   vec3 color = face + edgeLight*(.32+.68*edge);
   color *= .72 + uOptics.x*fresnel;
   // Reduce only the material's coverage. Preserve the existing premultiplied
@@ -233,8 +249,12 @@ void main() {
   vec3 body=face*(.72+uOptics.x*fresnel);
   outColor=vec4(color*opticalAlpha-body*(opticalAlpha-alpha),alpha);
   if(uCoating.y>.5) {
-    float front=mix(-.08,1.08,uCoating.x);
-    float coat=1.0-smoothstep(front-.06,front+.06,materialPixel.x/uRect.z);
+    vec2 origin=uCoatingOrigin*uRect.zw;
+    // CSS-pixel distance keeps the spreading front circular on wide controls.
+    float reach=length(max(origin,uRect.zw-origin));
+    float feather=2.5;
+    float front=mix(-feather,reach+feather,uCoating.x);
+    float coat=1.0-smoothstep(front-feather,front+feather,length(materialPixel-origin));
     outColor*=coat*uCoating.z;
   }
 }`;

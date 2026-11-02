@@ -105,10 +105,10 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       viewport = nextViewport;
       cards = Array.from(root.querySelectorAll<HTMLElement>(GLASS_SURFACE_SELECTOR)).map((element) => {
         const style = getComputedStyle(element);
-        const tint = element.matches(".negative-surface, .negative-strong, .critical, .risk-critical, .failed, .loss, .diary-loss, .negative-row") ? [1,.34,.43]
+        const tint = coatings.current.get(element)?.tint ?? (element.matches(".negative-surface, .negative-strong, .critical, .risk-critical, .failed, .loss, .diary-loss, .negative-row") ? [1,.34,.43]
           : element.matches(".violet, .insight-card, .lab-validation") ? [.64,.46,1]
           : element.matches(".amber, .calendar-strip, .warning, .risk-warning") ? [1,.62,.24]
-          : [.31,.77,.87];
+          : [.31,.77,.87]);
         const domRect = element.getBoundingClientRect();
         const left = domRect.left-nextViewport.left;
         const top = domRect.top-nextViewport.top;
@@ -157,9 +157,10 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         gl.viewport(0,0,width,height);
         gl.scissor(Math.max(0,Math.floor(rect.left*dpr)),Math.max(0,Math.floor((viewHeight-rect.bottom)*dpr)),Math.ceil(Math.min(rect.right,viewWidth)*dpr)-Math.max(0,Math.floor(rect.left*dpr)),Math.ceil(Math.min(rect.bottom,viewHeight)*dpr)-Math.max(0,Math.floor(rect.top*dpr)));
         const coating = coatings.current.get(element);
-        const [reveal, isControl, opacity, moving] = coating ? coatingProgress(coating, time, reduced.matches) : [1, 0, 1, 0];
+        const [reveal, isControl, opacity, moving, volume] = coating ? coatingProgress(coating, time, reduced.matches) : [1, 0, 1, 0, 1];
         coatingMoving ||= moving > 0;
-        gl.uniform3f(uniform("uCoating"), reveal, isControl, opacity);
+        gl.uniform4f(uniform("uCoating"), reveal, isControl, opacity, volume);
+        gl.uniform2f(uniform("uCoatingOrigin"), ...(coating?.origin ?? [.5, .5] as [number, number]));
         gl.uniform4f(uniform("uRect"),rect.left,rect.top,rect.width,rect.height);
         gl.uniform1f(uniform("uRadius"),radius);
         gl.uniform1f(uniform("uCrownHeight"),crownHeight);
