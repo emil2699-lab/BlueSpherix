@@ -904,15 +904,15 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
 .timeline-trade:hover { transform: translateX(2px); border-color: var(--stroke-strong); }
 .timeline-trade.selected { border-color: rgba(86,217,202,.3); background: linear-gradient(90deg,rgba(86,217,202,.075),rgba(86,217,202,.015)); box-shadow: 0 0 0 2px rgba(86,217,202,.05); }
 .timeline-trade.selected::before { background: var(--aqua); box-shadow: 0 0 12px rgba(86,217,202,.55); }
-.timeline-trade.loss { background: linear-gradient(90deg,rgba(255,111,125,.075),rgba(255,111,125,.015) 75%); box-shadow: inset 2px 0 rgba(255,111,125,.42); }
-.timeline-trade.loss.severe { background: linear-gradient(90deg,rgba(255,111,125,.14),rgba(255,111,125,.035) 86%); border-color: rgba(255,111,125,.18); }
-.timeline-trade.loss.selected { border-color: rgba(255,111,125,.38); box-shadow: inset 2px 0 rgba(255,111,125,.65),0 0 0 2px rgba(255,111,125,.055); }
+.timeline-trade.loss, .diary-trade.diary-loss { background: linear-gradient(90deg,rgba(255,111,125,.075),rgba(255,111,125,.015) 75%); box-shadow: inset 2px 0 rgba(255,111,125,.42); }
+.timeline-trade.loss.severe, .diary-trade.diary-loss.severe { background: linear-gradient(90deg,rgba(255,111,125,.14),rgba(255,111,125,.035) 86%); border-color: rgba(255,111,125,.18); }
+.timeline-trade.loss.selected, .diary-trade.diary-loss.selected { border-color: rgba(255,111,125,.38); box-shadow: inset 2px 0 rgba(255,111,125,.65),0 0 0 2px rgba(255,111,125,.055); }
 .timeline-trade.loss.selected::before { background: var(--red); box-shadow: 0 0 12px rgba(255,111,125,.55); }
 .timeline-trade time { color: #73808c; font-size: 9px; }
 .timeline-trade time small { display: block; margin-top: 5px; color: #56626e; font-size: 7px; }
 .timeline-symbol { display: flex; align-items: center; gap: 9px; min-width: 0; }
 .timeline-symbol > i { width: 30px; height: 30px; display: grid; place-items: center; flex-shrink: 0; border: 1px solid rgba(86,217,202,.12); border-radius: 9px; color: #9cfff4; background: rgba(86,217,202,.075); font-size: 8px; font-style: normal; }
-.timeline-trade.loss .timeline-symbol > i { color: #ffb0b8; border-color: rgba(255,111,125,.16); background: rgba(255,111,125,.09); }
+.timeline-trade.loss .timeline-symbol > i, .diary-loss .diary-symbol { color: #ffb0b8; border-color: rgba(255,111,125,.16); background: rgba(255,111,125,.09); }
 .timeline-symbol strong, .timeline-symbol small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .timeline-symbol strong { color: #e1e9ee; font-size: 10px; }
 .timeline-symbol small { margin-top: 5px; color: #64717d; font-size: 8px; }
@@ -1582,11 +1582,10 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
 .diary-list h2, .diary-detail h2 { font-size: 17px; }
 .diary-trade { display: grid; grid-template-columns: 38px minmax(0,1fr) auto; align-items: center; gap: 12px; width: 100%; border: 1px solid transparent; border-top-color: var(--stroke); background: transparent; color: var(--text); padding: 18px 10px; border-radius: 12px; text-align: left; }
 .diary-trade.selected { background: rgba(86,217,202,.045); border-color: rgba(86,217,202,.18); }
-.diary-trade:hover { background: rgba(86,217,202,.035); }
-.diary-trade.diary-loss { background: rgba(244,99,121,.025); }
-.diary-trade.diary-loss:hover, .diary-trade.diary-loss.selected { background: rgba(244,99,121,.06); border-color: rgba(244,99,121,.2); }
+.diary-trade:not(.diary-loss):hover { background: rgba(86,217,202,.035); }
+.diary-trade.diary-loss:not(.selected):not(.severe) { border-color: var(--stroke); }
+.diary-trade.diary-loss:not(.selected):hover { border-color: rgba(255,111,125,.28); }
 .diary-symbol { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 11px; border: 1px solid var(--stroke); color: var(--aqua); background: rgba(86,217,202,.04); font-size: 11px; }
-.diary-loss .diary-symbol { color: #e39aa5; background: rgba(244,99,121,.04); }
 .diary-trade > span:nth-child(2) { display: flex; flex-direction: column; gap: 7px; }
 .diary-trade strong { font-size: 12px; font-weight: 600; }
 .diary-trade small { font-size: 9px; color: var(--muted); font-weight: 400; }
