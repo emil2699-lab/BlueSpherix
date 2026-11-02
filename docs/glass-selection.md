@@ -2,6 +2,8 @@
 
 I controlli selezionabili nelle sezioni della dashboard usano lo stesso canvas e lo stesso shader delle card. `app/glass-selection.ts` gestisce una sola selezione visiva, indipendente dai valori funzionali di filtri, tab, note e tag. I controlli comprendono periodi, viste, righe, celle, opzioni, menu, checkbox e radio. I pulsanti di azione (esportazione, salvataggio) e la navigazione laterale esterna al canvas mantengono il proprio comportamento.
 
+In **Oggi**, anche le righe delle posizioni aperte sono pulsanti nativi rivestibili, raggiungibili con Tab e selezionabili con Space/Invio. Prima erano blocchi `div` statici, mentre il periodo del grafico era già collegato. La selezione è soltanto visiva: non cambia dati o apre operazioni. Il negativo mantiene materiale e riflessi tinti di rosso. Il controllo specifico è `scripts/check-glass-selection-today.mjs` (stesse variabili della suite generale).
+
 ## Materiale e sequenza
 
 - Il punto del clic viene memorizzato nelle coordinate locali del controllo. Tastiera e scelte da popup rimossi usano il centro del trigger rimasto visibile.

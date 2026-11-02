@@ -201,6 +201,7 @@ nav button b { margin-left: auto; font-size: 8px; color: #091110; background: va
 .position-table { width: 100%; min-width: 0; overflow-x: hidden; }
 .table-row { width: 100%; min-width: 0; display: grid; grid-template-columns: minmax(0,1.25fr) minmax(0,.9fr) minmax(0,.7fr) minmax(0,.9fr) minmax(0,.9fr) minmax(0,.8fr); align-items: center; min-height: 46px; border-top: 1px solid var(--stroke); color: #a7b2bc; font-size: 9px; }
 .table-row > * { min-width: 0; }
+button.table-row { border-right: 0; border-bottom: 0; border-left: 0; background: transparent; font-family: inherit; text-align: left; cursor: pointer; }
 .position-table .table-row:not(.table-header) { min-height: 42px; margin: 4px 0; padding: 0 10px; border-radius: 9px; }
 .table-header { min-height: 30px; border-top: 0; color: #586470; text-transform: uppercase; font-size: 7px; letter-spacing: .8px; }
 .table-row > *:last-child { text-align: right; }

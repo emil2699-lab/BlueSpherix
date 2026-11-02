@@ -10,6 +10,7 @@ const SELECTABLE = [
   'button[aria-pressed]', 'button[aria-selected]', 'button[role="tab"]', 'button[aria-expanded]',
   '.range-switch button', '.trade-filters button', '.proposal-picker button',
   '.timeline-trade', '.diary-trade', '.diary-days button', '.exposure-row',
+  '.position-table button.table-row',
   '.filter-select-control', '.date-picker-control', 'select',
   'input[type="checkbox"]', 'input[type="radio"]',
   '.lab-experiments button', '.lab-parameter button', '.lab-friction-profiles button',
