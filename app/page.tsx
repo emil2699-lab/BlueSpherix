@@ -32,6 +32,7 @@ import Analytics from "./analytics";
 import Operations from "./operations";
 import Risk from "./risk";
 import Lab from "./lab";
+import Journal from "./journal";
 import { ALPHA_ACCOUNT, BEST_RECENT_TRADE, BEST_SESSION_30D, DASHBOARD_RANGE_STATS, DEMO_BALANCE_SERIES, DEMO_EQUITY_SERIES, DEMO_PERIOD_STATS, OPEN_PNL, OPEN_TRADES, type DashboardRange } from "./demo-data";
 import { valueSign } from "./value-sign";
 import { IceGlass } from "./ice-glass";
@@ -143,7 +144,7 @@ export default function Home() {
       const target = window.location.hash.slice(1) || "overview";
       setView(target);
       requestAnimationFrame(() => {
-        if (target === "portfolio" || target === "analytics" || target === "positions" || target === "risk" || target === "lab") window.scrollTo({ top: 0, behavior });
+        if (target === "portfolio" || target === "analytics" || target === "positions" || target === "risk" || target === "lab" || target === "journal") window.scrollTo({ top: 0, behavior });
         else document.getElementById(target)?.scrollIntoView({ behavior, block: "start" });
       });
     };
@@ -185,7 +186,7 @@ export default function Home() {
             <button className={view === target ? "active" : ""} aria-current={view === target ? "page" : undefined} key={label} onClick={() => goTo(target)}><Icon size={18} /><span>{label}</span>{label === "Lab" && <em>Beta</em>}</button>
           ))}
           <p className="nav-label spaced">Strumenti</p>
-          <button onClick={() => goTo("positions")}><BookOpen size={18} /><span>Diario</span></button>
+          <button className={view === "journal" ? "active" : ""} aria-current={view === "journal" ? "page" : undefined} onClick={() => goTo("journal")}><BookOpen size={18} /><span>Diario</span></button>
           <button onClick={() => goTo("calendar")}><CalendarDays size={18} /><span>Calendario</span><b>3</b></button>
         </nav>
         <div className="sidebar-bottom">
@@ -214,7 +215,8 @@ export default function Home() {
           {view === "positions" && <Operations />}
           {view === "risk" && <Risk />}
           {view === "lab" && <Lab />}
-          <div className="today-dashboard" hidden={view === "portfolio" || view === "analytics" || view === "positions" || view === "risk" || view === "lab"}>
+          {view === "journal" && <Journal />}
+          <div className="today-dashboard" hidden={view === "portfolio" || view === "analytics" || view === "positions" || view === "risk" || view === "lab" || view === "journal"}>
           <section className="welcome today-welcome" id="overview">
             <div><p className="date-line">Mercoledì, 28 ottobre</p><h1>Buongiorno, Luca.</h1><p>Il portafoglio è stabile. Il rischio è sotto controllo.</p></div>
             <span className={`risk-live-status ${riskUsed < 80 ? "calm" : riskUsed < 100 ? "warning" : "critical"}`}><i /> Dati aggiornati · 28 ott, 18:42</span>

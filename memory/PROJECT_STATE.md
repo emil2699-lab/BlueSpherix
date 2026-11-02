@@ -1,6 +1,6 @@
 # BlueSpherix — memoria operativa
 
-Ultimo aggiornamento: 2026-11-01
+Ultimo aggiornamento: 2026-11-02
 
 ## Obiettivo
 
@@ -11,11 +11,13 @@ Web app moderna per analisi di trading, ispirata alle funzioni di Myfxbook ma co
 - Repository: `emil2699-lab/BlueSpherix`, branch `first`.
 - Anteprima: `https://emil2699-lab.github.io/BlueSpherix/`.
 - Stack: Next.js 16.4.3, React 19.3.1, TypeScript, export statico su GitHub Pages.
-- Sezioni già sviluppate: Dashboard, Portfolio, Analytics, Operazioni, Rischio e Strategy Lab.
+- Sezioni già sviluppate: Dashboard, Portfolio, Analytics, Operazioni, Rischio, Strategy Lab e Diario.
 - La sezione Oggi usa ora lo stesso linguaggio visivo delle sezioni recenti: stato live, avviso demo, periodo integrato nel grafico, sfera dello stato del rischio con nodi dinamici per rischio aperto, margine e drawdown, e KPI strutturati. Ogni nodo segue una propria orbita concentrica con palette acqua/viola/blu; valori e soglie restano in una legenda interna. I tre KPI restano affiancati alle larghezze intermedie e, quando lo spazio si riduce, il mini-grafico scorre fisicamente dalla posizione laterale a quella centrale sotto il numero con curva fluida; su mobile i riquadri passano in colonna. Sugli schermi larghi i mini-grafici crescono progressivamente fino a 132×46 px.
 - Ice Glass WebGL 2 è applicato a tutte le viste: canvas condiviso, luce globale senza interpolazione, SDF/Snell/Fresnel, dispersione RGB 0,05 e fascia cromatica dritta di base, deformata dalle differenze dei percorsi Snell locali. Il trasporto a fotoni sperimentale è disattivato dopo il feedback sui punti luminosi. Base ripristinata a `7f42d25` tramite `5fdc748`; esperimenti successivi conservati in `/workspace/Desktop/bluespherix layout backup/vetro_rgb`. La superficie ora è trasparente: canvas sotto il DOM e nessun riempimento CSS aggiuntivo; contenuti opachi. Risposta diretta del materiale e parametri ottici preservati. Non è stato aggiunto alcuno sfondo dinamico. Safari/macOS non verificabile dal cloud.
 - La sezione Rischio è completa: budget di rischio, stress test, simulatore pre-trade, correlazioni, drawdown, protezioni, Monte Carlo e guardrail.
 - Strategy Lab include tre ipotesi interattive con parametri specifici, confronto Digital Twin, costi reali, rischio variabile, validazione walk-forward, Out-of-Sample Gate 70/30, Execution Friction Test, Parameter Space con risultati reali e archivio dei benchmark salvati nella sessione.
+
+- Diario ora ha una vista dedicata `#journal`: revisioni trade e giornate, ricerca/filtri, checklist, emozioni, tag, qualità, screenshot reali ed export JSON. Editor e archivio persistente locale condivisi con Operazioni; salvataggio esplicito, bozze conservate in memoria durante la navigazione, errori di quota visibili. Dettagli e test in `docs/journal.md`. Nessun backend o collegamento MT5 introdotto.
 
 ## Preferenze UI vincolanti
 

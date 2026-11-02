@@ -1,0 +1,65 @@
+// Run against a static preview: JOURNAL_URL=http://localhost:3001 node scripts/check-journal.mjs
+// Requires Playwright; set PLAYWRIGHT_MODULE to its module path when installed externally.
+const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || "playwright");
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+const browser = await chromium.launch({executablePath:process.env.CHROMIUM_PATH || '/usr/bin/chromium',args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const page = await browser.newPage({viewport:{width:1440,height:1000},acceptDownloads:true});
+const errors=[];page.on('pageerror',e=>errors.push(e.message));
+const artifactDir = process.env.JOURNAL_ARTIFACTS || '/tmp/bluespherix-journal-check';
+await fs.mkdir(artifactDir, { recursive: true });
+await page.goto(`${process.env.JOURNAL_URL || 'http://127.0.0.1:3001/'}#journal`);
+await page.getByRole('heading',{name:'Diario di trading.'}).waitFor();
+const editor=page.locator('.diary-editor');
+await editor.getByLabel('Esecuzione e osservazioni').fill('Test revisione: esecuzione disciplinata');
+await editor.getByLabel('Lezione da portare').fill('Aspettare la conferma');
+await editor.locator('.filter-select').filter({hasText:'Stato emotivo'}).getByRole('button').click();
+await page.getByRole('option',{name:'Calmo',exact:true}).click();
+await editor.getByRole('button',{name:'Qualità 4 su 5'}).click();
+await editor.getByRole('button',{name:'Pazienza',exact:true}).click();
+await editor.getByLabel('Setup verificato', {exact:true}).check();
+await editor.getByRole('button',{name:'Da revisionare',exact:true}).click();
+const image=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a3ioAAAAASUVORK5CYII=','base64');
+await editor.locator('input[type=file]').setInputFiles({name:'trade.png',mimeType:'image/png',buffer:image});
+await editor.locator('.diary-attachments img').waitFor();
+await editor.getByRole('button',{name:'Salva revisione'}).click();
+assert.equal(await editor.getByRole('status').textContent(),'Revisione salvata.');
+const saved=JSON.parse(await page.evaluate(()=>localStorage.getItem('bluespherix.journal.v1')));
+const id=Object.keys(saved)[0]; assert(saved[id].reviewed); assert.equal(saved[id].rating,4); assert.equal(saved[id].images.length,1);
+await page.reload();await editor.getByLabel('Esecuzione e osservazioni').waitFor();
+assert.equal(await editor.getByLabel('Esecuzione e osservazioni').inputValue(),'Test revisione: esecuzione disciplinata');
+await editor.getByLabel('Esecuzione e osservazioni').fill('Bozza preservata');
+await page.locator('.diary-trade').nth(1).click();await page.locator('.diary-trade').first().click();
+assert.equal(await editor.getByLabel('Esecuzione e osservazioni').inputValue(),'Bozza preservata');
+await editor.getByRole('button',{name:'Salva revisione'}).click();
+await page.locator('nav').getByRole('button',{name:'Operazioni',exact:true}).click();
+await page.getByRole('tab',{name:'Diario',exact:true}).click();
+await page.locator('.timeline-trade').filter({hasText:id}).click();
+assert.equal(await editor.getByLabel('Esecuzione e osservazioni').inputValue(),'Bozza preservata');
+await editor.getByLabel('Esecuzione e osservazioni').fill('Nota condivisa da Operazioni');await editor.getByRole('button',{name:'Salva revisione'}).click();
+await page.locator('nav').getByRole('button',{name:'Diario',exact:true}).click();
+assert.equal(await editor.getByLabel('Esecuzione e osservazioni').inputValue(),'Nota condivisa da Operazioni');
+await page.getByLabel('Cerca nel diario').fill('non-esiste-xyz');await page.getByRole('heading',{name:'Nessun trade trovato'}).waitFor();
+await page.getByRole('button',{name:'Mostra tutte le operazioni'}).click();
+await page.getByRole('button',{name:'1A',exact:true}).click();
+await page.getByRole('button',{name:'Successiva',exact:true}).click();
+assert.match(await page.locator('.diary-pagination > span').textContent(),/^2 \/ /);
+await page.getByRole('button',{name:'Giornate',exact:true}).click();
+await editor.getByLabel('Riepilogo della giornata').fill('Riflessione della giornata');await editor.getByRole('button',{name:'Salva revisione'}).click();
+assert.equal(await page.locator('.diary-days button').count(),1);
+const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'Esporta diario'}).click();const download=await downloadPromise;
+const content=JSON.parse(await fs.readFile(await download.path(),'utf8')); assert.equal(content.entries['day:2026-10-28'].note,'Riflessione della giornata');
+await page.getByRole('button',{name:'Trade',exact:true}).click();await page.getByRole('button',{name:'30G',exact:true}).click();
+for (const width of [1440,1024,768,390]) {
+ await page.setViewportSize({width,height:1000});await page.waitForTimeout(350);
+ assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`overflow ${width}`);
+ await page.screenshot({path:`${artifactDir}/diary-${width}.png`,fullPage:true});
+}
+// Failed persistence reports an error instead of claiming success.
+await editor.getByLabel('Esecuzione e osservazioni').fill('Bozza da non perdere');
+await page.evaluate(()=>{Storage.prototype.setItem=function(){throw new DOMException('QuotaExceededError');};});
+await editor.getByRole('button',{name:'Salva revisione'}).click();assert.match(await editor.getByRole('status').textContent(),/Salvataggio non riuscito/);
+assert.equal(await editor.getByLabel('Esecuzione e osservazioni').inputValue(),'Bozza da non perdere');
+assert.deepEqual(errors,[]);
+console.log('PASS persistence, drafts, operations sync, image upload, daily review, export, search, pagination, responsive and quota failure');
+await browser.close();

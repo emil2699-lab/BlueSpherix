@@ -5,21 +5,16 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   BookOpen,
-  CalendarDays,
-  Check,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Download,
-  ImagePlus,
   Search,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
-  Tag,
   Target,
 } from "lucide-react";
 import { ALPHA_ACCOUNT, DEMO_PENDING_ORDERS, DEMO_PERIOD_STATS, DEMO_TRADES, OPEN_PNL, RECENT_PLAN_COUNT, tradesForPeriod, type DemoPendingOrder, type DemoPeriod, type DemoTrade } from "./demo-data";
+import { FilterSelect, DateFilterPicker } from "./trade-controls";
+import { JournalEditor } from "./journal-editor";
 import { valueSign } from "./value-sign";
 
 type Period = DemoPeriod;
@@ -29,7 +24,6 @@ type FocusTab = "Dettagli" | "Diario";
 
 const periodStats = DEMO_PERIOD_STATS;
 const trades = DEMO_TRADES;
-const latestTradeDate = trades.reduce((latest, trade) => trade.openedAt > latest ? trade.openedAt : latest, trades[0]?.openedAt ?? "1970-01-01T00:00:00.000Z").slice(0, 10);
 
 const money = (value: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value);
 const signedMoney = (value: number) => `${value > 0 ? "+" : ""}${money(value)}`;
@@ -261,10 +255,6 @@ function TimelineWorkspace({ contained = false, visible, pendingOrders, selected
   const inspectorRef = useRef<HTMLElement>(null);
   const [focusHeight, setFocusHeight] = useState(578);
   const [focusTab, setFocusTab] = useState<FocusTab>("Dettagli");
-  const [journalNotes, setJournalNotes] = useState<Record<string, string>>({});
-  const [journalTags, setJournalTags] = useState<Record<string, string[]>>({});
-  const [journalErrors, setJournalErrors] = useState<Record<string, string>>({});
-  const [screenshots, setScreenshots] = useState<Record<string, string>>({});
   const pendingMode = filter === "Pendenti";
   const activeId = pendingMode ? selectedPending.id : selectedTrade.id;
 
@@ -315,7 +305,7 @@ function TimelineWorkspace({ contained = false, visible, pendingOrders, selected
     <aside ref={inspectorRef} className={`glass-card trade-inspector ${!pendingMode && selectedTrade.result < 0 ? `negative-surface ${Math.abs(selectedTrade.result) >= 200 ? "negative-strong" : ""}` : ""}`}>
       {pendingMode
         ? <PendingInspector order={selectedPending} />
-        : <TradeInspector trade={selectedTrade} focusTab={focusTab} setFocusTab={setFocusTab} journalNote={journalNotes[selectedTrade.id] ?? selectedTrade.note} setJournalNote={(note) => setJournalNotes((notes) => ({ ...notes, [selectedTrade.id]: note }))} tags={journalTags[selectedTrade.id] ?? []} setTags={(tags) => setJournalTags((current) => ({ ...current, [selectedTrade.id]: tags }))} error={journalErrors[selectedTrade.id] ?? (selectedTrade.planAligned ? "Nessuno" : "Ingresso o gestione")} setError={(error) => setJournalErrors((current) => ({ ...current, [selectedTrade.id]: error }))} screenshot={screenshots[selectedTrade.id]} setScreenshot={(name) => setScreenshots((current) => ({ ...current, [selectedTrade.id]: name }))} />}
+        : <TradeInspector trade={selectedTrade} focusTab={focusTab} setFocusTab={setFocusTab} />}
     </aside>
   </section>;
 }
@@ -343,144 +333,6 @@ function AdvancedFilters({ accountFilter, setAccountFilter, symbolFilter, setSym
   </div>;
 }
 
-function FilterSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const focusOption = (index: number) => requestAnimationFrame(() => {
-    const buttons = rootRef.current?.querySelectorAll<HTMLButtonElement>('.filter-select-menu [role="option"]');
-    buttons?.[Math.max(0, Math.min(index, buttons.length - 1))]?.focus();
-  });
-  const openWithKeyboard = (index: number) => {
-    setOpen(true);
-    focusOption(index);
-  };
-  const handleOptionKey = (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
-    if (!["ArrowDown", "ArrowUp", "Home", "End", "Escape"].includes(event.key)) return;
-    event.preventDefault();
-    if (event.key === "Escape") {
-      setOpen(false);
-      rootRef.current?.querySelector<HTMLButtonElement>(".filter-select-control")?.focus();
-      return;
-    }
-    const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? options.length - 1 : event.key === "ArrowDown" ? Math.min(options.length - 1, index + 1) : Math.max(0, index - 1);
-    focusOption(nextIndex);
-  };
-
-  useEffect(() => {
-    if (!open) return;
-    const closeOnOutside = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("pointerdown", closeOnOutside);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("pointerdown", closeOnOutside);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [open]);
-
-  return <div className={`filter-field filter-select ${open ? "open" : ""}`} ref={rootRef}>
-    <span>{label}</span>
-    <button className="filter-select-control" type="button" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((current) => !current)} onKeyDown={(event) => { if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); openWithKeyboard(event.key === "ArrowDown" ? Math.max(0, options.indexOf(value)) : options.length - 1); } }}><span>{value}</span><ChevronDown size={13} /></button>
-    {open && <div className="filter-select-menu" role="listbox" aria-label={label}>
-      {options.map((option, index) => <button type="button" role="option" aria-selected={value === option} key={option} onKeyDown={(event) => handleOptionKey(event, index)} onClick={() => { onChange(option); setOpen(false); }}><span>{option}</span>{value === option && <Check size={12} />}</button>)}
-    </div>}
-  </div>;
-}
-
-const dateToIso = (date: Date) => `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
-const dateFromIso = (value: string) => {
-  const [year, month, day] = value.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, day));
-};
-
-function DateFilterPicker({ label, value, min, max, onChange }: { label: string; value: string; min?: string; max?: string; onChange: (value: string) => void }) {
-  const [open, setOpen] = useState(false);
-  const [viewMonth, setViewMonth] = useState(() => {
-    const anchor = dateFromIso(value || latestTradeDate);
-    return new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), 1));
-  });
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const closeOnOutside = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("pointerdown", closeOnOutside);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("pointerdown", closeOnOutside);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [open]);
-
-  const year = viewMonth.getUTCFullYear();
-  const month = viewMonth.getUTCMonth();
-  const firstWeekday = (viewMonth.getUTCDay() + 6) % 7;
-  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-  const calendarCells = Array.from({ length: 42 }, (_, index) => {
-    const day = index - firstWeekday + 1;
-    return day > 0 && day <= daysInMonth ? day : null;
-  });
-  const visibleValue = value ? new Intl.DateTimeFormat("it-IT", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" }).format(dateFromIso(value)).replace(".", "") : "Seleziona data";
-  const monthLabel = new Intl.DateTimeFormat("it-IT", { month: "long", year: "numeric", timeZone: "UTC" }).format(viewMonth);
-  const moveMonth = (amount: number) => setViewMonth(new Date(Date.UTC(year, month + amount, 1)));
-  const focusCalendarDay = (preferredIndex?: number) => requestAnimationFrame(() => {
-    const buttons = [...(rootRef.current?.querySelectorAll<HTMLButtonElement>(".date-days button") ?? [])];
-    const enabled = buttons.filter((button) => !button.disabled);
-    if (!enabled.length) return;
-    const selected = buttons.findIndex((button) => button.getAttribute("aria-pressed") === "true");
-    const target = preferredIndex ?? (selected >= 0 ? selected : buttons.indexOf(enabled[0]));
-    const available = buttons.map((button, index) => ({ button, index })).filter(item => !item.button.disabled);
-    available.reduce((closest, item) => Math.abs(item.index - target) < Math.abs(closest.index - target) ? item : closest).button.focus();
-  });
-  const handleDayKey = (event: React.KeyboardEvent<HTMLButtonElement>) => {
-    const buttons = [...(rootRef.current?.querySelectorAll<HTMLButtonElement>(".date-days button") ?? [])];
-    const index = buttons.indexOf(event.currentTarget);
-    const movement = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[event.key];
-    if (movement !== undefined || event.key === "Home" || event.key === "End") {
-      event.preventDefault();
-      focusCalendarDay(event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : Math.max(0, Math.min(buttons.length - 1, index + (movement ?? 0))));
-    }
-  };
-  const toggleCalendar = () => {
-    if (!open) {
-      const anchor = dateFromIso(value || latestTradeDate);
-      setViewMonth(new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), 1)));
-    }
-    setOpen((current) => !current);
-  };
-  const chooseDay = (day: number) => {
-    onChange(dateToIso(new Date(Date.UTC(year, month, day))));
-    setOpen(false);
-  };
-
-  return <div className={`filter-field date-picker ${open ? "open" : ""}`} ref={rootRef}>
-    <span><CalendarDays size={11} /> {label}</span>
-    <button className="date-picker-control" type="button" aria-haspopup="dialog" aria-expanded={open} onClick={toggleCalendar} onKeyDown={(event) => { if (event.key === "ArrowDown") { event.preventDefault(); if (!open) toggleCalendar(); focusCalendarDay(); } }}><span className={value ? "" : "placeholder"}>{visibleValue}</span><CalendarDays size={13} /></button>
-    {open && <div className="date-picker-menu" role="dialog" aria-label={`Calendario ${label}`}>
-      <div className="date-picker-head"><button type="button" aria-label="Mese precedente" onClick={() => moveMonth(-1)}><ChevronLeft size={14} /></button><strong>{monthLabel}</strong><button type="button" aria-label="Mese successivo" onClick={() => moveMonth(1)}><ChevronRight size={14} /></button></div>
-      <div className="date-weekdays" aria-hidden="true">{["L", "M", "M", "G", "V", "S", "D"].map((day, index) => <span key={`${day}-${index}`}>{day}</span>)}</div>
-      <div className="date-days">
-        {calendarCells.map((day, index) => {
-          if (!day) return <span key={`empty-${index}`} />;
-          const iso = dateToIso(new Date(Date.UTC(year, month, day)));
-          const disabled = Boolean((min && iso < min) || (max && iso > max));
-          return <button type="button" key={iso} disabled={disabled} aria-pressed={value === iso} onKeyDown={handleDayKey} onClick={() => chooseDay(day)}>{day}</button>;
-        })}
-      </div>
-      <div className="date-picker-foot"><button type="button" disabled={!value} onClick={() => { onChange(""); setOpen(false); }}>Rimuovi data</button></div>
-    </div>}
-  </div>;
-}
-
 function PendingStream({ orders, selected, setSelected }: { orders: DemoPendingOrder[]; selected: DemoPendingOrder; setSelected: (id: string) => void }) {
   return <div className="timeline-day pending-day">
     <div className="timeline-day-head"><span>Ordini pendenti</span><strong>{orders.length} attivi</strong></div>
@@ -497,22 +349,13 @@ function PendingStream({ orders, selected, setSelected }: { orders: DemoPendingO
   </div>;
 }
 
-function TradeInspector({ trade, focusTab, setFocusTab, journalNote, setJournalNote, tags, setTags, error, setError, screenshot, setScreenshot }: {
+function TradeInspector({ trade, focusTab, setFocusTab }: {
   trade: DemoTrade;
   focusTab: FocusTab;
   setFocusTab: (tab: FocusTab) => void;
-  journalNote: string;
-  setJournalNote: (note: string) => void;
-  tags: string[];
-  setTags: (tags: string[]) => void;
-  error: string;
-  setError: (error: string) => void;
-  screenshot?: string;
-  setScreenshot: (name: string) => void;
 }) {
   const [tabHasMoved, setTabHasMoved] = useState(false);
   const levels = levelsFor(trade);
-  const toggleTag = (tag: string) => setTags(tags.includes(tag) ? tags.filter((item) => item !== tag) : [...tags, tag]);
   const selectFocusTab = (tab: FocusTab) => {
     if (tab === focusTab) return;
     setTabHasMoved(true);
@@ -547,13 +390,7 @@ function TradeInspector({ trade, focusTab, setFocusTab, journalNote, setJournalN
       </dl>
       <dl className="trade-costs"><div><dt>Lordo</dt><dd data-sign={valueSign(trade.grossPnl)}>{signedMoney(trade.grossPnl)}</dd></div><div><dt>Commissioni</dt><dd data-sign={valueSign(trade.commission)}>{money(trade.commission)}</dd></div><div><dt>Swap</dt><dd data-sign={valueSign(trade.swap)}>{money(trade.swap)}</dd></div></dl>
       <div className="inspector-note"><Sparkles size={16} /><div><strong>Lettura operativa</strong><p>{trade.note}</p></div></div>
-    </> : <div className="journal-panel">
-      <div className={trade.planAligned ? "plan-status aligned" : "plan-status caution"}>{trade.planAligned ? <Check size={15} /> : <Sparkles size={15} />}<span><strong>{trade.planAligned ? "Piano rispettato" : "Da rivedere"}</strong><small>Valutazione dimostrativa dell’esecuzione</small></span></div>
-      <label className="journal-field"><span>Note personali</span><textarea value={journalNote} onChange={(event) => setJournalNote(event.target.value)} rows={5} /></label>
-      <label className="journal-field"><span>Errore principale</span><select value={error} onChange={(event) => setError(event.target.value)}><option>Nessuno</option><option>Ingresso anticipato</option><option>Rischio eccessivo</option><option>Uscita emotiva</option><option>Ingresso o gestione</option></select></label>
-      <div className="journal-field"><span><Tag size={13} /> Tag</span><div className="journal-tags">{["Piano rispettato", "Da rivedere", "Alta qualità", "News"].map((tag) => <button key={tag} className={tags.includes(tag) ? "active" : ""} onClick={() => toggleTag(tag)}>{tag}</button>)}</div></div>
-      <label className="screenshot-upload"><ImagePlus size={17} /><span><strong>{screenshot || "Aggiungi screenshot"}</strong><small>PNG o JPG · resta locale nella demo</small></span><input type="file" accept="image/png,image/jpeg" onChange={(event) => setScreenshot(event.target.files?.[0]?.name ?? "")} /></label>
-    </div>}
+    </> : <JournalEditor key={trade.id} entryId={trade.id} trade={trade} />}
   </>;
 }
 
