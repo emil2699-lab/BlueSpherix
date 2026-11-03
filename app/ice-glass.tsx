@@ -10,6 +10,9 @@ type ViewportRect = { left: number; top: number; width: number; height: number }
 type GlassRect = ViewportRect & { right: number; bottom: number };
 type Measurement = { element: HTMLElement; rect: GlassRect; radius: number; tint: number[]; crownHeight: number };
 const GLASS_SURFACE_SELECTOR = ".glass-card, .calendar-strip, .demo-notice, [data-glass-selection]";
+// Keep the overscanned backing store below a conservative Safari allocation
+// budget as well as the GPU's per-axis limits. These are physical pixels.
+const BUFFER_PIXEL_BUDGET = 8_388_608;
 
 export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -30,6 +33,9 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     let cards: Measurement[] = [];
     let dpr = Math.min(devicePixelRatio || 1, config.maxDPR);
     let dprCap: number = config.maxDPR;
+    let maxBufferWidth = 1;
+    let maxBufferHeight = 1;
+    let resolutionQuery: MediaQueryList | null = null;
     let viewport: ViewportRect = { left: 0, top: 0, width: innerWidth, height: innerHeight };
     let lastRender = 0;
     let slowFrames = 0;
@@ -72,7 +78,11 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         gl.useProgram(program);
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-        root.dataset.iceGlass = "ready";
+        const viewportLimits = gl.getParameter(gl.MAX_VIEWPORT_DIMS) as Int32Array;
+        const sideLimit = Math.min(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE),gl.getParameter(gl.MAX_TEXTURE_SIZE));
+        maxBufferWidth = Math.min(sideLimit,viewportLimits[0]);
+        maxBufferHeight = Math.min(sideLimit,viewportLimits[1]);
+        dprCap = config.maxDPR;
       } catch (error) {
         console.warn("Ice Glass uses the dark-card fallback:", error);
         dispose();
@@ -124,18 +134,37 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       cards = cards.filter(card=>card.rect.width>0 && card.rect.height>0);
       dirty = false;
     };
+    const fitDrawingBuffer = () => {
+      // Page zoom can enlarge the CSS viewport without reducing Safari's DPR.
+      // Reduce only raster resolution; all optical lengths stay in CSS pixels.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        dpr = Math.min(devicePixelRatio || 1,dprCap,
+          maxBufferWidth/viewport.width,maxBufferHeight/viewport.height,
+          Math.sqrt(BUFFER_PIXEL_BUDGET/(viewport.width*viewport.height)));
+        const width = Math.max(1,Math.floor(viewport.width*dpr));
+        const height = Math.max(1,Math.floor(viewport.height*dpr));
+        if (canvas.width !== width || canvas.height !== height || !gl.drawingBufferWidth || !gl.drawingBufferHeight) {
+          canvas.width = width;
+          canvas.height = height;
+        }
+        // The requested attributes can survive a failed allocation. Hide the
+        // CSS fallback only after the actual WebGL buffer matches the request.
+        if (gl.drawingBufferWidth === width && gl.drawingBufferHeight === height) return { width, height };
+        if (gl.isContextLost()) break;
+        dprCap = dpr*.5;
+      }
+      delete root.dataset.iceGlass;
+      return null;
+    };
     const draw = (time: number) => {
       frame = 0;
       if (lost || !program || document.hidden) return;
       const nextViewport = readViewport();
       if (dirty || viewportChanged(nextViewport)) measure(nextViewport);
-      // Safari changes devicePixelRatio independently from layout while browser
-      // zoom is in progress. Read it per frame so backing store and DOM remain
-      // in the same coordinate space throughout the zoom gesture.
-      dpr = Math.min(devicePixelRatio || 1,dprCap);
       const viewWidth = viewport.width, viewHeight = viewport.height;
-      const width = Math.max(1,Math.round(viewWidth*dpr)), height = Math.max(1,Math.round(viewHeight*dpr));
-      if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
+      const buffer = fitDrawingBuffer();
+      if (!buffer) return;
+      const { width, height } = buffer;
       gl.disable(gl.SCISSOR_TEST);
       gl.clearColor(0,0,0,0);
       gl.clear(gl.COLOR_BUFFER_BIT);
@@ -192,6 +221,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         gl.uniform3f(uniform("uTint"),tint[0],tint[1],tint[2]);
         gl.drawArrays(gl.TRIANGLES,0,6);
       }
+      if (root.dataset.iceGlass !== "ready") root.dataset.iceGlass = "ready";
       canvas.dataset.pointer = `${pointer.x},${pointer.y}`;
       // Adapt resolution only under sustained activity, never interpolate position.
       const settling = time < settleUntil;
@@ -213,6 +243,12 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     };
     const invalidate = () => { dirty = true; schedule(); };
     const settleLayout = () => { settleUntil = performance.now()+700; invalidate(); };
+    const watchResolution = () => {
+      resolutionQuery?.removeEventListener("change",resolutionChanged);
+      resolutionQuery = matchMedia(`(resolution: ${devicePixelRatio || 1}dppx)`);
+      resolutionQuery.addEventListener("change",resolutionChanged);
+    };
+    const resolutionChanged = () => { watchResolution(); settleLayout(); };
     const syncObservedSurfaces = () => {
       if (!resize) return;
       const current = new Set(root.querySelectorAll(GLASS_SURFACE_SELECTOR));
@@ -239,6 +275,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     };
     const contextRestored = () => { dispose(); lost = false; initialize(); invalidate(); };
     initialize();
+    watchResolution();
     resize = new ResizeObserver(settleLayout);
     resize.observe(root);
     syncObservedSurfaces();
@@ -266,6 +303,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     invalidate();
     return () => {
       clearTimeout(underlightTimer); cancelAnimationFrame(frame); resize?.disconnect(); mutation.disconnect();
+      resolutionQuery?.removeEventListener("change",resolutionChanged);
       window.removeEventListener("pointermove",move); window.removeEventListener("pointerrawupdate",move);
       window.removeEventListener("pointerout",leave); window.removeEventListener("resize",settleLayout);
       window.removeEventListener("scroll",invalidate,true); root.removeEventListener("transitionrun",settleLayout); root.removeEventListener("transitionend",invalidate);

@@ -41,7 +41,11 @@ function materialTint(element: HTMLElement, context: CanvasRenderingContext2D | 
   element.style.setProperty('transition', 'none', 'important');
   const style = getComputedStyle(element);
   const indicator = element.parentElement?.querySelector<HTMLElement>('.diary-tab-indicator, .focus-tab-indicator');
+  // Correlation cells keep their semantic palette on a full-size pseudo layer.
+  // Sample it before suppressing that flat surface beneath the optical one.
+  const surface = element.matches('button.correlation-cell') ? getComputedStyle(element,'::before') : null;
   const sources = [style.backgroundImage, style.backgroundColor,
+    surface?.backgroundImage ?? '', surface?.backgroundColor ?? '',
     indicator ? getComputedStyle(indicator).background : '', style.color];
   if (transition) element.style.setProperty('transition', transition, priority);
   else element.style.removeProperty('transition');

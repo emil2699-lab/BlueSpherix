@@ -129,6 +129,21 @@ gli eventi `visualViewport` invalidano le geometrie durante zoom e pan. In quest
 modo il materiale WebGL resta sovrapposto alle card anche mentre Safari cambia
 separatamente viewport, layout e scala del backing store.
 
+Il backing store rispetta anche i limiti WebGL di ciascun asse e un budget di
+8.388.608 pixel fisici: lo zoom non può ingrandire senza controllo il canvas
+con overscan. Si riduce soltanto la risoluzione di rasterizzazione, mantenendo
+geometrie e parametri ottici in pixel CSS. Un media query listener sulla
+risoluzione risveglia il renderer anche quando cambia solo il DPR.
+
+Lo stato `ready` viene applicato dopo un disegno su un buffer effettivamente
+allocato. Se l'allocazione fallisce, il renderer prova risoluzioni inferiori e
+mantiene disponibile il materiale CSS invece di lasciare superfici vuote.
+I limiti vengono riletti dopo il ripristino del contesto.
+
+`scripts/check-glass-zoom.mjs` verifica viewport/DPR, pinch zoom, cambi di solo
+DPR, allocazioni fallite, fallback e ripristino WebGL con limiti GPU ridotti.
+Queste prove sono eseguite in Chromium; Safari nativo non è disponibile nel cloud.
+
 ### Copertura dell'applicazione
 
 Il renderer globale è montato una sola volta sul contenitore principale e

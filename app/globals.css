@@ -142,6 +142,7 @@ nav button b { margin-left: auto; font-size: 8px; color: #091110; background: va
 /* The isolated content stack keeps the glass above the page background and
    below all DOM content. Only the material transmits the backdrop. */
 .ice-glass-canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; pointer-events: none; z-index: -1; }
+.content:not([data-ice-glass="ready"]) > .ice-glass-canvas { visibility: hidden; }
 .content[data-ice-glass="ready"] :is(.glass-card, .calendar-strip, .demo-notice) { background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
 .content:not([data-ice-glass="ready"]) :is(.glass-card, .calendar-strip, .demo-notice) { background: rgba(17,27,40,.26); }
 .content[data-ice-glass="ready"] .glass-card:hover { transform: none; }
@@ -1692,6 +1693,9 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
+/* This full-size flat plate has a tighter corner radius than the soap glass.
+   Its palette is transferred to the shader; keep only the optical material. */
+.content[data-ice-glass="ready"] button.correlation-cell[data-glass-selection]::before { background: none !important; }
 /* These older sliding plates would cover the shared glass drawn behind them. */
 .content :is(.diary-segment,.focus-tabs):has([data-glass-selection]) > :is(.diary-tab-indicator,.focus-tab-indicator) { visibility: hidden; }
 .content:not([data-ice-glass="ready"]) [data-glass-selection] {

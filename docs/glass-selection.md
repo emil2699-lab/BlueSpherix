@@ -42,6 +42,11 @@ Lo shader riceve `uCoating = (coverage, isControl, opacity, volume)` e `uCoating
 
 ## Verifica
 
+Le celle di correlazione trasferiscono allo shader anche la tinta del proprio
+pseudo-elemento di superficie. Durante il rivestimento quel livello piatto viene
+nascosto: il raggio più stretto della sua sagoma non può più sporgere dagli angoli
+del vetro. Alla deselezione ricompare lo stile originale.
+
 ```sh
 PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs node scripts/check-glass-selection.mjs
 ```
