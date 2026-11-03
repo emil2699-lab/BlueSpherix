@@ -261,13 +261,19 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .portfolio-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 24px 0 16px; }
 .portfolio-toolbar > span, .portfolio-caption { color: var(--muted); font-size: 11px; line-height: 1.6; }
 .portfolio-toolbar .range-switch button { min-width: 65px; font-size: 12px; height: 32px; }
-.portfolio-totals { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 15px; }
+.portfolio-totals { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.1fr) minmax(180px, .7fr); gap: 15px; }
 .portfolio-totals article { padding: 22px; }
 .portfolio-totals strong { font-size: clamp(22px, 2.5vw, 31px); letter-spacing: -1px; }
 .portfolio-totals p:last-child { font-size: 11px; color: var(--muted); margin-bottom: 0; line-height: 1.6; }
 .portfolio-main { display: grid; grid-template-columns: minmax(0, 1.9fr) minmax(270px, 1fr); gap: 15px; margin-top: 16px; }
 .comparison-card, .allocation-card { padding: 24px; min-width: 0; }
 .comparison-chart { width: 100%; display: block; margin: 22px 0 12px; }
+.comparison-scale-controls { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 18px; color: var(--muted); font-size: 10px; }
+.comparison-scale-controls button { border: 0; border-radius: 7px; padding: 6px 8px; background: rgba(86,217,202,.08); color: var(--aqua); font: inherit; cursor: pointer; }
+.comparison-scale-controls button:disabled { background: transparent; color: var(--muted); cursor: default; }
+.comparison-axis-handle { touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
+.comparison-axis-handle.dragging { cursor: grabbing; }
+.comparison-axis-handle:focus-visible { outline: 1px solid var(--aqua); outline-offset: 2px; }
 .chart-slider { display: flex; flex-direction: column; gap: 10px; color: var(--muted); font-size: 11px; }
 .chart-slider input { width: 100%; accent-color: var(--aqua); cursor: pointer; }
 .comparison-values { display: flex; gap: 18px; flex-wrap: wrap; margin: 18px 0; font-size: 11px; }
