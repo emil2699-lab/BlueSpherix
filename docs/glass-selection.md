@@ -14,6 +14,16 @@ La luce secondaria usa un'approssimazione di area luminosa in 2.5D: ogni frammen
 
 Il renderer condiviso aggiorna il moto a circa 30 fps a riposo, senza ritardare gli eventi del puntatore. La deselezione dissolve anche la luce e arresta il loop; pagina nascosta, perdita del contesto e smontaggio cancellano il timer. Reduced motion mantiene la luce ferma. Lo sfondo non viene animato. Verifica: `scripts/check-glass-underlight.mjs`, con catture temporali, copertura delle sette sezioni, reset durante la navigazione, scala P&L tra le viste, arresto del loop e mobile/reduced motion. `node --experimental-strip-types scripts/check-underlight-scale.mjs` verifica soglie, limite e simmetria dei segni. `scripts/check-underlight-optics.mjs` esegue il GLSL di produzione in framebuffer float: spegnimento e riaccensione dello stesso punto, continuità, colore, decadimento sulla card lontana, clipping ai bordi e alpha invariato.
 
+### Trasporto interno sulla spalla curva
+
+La luce della selezione raggiunge anche la propria spalla convessa. Il frammento traccia il cammino inverso dall'osservatore ortografico: rifrazione aria-vetro, intersezione con il volume chiuso `±soapSurface`, rifrazione vetro-aria e campionamento della sorgente diffusa sotto il materiale. Il piano emittente si trova a `z = -1,6 × spessore` e usa lo stesso campo luminoso, colore, tempo e tetto P&L della superficie centrale. Il campionamento rifratto può comprimere, allargare o spostare le zone luminose sul raccordo.
+
+Ogni interfaccia usa Snell e Fresnel non polarizzato, compreso l'angolo critico. L'energia riflessa prosegue fino a due riflessioni interne; l'energia trasmessa contribuisce solo se raggiunge il piano emittente entro la sagoma. Beer-Lambert attenua ogni segmento in funzione della lunghezza effettiva nel vetro. Il risolutore combina Newton con un intervallo di bisezione e usa le normali analitiche del medesimo volume convesso. Il volume cresce con la fase di lievitazione della selezione.
+
+La transizione dal contributo diffuso centrale al trasporto ottico segue l'inclinazione locale della superficie. Non somma due volte la stessa luce e non amplifica la radiance con un moltiplicatore di curvatura: alcune parti della spalla diventano più luminose, altre più scure. Le zone soggette a riflessione interna totale possono rimanere scure; non è previsto un contorno uniformemente acceso. Il limite della sorgente resta quello approvato (+15%). Alpha, sagoma, riflesso RGB del cursore e contributo alle card vicine rimangono invariati.
+
+È un modello di ottica geometrica in 2.5D, con un numero limitato di cammini speculari; non include diffusione volumetrica o una simulazione ondulatoria. `scripts/check-underlight-rim.mjs` verifica in GPU le intersezioni durante la crescita, Fresnel al 4% a incidenza normale per IOR 1,5, riflessione interna totale, conservazione della radiance, redistribuzione e continuità temporale, clipping, alpha e identità del materiale senza luce interna. La suite browser verifica anche che luce e bordo restino agganciati alla selezione durante lo scroll.
+
 ## Materiale e sequenza
 
 - Il punto del clic viene memorizzato nelle coordinate locali del controllo. Tastiera e scelte da popup rimossi usano il centro del trigger rimasto visibile.

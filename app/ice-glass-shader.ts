@@ -90,7 +90,7 @@ uniform float uCrownHeight;
 // x: radial coverage, y: control flag, z: deselection fade, w: convex volume.
 uniform vec4 uCoating;
 uniform vec2 uCoatingOrigin;
-// Oggi selection experiment: strength and seconds since selection.
+// Selected under-glass light: P&L ceiling and seconds since selection.
 uniform vec2 uUnderlight;
 // Selected area emitter, in the same CSS-pixel space as every glass card.
 uniform vec4 uSpillRect;
@@ -155,6 +155,77 @@ vec3 softUnderlight(vec2 localPixel, float depth, float fresnel, float volume) {
   float softEdge=smoothstep(0.0,min(14.0,uRect.w*.27),depth);
   return transmission*(.138*1.15*level)*softEdge*(1.0-fresnel)
     *smoothstep(.2,1.0,volume);
+}
+float internalFresnel(float cosine, float fromIOR, float toIOR) {
+  float c=clamp(cosine,0.0,1.0), eta=fromIOR/toIOR;
+  float sineSquared=eta*eta*(1.0-c*c);
+  if(sineSquared>=1.0) return 1.0;
+  float transmittedCosine=sqrt(max(0.0,1.0-sineSquared));
+  float s=(fromIOR*c-toIOR*transmittedCosine)/max(fromIOR*c+toIOR*transmittedCosine,.0001);
+  float p=(toIOR*c-fromIOR*transmittedCosine)/max(toIOR*c+fromIOR*transmittedCosine,.0001);
+  return .5*(s*s+p*p);
+}
+// Intersect the closed soap volume, not a flat slab or a painted edge mask.
+// Safeguarded Newton steps converge quickly; bisection handles grazing rays.
+float soapRayExit(vec3 origin, vec3 ray, vec2 b, float radius, float thickness,
+  float volume, out vec3 normal) {
+  float lo=.04;
+  float vertical=(thickness*volume*1.3-sign(ray.z)*origin.z)/max(abs(ray.z),.0001);
+  vec2 sides=(b-sign(ray.xy)*origin.xy)/max(abs(ray.xy),vec2(.0001));
+  float hi=min(vertical,min(sides.x,sides.y))+.001;
+  float travel=hi;
+  vec3 gradient=vec3(0,0,1);
+  for(int i=0;i<13;i++) {
+    vec3 point=origin+ray*travel;
+    float contour=boxSDF(point.xy,b,radius);
+    vec3 surface=contour<0.0 ? soapSurface(point.xy,b,radius,thickness)*volume : vec3(0.0);
+    float vertical=abs(point.z)-surface.z;
+    float boundary=max(contour,vertical);
+    gradient=vertical>contour ? vec3(-surface.xy,sign(point.z))
+      : vec3(roundedSurfaceNormal(point.xy,b,radius),0.0);
+    if(abs(boundary)<.0005 || i==12) break;
+    if(boundary>0.0) hi=travel; else lo=travel;
+    float slope=dot(gradient,ray);
+    float next=travel-boundary/max(slope,.0001);
+    travel=slope>.0001 && next>lo && next<hi ? next : (lo+hi)*.5;
+  }
+  normal=normalize(gradient);
+  return travel;
+}
+vec3 internalUnderlight(vec2 localPixel, vec3 surface, vec3 normal,
+  float radius, float thickness, float volume) {
+  vec2 b=uRect.zw*.5;
+  vec3 point=vec3(localPixel-b,surface.z*volume);
+  // Trace camera -> glass -> luminous underside. Fresnel splits the energy at
+  // every interface; retained energy follows up to two internal reflections.
+  vec3 ray=refract(vec3(0,0,-1),normal,1.0/uGlass.x);
+  float energy=1.0-internalFresnel(normal.z,1.0,uGlass.x);
+  vec3 radiance=vec3(0.0);
+  for(int bounce=0;bounce<3;bounce++) {
+    point+=ray*.04;
+    vec3 exitNormal;
+    float path=soapRayExit(point,ray,b,radius,thickness,volume,exitNormal);
+    point+=ray*path;
+    // Beer-Lambert attenuation depends on the actual distance inside the glass.
+    energy*=exp(-.055*path/max(thickness,1.0));
+    float reflected=internalFresnel(dot(ray,exitNormal),uGlass.x,1.0);
+    vec3 outgoing=refract(ray,-exitNormal,uGlass.x);
+    if(outgoing.z<-.02 && reflected<1.0) {
+      float toLamp=(-thickness*volume*1.6-point.z)/outgoing.z;
+      if(toLamp>0.0) {
+        vec2 source=point.xy+outgoing.xy*toLamp;
+        float lamp=1.0-smoothstep(-max(2.0,thickness*.15),0.0,boxSDF(source,b,radius));
+        float level=underlightLevel(source+b,uRect.zw,uCoatingOrigin,uUnderlight.y)*uUnderlight.x;
+        radiance+=underlightTransmission(uTint,level)*level*lamp*energy*(1.0-reflected);
+      }
+    }
+    energy*=reflected;
+    if(energy<.002) break;
+    ray=reflect(ray,exitNormal);
+  }
+  // Radiance is transported, never amplified by a curvature multiplier. The
+  // refracted source footprint compresses/stretches across the curved shoulder.
+  return radiance*(.138*1.15)*smoothstep(.2,1.0,volume);
 }
 vec3 underlightSpill(vec2 pixel, float depth) {
   // A near-field area-light approximation. Each receiver samples the actual
@@ -314,8 +385,15 @@ void main() {
   outColor=vec4(color*opticalAlpha-body*(opticalAlpha-alpha),alpha);
   if(uSpill.w>.5 && depth<26.0) outColor.rgb+=underlightSpill(pixel,depth)*coverage;
   if(uUnderlight.x>0.0 && uCoating.y>.5) {
-    // Add only transmitted radiance: opacity, geometry and rim optics stay fixed.
-    outColor.rgb+=softUnderlight(materialPixel,depth,fresnel,volume)*coverage;
+    vec3 illumination=softUnderlight(materialPixel,depth,fresnel,volume);
+    float shoulderTransport=smoothstep(.02,.18,1.0-N.z);
+    if(shoulderTransport>.001 && volume>.2) {
+      vec3 transported=internalUnderlight(materialPixel,surface,N,radius,thickness,volume);
+      illumination=mix(illumination,transported,shoulderTransport);
+    }
+    // Only the underlight changes: preserve alpha, the cursor's RGB reflection,
+    // the material geometry and the crisp interface above the optical layer.
+    outColor.rgb+=illumination*coverage;
   }
   if(uCoating.y>.5) {
     vec2 origin=uCoatingOrigin*uRect.zw;

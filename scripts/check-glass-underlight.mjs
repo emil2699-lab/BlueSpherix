@@ -10,11 +10,11 @@ const instrument = () => {
   window.underlightFrames = [];
   const proto = WebGL2RenderingContext.prototype;
   const get = proto.getUniformLocation, put = proto.uniform2f, put4 = proto.uniform4f, draw = proto.drawArrays;
-  const locations = new WeakMap(); let underlight = [0, 0], spill = [0,0,0,0];
+  const locations = new WeakMap(); let underlight = [0, 0], spill = [0,0,0,0], rect = [0,0,0,0];
   proto.getUniformLocation = function (program, name) { const l = get.call(this, program, name); if (l) locations.set(l, name); return l; };
   proto.uniform2f = function (location, ...values) { if (locations.get(location) === 'uUnderlight') underlight = values; return put.call(this, location, ...values); };
-  proto.uniform4f = function(location,...values) { if(locations.get(location)==='uSpill') spill=values; return put4.call(this,location,...values); };
-  proto.drawArrays = function (...args) { window.underlightFrames.push({ time: performance.now(), values: [...underlight], spill: [...spill] }); return draw.call(this, ...args); };
+  proto.uniform4f = function(location,...values) { if(locations.get(location)==='uSpill') spill=values; if(locations.get(location)==='uRect') rect=values; return put4.call(this,location,...values); };
+  proto.drawArrays = function (...args) { window.underlightFrames.push({ time: performance.now(), values: [...underlight], spill: [...spill], rect: [...rect] }); return draw.call(this, ...args); };
 };
 await page.addInitScript(instrument); page.on('pageerror', e => errors.push(e.message));
 const url = process.env.GLASS_SELECTION_URL || 'http://127.0.0.1:3001/';
@@ -34,6 +34,15 @@ const expected = Number(await negative.getAttribute('data-glass-underlight'));
 assert(expected >= .25 && expected <= 1);
 assert(active.every(f=>Math.abs(f.values[0]-expected)<1e-6),'negative P&L ceiling reaches shader');
 assert(active.length > 2); assert(active.at(-1).values[1] - active[0].values[1] > 12);
+for (const delta of [-160, 160]) {
+  await page.evaluate(y => { window.underlightFrames = []; window.scrollBy(0,y); }, delta); await step(200);
+  const alignment = await negative.evaluate(el => {
+    const row=el.getBoundingClientRect(),canvas=document.querySelector('.ice-glass-canvas').getBoundingClientRect();
+    const frame=window.underlightFrames.findLast(f=>f.values[0]>0);
+    return frame ? Math.max(Math.abs(frame.rect[0]-(row.left-canvas.left)),Math.abs(frame.rect[1]-(row.top-canvas.top)),Math.abs(frame.rect[2]-row.width),Math.abs(frame.rect[3]-row.height)) : Infinity;
+  });
+  assert(alignment < .1, 'underlight and curved rim remain attached during scrolling');
+}
 // Other position ceilings are read from their own numerical result, not labels.
 for (const row of await page.locator('.position-table button.table-row').all()) {
   await row.click(); await page.clock.runFor(2); await step(1000);
