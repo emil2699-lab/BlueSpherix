@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { returnScale, returnTicks, stretchReturns } from "./portfolio-scale";
+import { PORTFOLIO_TRADES, portfolioDate, type PortfolioTrade } from "./portfolio-trades";
 
 type Domain = { min: number; max: number };
 type Series = { id: string; color: string; returns: number[] };
 const axisPercent = (value: number) => `${value.toLocaleString("it-IT", { maximumFractionDigits: 2 })}%`;
 
-export default function PortfolioChart({ accounts, point }: { accounts: Series[]; point: number }) {
+export default function PortfolioChart({ accounts, point, onTrade }: { accounts: Series[]; point: number; onTrade: (trade: PortfolioTrade) => void }) {
   const automatic = returnScale(accounts.flatMap(account => account.returns));
   const [manual, setManual] = useState<Domain | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -20,6 +21,7 @@ export default function PortfolioChart({ accounts, point }: { accounts: Series[]
   const ticks = manual ? returnTicks(domain.min, domain.max) : automatic.ticks;
   const chartY = (value: number) => 220 - (value - domain.min) / (domain.max - domain.min) * 200;
   const plotWidth = chartWidth - 65;
+  const markers = PORTFOLIO_TRADES.filter(trade => accounts.some(account => account.id === trade.accountId) && trade.returnPct >= domain.min && trade.returnPct <= domain.max);
   const plotHeight = useCallback(() => (axis.current?.ownerSVGElement?.getBoundingClientRect().height ?? 255) * 200 / 255, []);
   const anchorAt = useCallback((clientY: number) => {
     const box = axis.current?.ownerSVGElement?.getBoundingClientRect();
@@ -61,7 +63,6 @@ export default function PortfolioChart({ accounts, point }: { accounts: Series[]
 
   return <>
     <div className="comparison-scale-controls">
-      <span>Trascina o pizzica la scala · Maiusc per spostarla</span>
       <button type="button" aria-label="Ripristina scala automatica" disabled={!manual} onClick={() => setManual(null)}>Scala automatica</button>
     </div>
     <svg className="comparison-chart" viewBox={`0 0 ${chartWidth} 255`} role="group" aria-label={`Rendimento percentuale delle strategie selezionate, scala comune da ${axisPercent(domain.min)} a ${axisPercent(domain.max)}`}>
@@ -85,8 +86,26 @@ export default function PortfolioChart({ accounts, point }: { accounts: Series[]
         {accounts.map(a => <polyline key={a.id} points={a.returns.map((v, i) => `${45 + i * plotWidth / 11},${chartY(v)}`).join(" ")} fill="none" stroke={a.color} strokeWidth="2.5" strokeLinejoin="round" />)}
         <line x1={45 + point * plotWidth / 11} x2={45 + point * plotWidth / 11} y1="20" y2="220" stroke="#8c99a7" strokeDasharray="4 5" />
         {accounts.map(a => <circle key={a.id} cx={45 + point * plotWidth / 11} cy={chartY(a.returns[point])} r="4" fill={a.color} />)}
+        {markers.map(trade => {
+          const account = accounts.find(account => account.id === trade.accountId)!;
+          const name = `${account.id === "alpha" ? "Trade" : "Trade dimostrativo"} ${trade.id} · ${portfolioDate(trade.progress)} · ${trade.netPnl.toLocaleString("it-IT", { maximumFractionDigits: 2 })} USD`;
+          return <g key={`${trade.accountId}:${trade.id}`} className="comparison-trade-point" role="button" tabIndex={0} aria-label={name} data-account={trade.accountId} data-trade={trade.id}
+            onClick={click => {
+              // Overlapping hit areas choose the closest visible dot, rather than the last SVG element.
+              const bounds = click.currentTarget.ownerSVGElement!.getBoundingClientRect();
+              const x = (click.clientX - bounds.left) / bounds.width * chartWidth;
+              const y = (click.clientY - bounds.top) / bounds.height * 255;
+              const distance = (event: PortfolioTrade) => (45 + event.progress * plotWidth - x) ** 2 + (chartY(event.returnPct) - y) ** 2;
+              onTrade(click.detail ? markers.reduce((nearest, candidate) => distance(candidate) < distance(nearest) ? candidate : nearest, trade) : trade);
+            }}
+            onKeyDown={key => { if (key.key === "Enter" || key.key === " ") { key.preventDefault(); onTrade(trade); } }}>
+            <title>{name}</title>
+            <circle cx={45 + trade.progress * plotWidth} cy={chartY(trade.returnPct)} r="16" fill="transparent" />
+            <circle className="comparison-trade-dot" cx={45 + trade.progress * plotWidth} cy={chartY(trade.returnPct)} r="3.25" fill={account.color} />
+          </g>;
+        })}
       </g>
-      <text x="45" y="250" fill="#8c99a7" fontSize="11">1 ott</text><text x={chartWidth - 20} textAnchor="end" y="250" fill="#8c99a7" fontSize="11">28 ott</text>
+      <text x="45" y="250" fill="#8c99a7" fontSize="11">{portfolioDate(0)}</text><text x={chartWidth - 20} textAnchor="end" y="250" fill="#8c99a7" fontSize="11">{portfolioDate(1)}</text>
       <rect ref={axis} className={`comparison-axis-handle${dragging ? " dragging" : ""}`} x="0" y="10" width="43" height="220" fill="transparent" role="button" tabIndex={0} aria-label="Regola la scala percentuale: trascina, scorri, pizzica o usa le frecce; Maiusc per spostarla, Home per ripristinarla"
         onPointerDown={event => {
           if (event.button !== 0) return;

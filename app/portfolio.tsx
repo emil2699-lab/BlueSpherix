@@ -5,6 +5,8 @@ import { ArrowUpRight, Download, ShieldCheck } from "lucide-react";
 import { DEMO_ACCOUNTS } from "./demo-data";
 import { valueSign } from "./value-sign";
 import PortfolioChart from "./portfolio-chart";
+import PortfolioTradeDialog from "./portfolio-trade-dialog";
+import { portfolioDate, type PortfolioTrade } from "./portfolio-trades";
 
 const accounts = DEMO_ACCOUNTS;
 const money = (value: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "USD" }).format(value);
@@ -15,6 +17,7 @@ export default function Portfolio() {
   const [selected, setSelected] = useState(accounts.map(account => account.id));
   const [detail, setDetail] = useState<string | null>(null);
   const [point, setPoint] = useState(11);
+  const [tradeFocus, setTradeFocus] = useState<PortfolioTrade | null>(null);
   const visible = accounts.filter(account => filter === "Tutti" || account.type === filter);
   const compared = visible.filter(account => selected.includes(account.id));
   const total = visible.reduce((sum, account) => sum + account.equity, 0);
@@ -33,14 +36,19 @@ export default function Portfolio() {
     <div className="demo-notice"><ShieldCheck size={16} /><span><strong>Ambiente dimostrativo.</strong> Tutti i conti e i risultati sono simulati. Nessun conto MT5 è collegato.</span></div>
     <div className="portfolio-toolbar"><div className="range-switch" aria-label="Filtra conti">{["Tutti", "Reale", "Demo"].map(item => <button key={item} aria-pressed={filter === item} className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>{item === "Reale" ? "Reali" : item}</button>)}</div><span>{visible.length} conti · Valuta USD · Ottobre 2026</span></div>
     <section className="portfolio-totals" aria-label="Riepilogo conti filtrati"><article className="glass-card"><p className="eyebrow">Equity dei conti visualizzati</p><strong data-sign={valueSign(total)}>{money(total)}</strong><p>{filter === "Tutti" ? "Include capitale reale e demo simulato" : `Solo conti di tipo ${filter.toLowerCase()} simulati`}</p></article><article className={`glass-card ${floating < 0 ? "negative-surface" : ""}`}><p className="eyebrow">Profitto / perdita aperta</p><strong data-sign={valueSign(floating)}>{money(floating)}</strong><p>Differenza tra equity e balance</p></article><article className="glass-card"><p className="eyebrow">Operazioni del mese</p><strong>{visible.reduce((sum, a) => sum + a.trades, 0)}</strong><p>Su {visible.length} strategie visualizzate</p></article></section>
-    <section className="portfolio-main"><article className="glass-card comparison-card"><div className="section-head"><div><p className="eyebrow">Confronto strategie</p><h2>Stesso punto di partenza.</h2></div><span className="portfolio-caption">Rendimento % · 1 mese</span></div><p className="portfolio-caption">Seleziona i conti sotto il grafico per confrontarli. Ogni curva parte da 0%.</p>
-      {compared.length ? <>
-        <PortfolioChart key={compared.map(account => account.id).join(",")} accounts={compared} point={point} />
-        <label className="chart-slider">Esplora il mese · {1 + Math.round(point * 27 / 11)} ottobre<input type="range" min="0" max="11" value={point} onChange={event => setPoint(Number(event.target.value))} /></label>
-        <div className="comparison-values" aria-live="polite">{compared.map(a => <span key={a.id} style={{ color: a.color }}>{a.name} <strong data-sign={valueSign(a.returns[point])}>{percent(a.returns[point])}</strong></span>)}</div>
-      </> : <div className="comparison-empty">Seleziona almeno un conto per visualizzare il confronto.</div>}
-      <div className="comparison-choices">{visible.map(a => <label key={a.id}><input type="checkbox" checked={selected.includes(a.id)} onChange={() => toggle(a.id)} /><i style={{ background: a.color }} />{a.name}</label>)}</div>
+    <section className="portfolio-main"><article className="glass-card comparison-card"><div className="section-head"><div><p className="eyebrow">Confronto strategie</p><h2>Stesso punto di partenza.</h2></div><span className="portfolio-caption">Rendimento % · 1 mese</span></div><p className="portfolio-caption">Confronta i conti selezionati. Ogni curva parte da 0%.</p>
+      <div className="comparison-workspace">
+        <div className="comparison-plot">{compared.length ? <>
+          <PortfolioChart key={compared.map(account => account.id).join(",")} accounts={compared} point={point} onTrade={setTradeFocus} />
+          <label className="chart-slider">Esplora il mese · {portfolioDate(point / 11)}<input type="range" min="0" max="11" value={point} onChange={event => setPoint(Number(event.target.value))} /></label>
+        </> : <div className="comparison-empty">Seleziona almeno un conto per visualizzare il confronto.</div>}</div>
+        <div className="comparison-choices" aria-label="Strategie da confrontare">{visible.map(a => <label className="comparison-choice" key={`${a.id}:${valueSign(a.returns[point])}`} data-result={valueSign(a.returns[point])}>
+          <input type="checkbox" aria-label={a.name} checked={selected.includes(a.id)} onChange={() => toggle(a.id)} />
+          <span className="comparison-choice-copy"><span className="comparison-choice-name" style={{ color: a.color }}><i style={{ background: a.color }} />{a.name}</span><strong data-sign={valueSign(a.returns[point])}>{percent(a.returns[point])}</strong></span>
+        </label>)}</div>
+      </div>
     </article><article className="glass-card allocation-card"><p className="eyebrow">Distribuzione capitale</p><h2>Il peso di ogni strategia.</h2><div className="allocation-bar" aria-label="Allocazione per equity">{visible.map(a => <span key={a.id} style={{ width: `${a.equity / total * 100}%`, background: a.color }} />)}</div>{visible.map(a => <div className="allocation-row" key={a.id}><span><i style={{ background: a.color }} />{a.name}</span><strong>{(a.equity / total * 100).toFixed(1)}%</strong></div>)}<p className="allocation-note">Il peso è calcolato sull’equity dei conti filtrati. Capitale demo e reale sono separabili con i filtri.</p><div className="connection-note"><ShieldCheck size={22} /><div><strong>MT5 · In preparazione</strong><p>Il collegamento in sola lettura sarà disponibile nella prossima fase. Non servono credenziali per esplorare la demo.</p></div></div></article></section>
     <section className="account-grid" aria-label="Conti dimostrativi">{visible.map(a => <article className={`glass-card account-card ${a.returns[11] < 0 ? "negative-surface" : ""}`} key={a.id}><div className="section-head"><div className="account-identity"><span style={{ color: a.color }}>{a.name.split(" ").map(word => word[0]).join("")}</span><div><h2>{a.name}</h2><p>{a.strategy}</p></div></div><span className="account-type">{a.type} simulato</span></div><div className="account-equity"><strong data-sign={valueSign(a.equity)}>{money(a.equity)}</strong><span data-sign={valueSign(a.returns[11])}>{percent(a.returns[11])} nel mese</span></div><dl><div><dt>Drawdown massimo</dt><dd>{a.drawdown}%</dd></div><div><dt>Operazioni</dt><dd>{a.trades}</dd></div></dl><button className="text-action" aria-expanded={detail === a.id} onClick={() => setDetail(detail === a.id ? null : a.id)}>{detail === a.id ? "Chiudi dettagli" : "Dettagli del conto"}<ArrowUpRight size={15} /></button>{detail === a.id && <div className="account-details"><dl><div><dt>Balance</dt><dd data-sign={valueSign(a.balance)}>{money(a.balance)}</dd></div><div><dt>P&amp;L aperto</dt><dd data-sign={valueSign(a.equity - a.balance)}>{money(a.equity - a.balance)}</dd></div><div><dt>Piattaforma prevista</dt><dd>MetaTrader 5</dd></div></dl><p>Dati di esempio · Nessuna sincronizzazione attiva</p></div>}</article>)}</section>
+    {tradeFocus && <PortfolioTradeDialog event={tradeFocus} onChange={setTradeFocus} onClose={() => setTradeFocus(null)} />}
   </div>;
 }

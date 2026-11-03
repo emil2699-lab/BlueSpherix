@@ -267,8 +267,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .portfolio-totals p:last-child { font-size: 11px; color: var(--muted); margin-bottom: 0; line-height: 1.6; }
 .portfolio-main { display: grid; grid-template-columns: minmax(0, 1.9fr) minmax(270px, 1fr); gap: 15px; margin-top: 16px; }
 .comparison-card, .allocation-card { padding: 24px; min-width: 0; }
+.comparison-card { container-type: inline-size; }
+.comparison-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 184px; align-items: center; gap: 20px; margin-top: 12px; }
+.comparison-plot { min-width: 0; }
 .comparison-chart { width: 100%; display: block; margin: 22px 0 12px; }
-.comparison-scale-controls { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 18px; color: var(--muted); font-size: 10px; }
+.comparison-scale-controls { display: flex; justify-content: flex-end; align-items: center; margin-top: 0; min-height: 24px; color: var(--muted); font-size: 10px; }
 .comparison-scale-controls button { border: 0; border-radius: 7px; padding: 6px 8px; background: rgba(86,217,202,.08); color: var(--aqua); font: inherit; cursor: pointer; }
 .comparison-scale-controls button:disabled { background: transparent; color: var(--muted); cursor: default; }
 .comparison-axis-handle { touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
@@ -276,13 +279,48 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .comparison-axis-handle:focus-visible { outline: 1px solid var(--aqua); outline-offset: 2px; }
 .chart-slider { display: flex; flex-direction: column; gap: 10px; color: var(--muted); font-size: 11px; }
 .chart-slider input { width: 100%; accent-color: var(--aqua); cursor: pointer; }
-.comparison-values { display: flex; gap: 18px; flex-wrap: wrap; margin: 18px 0; font-size: 11px; }
-.comparison-values strong { display: block; margin-top: 6px; font-size: 17px; }
-.comparison-choices { display: flex; flex-wrap: wrap; gap: 15px; padding-top: 15px; border-top: 1px solid var(--stroke); }
-.comparison-choices label { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--muted); cursor: pointer; min-height: 30px; }
+.comparison-choices { display: flex; flex-direction: column; gap: 14px; padding: 14px 0 14px 16px; border-left: 1px solid var(--stroke); }
+.comparison-choices label { display: flex; align-items: center; gap: 9px; font-size: 11px; cursor: pointer; min-height: 76px; padding: 12px 10px; border-radius: 16px; background: rgba(255,255,255,.025); }
+.comparison-choice[data-result="positive"] { color: var(--aqua); }
+.comparison-choice[data-result="negative"] { color: var(--red); }
+.comparison-choice[data-result="neutral"] { color: var(--muted); }
+.comparison-choice[data-result="positive"]:has(:checked) { background: rgba(86,217,202,.09); }
+.comparison-choice[data-result="negative"]:has(:checked) { background: rgba(255,111,125,.09); }
+.comparison-choice-copy { display: grid; gap: 8px; min-width: 0; }
+.comparison-choice-name { display: flex; align-items: center; gap: 6px; font-size: 10px; line-height: 1.4; }
+.comparison-choice-copy strong { font-size: 18px; letter-spacing: -.5px; }
 .comparison-choices input { accent-color: var(--aqua); }
+.comparison-choice[data-result="negative"] input { accent-color: var(--red); }
 .comparison-choices i, .allocation-row i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.comparison-choices i { flex-shrink: 0; }
 .comparison-empty { display: grid; place-items: center; min-height: 250px; text-align: center; color: var(--muted); font-size: 13px; }
+.comparison-trade-point { cursor: pointer; outline: none; }
+.comparison-trade-dot { transition: r .15s ease, stroke-width .15s ease; stroke: #0b1119; stroke-width: 1px; }
+.comparison-trade-point:is(:hover,:focus-visible) .comparison-trade-dot { r: 5px; stroke: var(--text); stroke-width: 1.5px; }
+.portfolio-trade-dialog { width: min(460px, calc(100% - 32px)); max-width: none; max-height: none; padding: 0; border: 0; color: var(--text); background: transparent; overflow: visible; }
+.portfolio-trade-dialog::backdrop { background: rgba(2,6,11,.5); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); }
+.content .portfolio-trade-dialog .portfolio-trade-sheet { padding: 26px; border-radius: 24px; max-height: calc(100dvh - 48px); overflow-y: auto; background: linear-gradient(145deg,rgba(26,39,49,.84),rgba(10,18,27,.84)); backdrop-filter: blur(24px) saturate(112%); -webkit-backdrop-filter: blur(24px) saturate(112%); box-shadow: 0 24px 80px rgba(0,0,0,.28); }
+.portfolio-trade-sheet h2 { font-size: 20px; }
+.portfolio-dialog-close { display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 50%; background: rgba(255,255,255,.04); color: var(--muted); cursor: pointer; }
+.portfolio-trade-meta, .portfolio-trade-note { font-size: 11px; color: var(--muted); line-height: 1.7; }
+.portfolio-trade-result { display: grid; gap: 8px; margin: 24px 0; }
+.portfolio-trade-result span { color: var(--muted); font-size: 11px; }
+.portfolio-trade-result strong { font-size: 29px; letter-spacing: -.8px; }
+.portfolio-trade-facts { margin: 0; }
+.portfolio-trade-facts > div { display: flex; justify-content: space-between; align-items: baseline; gap: 18px; padding: 10px 0; font-size: 11px; }
+.portfolio-trade-facts > div + div { border-top: 1px solid var(--stroke); }
+.portfolio-trade-facts dt { color: var(--muted); }
+.portfolio-trade-facts dd { margin: 0; text-align: right; }
+.portfolio-trade-note { margin: 20px 0; }
+.portfolio-trade-navigation { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 16px; border-top: 1px solid var(--stroke); }
+.portfolio-trade-navigation button { display: flex; align-items: center; gap: 4px; padding: 8px 0; border: 0; background: transparent; color: var(--aqua); cursor: pointer; font: inherit; font-size: 11px; }
+.portfolio-trade-navigation button:disabled { opacity: .35; cursor: default; }
+.portfolio-trade-navigation > span { font-size: 10px; color: var(--muted); }
+@container (max-width: 520px) {
+  .comparison-workspace { grid-template-columns: 1fr; gap: 16px; }
+  .comparison-choices { flex-direction: row; flex-wrap: wrap; padding: 16px 0 0; border-left: 0; border-top: 1px solid var(--stroke); gap: 10px; }
+  .comparison-choices label { flex: 1 1 140px; min-height: 72px; }
+}
 .allocation-card h2 { font-size: 18px; line-height: 1.4; margin: 0; }
 .allocation-bar { display: flex; height: 18px; gap: 4px; border-radius: 6px; overflow: hidden; margin: 30px 0 20px; }
 .allocation-row { display: flex; justify-content: space-between; gap: 10px; margin: 20px 0; font-size: 12px; }
