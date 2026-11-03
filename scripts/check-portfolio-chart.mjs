@@ -14,6 +14,9 @@ for (const values of [[], [0, 0], [0, .03, .08], [0, -.04, -.12], [0, -80, 230],
 assert.equal(returnScale([0, .03, .08]).max, .1, 'small returns use tenths of a percent');
 const automatic = returnScale(DEMO_ACCOUNTS.flatMap(a => a.returns));
 assert(automatic.max - automatic.min < 16, 'demo curves fill more space than the old fixed -4..12 range');
+const returns = DEMO_ACCOUNTS.flatMap(a => a.returns);
+const occupied = (Math.max(...returns) - Math.min(...returns)) / (automatic.max - automatic.min);
+assert(occupied > .9, 'automatic bounds use at least 90% of the plot for demo returns');
 for (const factor of [.01, .25, 1, 4, 100]) {
   const zoom = stretchReturns(automatic, factor, .3);
   const anchor = range => range.max - (range.max - range.min) * .3;

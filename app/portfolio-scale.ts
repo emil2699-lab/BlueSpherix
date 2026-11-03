@@ -32,12 +32,8 @@ export function returnScale(values: readonly number[]) {
   }
 
   const padding = Math.max(high - low, 0.1) * 0.04;
-  const bottom = low < 0 ? low - padding : 0;
-  const top = high > 0 ? high + padding : low === 0 ? 0.1 : 0;
-  // Choose readable intervals without wasting half the plot on unused values.
-  const step = tickStep(top - bottom);
-  const first = Math.floor(bottom / step);
-  const last = Math.ceil(top / step);
-  const ticks = Array.from({ length: last - first + 1 }, (_, i) => Number(((first + i) * step).toFixed(10)));
-  return { min: ticks[0], max: ticks[ticks.length - 1], ticks };
+  const min = low < 0 ? Math.min(-0.1, low - padding) : 0;
+  const max = high > 0 ? Math.max(0.1, high + padding) : low === 0 ? 0.1 : 0;
+  // Keep readable ticks inside the data bounds instead of rounding the plot outwards.
+  return { min, max, ticks: returnTicks(min, max) };
 }

@@ -6,6 +6,10 @@ import { PORTFOLIO_TRADES, portfolioDate, type PortfolioTrade } from "./portfoli
 
 type Domain = { min: number; max: number };
 type Series = { id: string; color: string; returns: number[] };
+const CHART_HEIGHT = 270;
+const PLOT_TOP = 8;
+const PLOT_BOTTOM = 240;
+const PLOT_HEIGHT = PLOT_BOTTOM - PLOT_TOP;
 const axisPercent = (value: number) => `${value.toLocaleString("it-IT", { maximumFractionDigits: 2 })}%`;
 
 export default function PortfolioChart({ accounts, point, onTrade }: { accounts: Series[]; point: number; onTrade: (trade: PortfolioTrade) => void }) {
@@ -19,13 +23,13 @@ export default function PortfolioChart({ accounts, point, onTrade }: { accounts:
   const pinch = useRef<{ distance: number; domain: Domain; anchor: number } | null>(null);
   const domain = manual ?? automatic;
   const ticks = manual ? returnTicks(domain.min, domain.max) : automatic.ticks;
-  const chartY = (value: number) => 220 - (value - domain.min) / (domain.max - domain.min) * 200;
+  const chartY = (value: number) => PLOT_BOTTOM - (value - domain.min) / (domain.max - domain.min) * PLOT_HEIGHT;
   const plotWidth = chartWidth - 65;
   const markers = PORTFOLIO_TRADES.filter(trade => accounts.some(account => account.id === trade.accountId) && trade.returnPct >= domain.min && trade.returnPct <= domain.max);
-  const plotHeight = useCallback(() => (axis.current?.ownerSVGElement?.getBoundingClientRect().height ?? 255) * 200 / 255, []);
+  const plotHeight = useCallback(() => (axis.current?.ownerSVGElement?.getBoundingClientRect().height ?? CHART_HEIGHT) * PLOT_HEIGHT / CHART_HEIGHT, []);
   const anchorAt = useCallback((clientY: number) => {
     const box = axis.current?.ownerSVGElement?.getBoundingClientRect();
-    return box ? Math.max(0, Math.min(1, (clientY - box.top - box.height * 20 / 255) / plotHeight())) : 0.5;
+    return box ? Math.max(0, Math.min(1, (clientY - box.top - box.height * PLOT_TOP / CHART_HEIGHT) / plotHeight())) : 0.5;
   }, [plotHeight]);
   const finishGesture = () => { drag.current = null; pinch.current = null; touches.current.clear(); setDragging(false); };
 
@@ -65,26 +69,26 @@ export default function PortfolioChart({ accounts, point, onTrade }: { accounts:
     <div className="comparison-scale-controls">
       <button type="button" aria-label="Ripristina scala automatica" disabled={!manual} onClick={() => setManual(null)}>Scala automatica</button>
     </div>
-    <svg className="comparison-chart" viewBox={`0 0 ${chartWidth} 255`} role="group" aria-label={`Rendimento percentuale delle strategie selezionate, scala comune da ${axisPercent(domain.min)} a ${axisPercent(domain.max)}`}>
+    <svg className="comparison-chart" viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`} role="group" aria-label={`Rendimento percentuale delle strategie selezionate, scala comune da ${axisPercent(domain.min)} a ${axisPercent(domain.max)}`}>
       <title>Confronto rendimenti di ottobre</title>
       <defs>
-        <clipPath id="portfolio-return-plot"><rect x="41" y="16" width={plotWidth + 8} height="208" /></clipPath>
-        <linearGradient id="portfolio-axis-fade" gradientUnits="userSpaceOnUse" x1="0" y1="20" x2="0" y2="220">
+        <clipPath id="portfolio-return-plot"><rect x="41" y={PLOT_TOP - 4} width={plotWidth + 8} height={PLOT_HEIGHT + 8} /></clipPath>
+        <linearGradient id="portfolio-axis-fade" gradientUnits="userSpaceOnUse" x1="0" y1={PLOT_TOP} x2="0" y2={PLOT_BOTTOM}>
           <stop offset="0" stopColor="white" stopOpacity="0" /><stop offset=".09" stopColor="white" />
           <stop offset=".91" stopColor="white" /><stop offset="1" stopColor="white" stopOpacity="0" />
         </linearGradient>
-        <mask id="portfolio-axis-mask" maskUnits="userSpaceOnUse" x="0" y="10" width={chartWidth} height="220">
-          <rect x="0" y="10" width={chartWidth} height="220" fill="url(#portfolio-axis-fade)" />
+        <mask id="portfolio-axis-mask" maskUnits="userSpaceOnUse" x="0" y="0" width={chartWidth} height={PLOT_BOTTOM + 10}>
+          <rect x="0" y="0" width={chartWidth} height={PLOT_BOTTOM + 10} fill="url(#portfolio-axis-fade)" />
         </mask>
       </defs>
-      {domain.min < 0 && <rect x="45" y={Math.max(20, chartY(0))} width={plotWidth} height={220 - Math.max(20, Math.min(220, chartY(0)))} rx="5" fill="rgba(255,111,125,.045)" />}
+      {domain.min < 0 && <rect x="45" y={Math.max(PLOT_TOP, chartY(0))} width={plotWidth} height={PLOT_BOTTOM - Math.max(PLOT_TOP, Math.min(PLOT_BOTTOM, chartY(0)))} rx="5" fill="rgba(255,111,125,.045)" />}
       <g className="comparison-axis-grid" mask="url(#portfolio-axis-mask)">{ticks.map(value => <g key={value}>
         <line x1="45" x2={chartWidth - 20} y1={chartY(value)} y2={chartY(value)} stroke={value === 0 ? "#53606c" : "#27303b"} strokeDasharray="3 5" />
         <text x="0" y={chartY(value) + 4} fill={value < 0 ? "#ff6f7d" : "#8c99a7"} fontSize="10">{axisPercent(value)}</text>
       </g>)}</g>
       <g clipPath="url(#portfolio-return-plot)">
         {accounts.map(a => <polyline key={a.id} points={a.returns.map((v, i) => `${45 + i * plotWidth / 11},${chartY(v)}`).join(" ")} fill="none" stroke={a.color} strokeWidth="2.5" strokeLinejoin="round" />)}
-        <line x1={45 + point * plotWidth / 11} x2={45 + point * plotWidth / 11} y1="20" y2="220" stroke="#8c99a7" strokeDasharray="4 5" />
+        <line x1={45 + point * plotWidth / 11} x2={45 + point * plotWidth / 11} y1={PLOT_TOP} y2={PLOT_BOTTOM} stroke="#8c99a7" strokeDasharray="4 5" />
         {accounts.map(a => <circle key={a.id} cx={45 + point * plotWidth / 11} cy={chartY(a.returns[point])} r="4" fill={a.color} />)}
         {markers.map(trade => {
           const account = accounts.find(account => account.id === trade.accountId)!;
@@ -94,7 +98,7 @@ export default function PortfolioChart({ accounts, point, onTrade }: { accounts:
               // Overlapping hit areas choose the closest visible dot, rather than the last SVG element.
               const bounds = click.currentTarget.ownerSVGElement!.getBoundingClientRect();
               const x = (click.clientX - bounds.left) / bounds.width * chartWidth;
-              const y = (click.clientY - bounds.top) / bounds.height * 255;
+              const y = (click.clientY - bounds.top) / bounds.height * CHART_HEIGHT;
               const distance = (event: PortfolioTrade) => (45 + event.progress * plotWidth - x) ** 2 + (chartY(event.returnPct) - y) ** 2;
               onTrade(click.detail ? markers.reduce((nearest, candidate) => distance(candidate) < distance(nearest) ? candidate : nearest, trade) : trade);
             }}
@@ -105,8 +109,8 @@ export default function PortfolioChart({ accounts, point, onTrade }: { accounts:
           </g>;
         })}
       </g>
-      <text x="45" y="250" fill="#8c99a7" fontSize="11">{portfolioDate(0)}</text><text x={chartWidth - 20} textAnchor="end" y="250" fill="#8c99a7" fontSize="11">{portfolioDate(1)}</text>
-      <rect ref={axis} className={`comparison-axis-handle${dragging ? " dragging" : ""}`} x="0" y="10" width="43" height="220" fill="transparent" role="button" tabIndex={0} aria-label="Regola la scala percentuale: trascina, scorri, pizzica o usa le frecce; Maiusc per spostarla, Home per ripristinarla"
+      <text x="45" y={CHART_HEIGHT - 5} fill="#8c99a7" fontSize="11">{portfolioDate(0)}</text><text x={chartWidth - 20} textAnchor="end" y={CHART_HEIGHT - 5} fill="#8c99a7" fontSize="11">{portfolioDate(1)}</text>
+      <rect ref={axis} className={`comparison-axis-handle${dragging ? " dragging" : ""}`} x="0" y="0" width="43" height={PLOT_BOTTOM + 10} fill="transparent" role="button" tabIndex={0} aria-label="Regola la scala percentuale: trascina, scorri, pizzica o usa le frecce; Maiusc per spostarla, Home per ripristinarla"
         onPointerDown={event => {
           if (event.button !== 0) return;
           if (event.pointerType === "touch") touches.current.set(event.pointerId, event.clientY);

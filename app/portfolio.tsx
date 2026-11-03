@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { ArrowUpRight, Download, ShieldCheck } from "lucide-react";
 import { DEMO_ACCOUNTS } from "./demo-data";
 import { valueSign } from "./value-sign";
@@ -40,7 +40,10 @@ export default function Portfolio() {
       <div className="comparison-workspace">
         <div className="comparison-plot">{compared.length ? <>
           <PortfolioChart key={compared.map(account => account.id).join(",")} accounts={compared} point={point} onTrade={setTradeFocus} />
-          <label className="chart-slider">Esplora il mese · {portfolioDate(point / 11)}<input type="range" min="0" max="11" value={point} onChange={event => setPoint(Number(event.target.value))} /></label>
+          <label className="chart-slider" style={{ "--timeline-progress": `${point / 11 * 100}%` } as CSSProperties}>
+            <span className="chart-slider-caption"><span>Esplora il mese</span><output>{portfolioDate(point / 11)}</output></span>
+            <input type="range" aria-label="Esplora il mese" aria-valuetext={portfolioDate(point / 11)} min="0" max="11" step="1" value={point} onChange={event => setPoint(Number(event.target.value))} />
+          </label>
         </> : <div className="comparison-empty">Seleziona almeno un conto per visualizzare il confronto.</div>}</div>
         <div className="comparison-choices" aria-label="Strategie da confrontare">{visible.map(a => <label className="comparison-choice" key={`${a.id}:${valueSign(a.returns[point])}`} data-result={valueSign(a.returns[point])}>
           <input type="checkbox" aria-label={a.name} checked={selected.includes(a.id)} onChange={() => toggle(a.id)} />

@@ -1,6 +1,13 @@
 # BlueSpherix — memoria operativa
 
-Ultimo aggiornamento: 2026-11-02
+## Skill Graphify installata (2026-11-03)
+
+- Skill locale `.agents/skills/graphify/SKILL.md`, otto riferimenti e note locali in `INSTALLATION.md`. Sorgente Graphify-Labs/graphify, commit `8e6a6d2129d4aeffc7a0e9ed79b153f7f057f42b`, versione 0.9.101.
+- CLI `/workspace/bin/graphify`, Python `/workspace/tools/uv/graphifyy/bin/python`; usare `GRAPHIFY_NO_AUTO_REFRESH=1`, evitare aggiornamenti automatici e leggere le note locali prima dell’uso.
+- Controlli preliminari e limiti in `docs/graphify-security-review.md`; nessun testo invisibile nella skill/riferimenti, nessuna vulnerabilità nota sui 31 pacchetti installati. Nessun hook o listener installato.
+- Configurazione in `docs/graphify.md`: `npm run graph:build`, `npm run graph:query -- "Simbolo"`, `npm run graph:status`. Indicizzazione locale del codice, backend LLM disattivati, output ignorato da Git; documenti/CSS non analizzati semanticamente. Grafo iniziale: 476 nodi, 880 archi, 26 comunità. Consultarlo per domande strutturali e rigenerarlo dopo blocchi di modifiche; query con anteprima limitata a 6.000 caratteri e risultato completo su disco.
+
+Ultimo aggiornamento: 2026-11-03
 
 ## Obiettivo
 
@@ -12,6 +19,7 @@ Web app moderna per analisi di trading, ispirata alle funzioni di Myfxbook ma co
 - Anteprima: `https://emil2699-lab.github.io/BlueSpherix/`.
 - Stack: Next.js 16.4.3, React 19.3.1, TypeScript, export statico su GitHub Pages.
 - Sezioni già sviluppate: Dashboard, Portfolio, Analytics, Operazioni, Rischio, Strategy Lab e Diario.
+- Portafoglio → Confronto strategie: recuperato il margine superiore del grafico, area utile verticale ampliata e scala automatica aderente ai dati (tick leggibili indipendenti dai limiti). “Esplora il mese” ha traccia sottile, cursore personalizzato, data separata e area touch di 44 px; rimane un range nativo accessibile. Coordinate di gesti e selezione trade aggiornate alla nuova geometria. Build e controlli Chromium desktop/mobile superati; screenshot e verifiche in `/workspace/artifacts/portfolio-chart-refinement/`.
 - La sezione Oggi usa ora lo stesso linguaggio visivo delle sezioni recenti: stato live, avviso demo, periodo integrato nel grafico, sfera dello stato del rischio con nodi dinamici per rischio aperto, margine e drawdown, e KPI strutturati. Ogni nodo segue una propria orbita concentrica con palette acqua/viola/blu; valori e soglie restano in una legenda interna. I tre KPI restano affiancati alle larghezze intermedie e, quando lo spazio si riduce, il mini-grafico scorre fisicamente dalla posizione laterale a quella centrale sotto il numero con curva fluida; su mobile i riquadri passano in colonna. Sugli schermi larghi i mini-grafici crescono progressivamente fino a 132×46 px.
 - Ice Glass WebGL 2 è applicato a tutte le viste: canvas condiviso, luce globale senza interpolazione, SDF/Snell/Fresnel, dispersione RGB 0,05 e fascia cromatica dritta di base, deformata dalle differenze dei percorsi Snell locali. Il trasporto a fotoni sperimentale è disattivato dopo il feedback sui punti luminosi. Base ripristinata a `7f42d25` tramite `5fdc748`; esperimenti successivi conservati in `/workspace/Desktop/bluespherix layout backup/vetro_rgb`. La superficie ora è trasparente: canvas sotto il DOM e nessun riempimento CSS aggiuntivo; contenuti opachi. Risposta diretta del materiale e parametri ottici preservati. Non è stato aggiunto alcuno sfondo dinamico. Safari/macOS non verificabile dal cloud.
 - La sezione Rischio è completa: budget di rischio, stress test, simulatore pre-trade, correlazioni, drawdown, protezioni, Monte Carlo e guardrail.
@@ -39,6 +47,7 @@ Web app moderna per analisi di trading, ispirata alle funzioni di Myfxbook ma co
 - `next dev` può modificare `next-env.d.ts`: ripristinarlo prima del commit.
 - TypeScript: usare `npx tsc --noEmit --incremental false`.
 - Verifiche standard per un blocco: lint, TypeScript e controllo dati; browser test solo per modifiche visive/interattive rilevanti.
+- Pubblicare sempre le modifiche completate dopo i controlli, senza richiedere ogni volta conferma: commit e push sul branch `first`, quindi verifica del deploy GitHub Pages. Preferenza esplicita dell’utente del 2026-11-03.
 
 ## Metodo per ridurre il consumo di contesto
 
