@@ -156,10 +156,8 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       // One selected area emits; retain a fading selection only during its exit.
       // Reuse measured rectangles so this adds no layout reads to pointer frames.
       const emitter = cards.find(({element}) => coatings.current.has(element)
-        && coatings.current.get(element)?.exiting === undefined
-        && element.closest<HTMLElement>('.today-dashboard')?.hidden === false)
-        ?? cards.find(({element}) => coatings.current.has(element)
-          && element.closest<HTMLElement>('.today-dashboard')?.hidden === false);
+        && coatings.current.get(element)?.exiting === undefined)
+        ?? cards.find(({element}) => coatings.current.has(element));
       const emission = emitter && coatings.current.get(emitter.element);
       const power = emitter ? Math.max(0,Math.min(1,Number(emitter.element.dataset.glassUnderlight ?? 1)||0)) : 0;
       const emissionPhase = emission ? coatingProgress(emission,time,reduced.matches) : [0,0,0,0,0];
@@ -176,13 +174,12 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         const coating = coatings.current.get(element);
         const [reveal, isControl, opacity, moving, volume] = coating ? coatingProgress(coating, time, reduced.matches) : [1, 0, 1, 0, 1];
         coatingMoving ||= moving > 0;
-        const today = element.closest<HTMLElement>('.today-dashboard');
-        const receivesSpill = !!(emitter && power > .35 && today && !today.hidden && element.matches('.glass-card')
+        const receivesSpill = !!(emitter && power > .35 && element.matches('.glass-card')
           && !element.contains(emitter.element) && !emitter.element.contains(element));
         gl.uniform4f(uniform("uSpill"),power,reduced.matches ? 0 : emission ? (time-emission.started)/1000 : 0,
           emissionPhase[0]*emissionPhase[2]*emissionPhase[4],receivesSpill ? 1 : 0);
         underlightMoving ||= receivesSpill && power > .35 && !reduced.matches && emission?.exiting === undefined;
-        const underlight = coating && today && !today.hidden
+        const underlight = coating
           ? Math.max(0, Math.min(1, Number(element.dataset.glassUnderlight ?? 1) || 0)) : 0;
         underlightMoving ||= underlight > 0 && !reduced.matches && coating?.exiting === undefined;
         gl.uniform2f(uniform("uUnderlight"), underlight,

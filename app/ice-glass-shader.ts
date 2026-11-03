@@ -139,7 +139,10 @@ vec3 underlightTransmission(vec3 tint, float level) {
   float chroma=max(max(tint.r,tint.g),tint.b)-min(min(tint.r,tint.g),tint.b);
   vec3 pigment=tint/max(max(tint.r,tint.g),max(tint.b,.001));
   vec3 transmission=mix(vec3(1.0),pigment,smoothstep(.18,.32,chroma));
-  return mix(transmission,vec3(1.0),smoothstep(.35,.95,level)*.72);
+  transmission=mix(transmission,vec3(1.0),smoothstep(.35,.95,level)*.72);
+  // Increase only the underlight chroma; retain hue, luminance and white peaks.
+  float luminance=dot(transmission,vec3(.2126,.7152,.0722));
+  return max(vec3(0.0),mix(vec3(luminance),transmission,1.15));
 }
 vec3 softUnderlight(vec2 localPixel, float depth, float fresnel, float volume) {
   // Smooth local extinction and relighting, with no moving surface normals.
@@ -150,7 +153,7 @@ vec3 softUnderlight(vec2 localPixel, float depth, float fresnel, float volume) {
   // white, rather than making every part of the transmitted light monochrome.
   vec3 transmission=underlightTransmission(uTint,level);
   float softEdge=smoothstep(0.0,min(14.0,uRect.w*.27),depth);
-  return transmission*(.138*level)*softEdge*(1.0-fresnel)
+  return transmission*(.138*1.15*level)*softEdge*(1.0-fresnel)
     *smoothstep(.2,1.0,volume);
 }
 vec3 underlightSpill(vec2 pixel, float depth) {
@@ -163,7 +166,7 @@ vec3 underlightSpill(vec2 pixel, float depth) {
   float radiance=level*smoothstep(.35,.75,level)*uSpill.z;
   float attenuation=1.0/(1.0+pow(distanceToSource/90.0,2.0));
   float rim=exp(-depth/5.0)*(1.0-smoothstep(18.0,26.0,depth));
-  return underlightTransmission(uSpillTint,level)*radiance*attenuation*rim*.07;
+  return underlightTransmission(uSpillTint,level)*radiance*attenuation*rim*(.07*1.15);
 }
 void main() {
   vec2 pixel = vec2(gl_FragCoord.x/uDPR, (uResolution.y-gl_FragCoord.y)/uDPR);

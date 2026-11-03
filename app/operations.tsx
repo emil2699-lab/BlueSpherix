@@ -16,6 +16,7 @@ import { ALPHA_ACCOUNT, DEMO_PENDING_ORDERS, DEMO_PERIOD_STATS, DEMO_TRADES, OPE
 import { FilterSelect, DateFilterPicker } from "./trade-controls";
 import { JournalEditor } from "./journal-editor";
 import { valueSign } from "./value-sign";
+import { positionUnderlight } from "./glass-underlight";
 
 type Period = DemoPeriod;
 type TradeFilter = "Tutte" | "Aperte" | "Pendenti" | "Chiuse" | "In profitto" | "In perdita";
@@ -289,7 +290,7 @@ function TimelineWorkspace({ contained = false, visible, pendingOrders, selected
           const total = dayTrades.reduce((sum, trade) => sum + trade.result, 0);
           return <div className="timeline-day" key={day}>
             <div className="timeline-day-head"><span>{day}</span><strong data-sign={valueSign(total)}>{signedMoney(total)}</strong></div>
-            {dayTrades.map((trade) => <button key={trade.id} className={`timeline-trade ${selectedTrade.id === trade.id ? "selected" : ""} ${trade.result < 0 ? (Math.abs(trade.result) >= 200 ? "loss severe" : "loss") : ""}`} onClick={() => setSelected(trade.id)}>
+            {dayTrades.map((trade) => <button key={trade.id} className={`timeline-trade ${selectedTrade.id === trade.id ? "selected" : ""} ${trade.result < 0 ? (Math.abs(trade.result) >= 200 ? "loss severe" : "loss") : ""}`} data-glass-underlight={positionUnderlight(trade.result, ALPHA_ACCOUNT.balance)} onClick={() => setSelected(trade.id)}>
               <time>{trade.time}<small>{trade.id}</small></time>
               <span className="timeline-symbol"><i>{trade.symbol.slice(0, 2)}</i><span><strong>{trade.symbol}</strong><small>{trade.setup}</small></span></span>
               <span className={trade.side === "Long" ? "long" : "short"}>{trade.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{trade.side}<small>{trade.volumeLabel} lot</small></span>

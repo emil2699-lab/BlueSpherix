@@ -4,6 +4,7 @@ import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, BellRing, CalendarClock, CheckCircle2, Crosshair, Gauge, Layers3, Network, Plus, ShieldAlert, ShieldCheck, Sparkles, Target, TrendingDown } from "lucide-react";
 import { ALPHA_ACCOUNT, DEMO_EQUITY_SERIES, DEMO_TRADES, OPEN_TRADES, type DemoTrade } from "./demo-data";
 import { valueSign } from "./value-sign";
+import { positionUnderlight } from "./glass-underlight";
 
 type StressScenario = "stop" | "volatility" | "gap";
 type CorrelationId = "eur-xau" | "eur-gbp" | "xau-gbp";
@@ -381,7 +382,7 @@ function RiskKpi({ icon, label, value, detail, severity }: { icon: ReactNode; la
 function ExposureRow({ trade, totalRisk, selected, onSelect }: { trade: DemoTrade; totalRisk: number; selected: boolean; onSelect: () => void }) {
   const share = trade.riskUsd / totalRisk * 100;
   const heat = .035 + share / 100 * .16;
-  return <button className={`exposure-row ${selected ? "selected" : ""}`} onClick={onSelect} style={{ background: `linear-gradient(90deg,rgba(255,111,125,${heat}),rgba(255,111,125,.012) 78%)` }}><span className="exposure-symbol"><i>{trade.symbol.slice(0, 2)}</i><span><strong>{trade.symbol}</strong><small>{trade.setup}</small></span></span><span className={trade.side === "Long" ? "long" : "short"}>{trade.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{trade.side}</span><span className="exposure-share"><i><b style={{ width: `${share}%` }} /></i><small>{percent(share, 1)} del rischio</small></span><strong>{money(trade.riskUsd)}</strong></button>;
+  return <button className={`exposure-row ${selected ? "selected" : ""}`} data-glass-underlight={positionUnderlight(trade.netPnl, ALPHA_ACCOUNT.balance)} onClick={onSelect} style={{ background: `linear-gradient(90deg,rgba(255,111,125,${heat}),rgba(255,111,125,.012) 78%)` }}><span className="exposure-symbol"><i>{trade.symbol.slice(0, 2)}</i><span><strong>{trade.symbol}</strong><small>{trade.setup}</small></span></span><span className={trade.side === "Long" ? "long" : "short"}>{trade.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{trade.side}</span><span className="exposure-share"><i><b style={{ width: `${share}%` }} /></i><small>{percent(share, 1)} del rischio</small></span><strong>{money(trade.riskUsd)}</strong></button>;
 }
 
 function LimitRow({ label, current, limit }: { label: string; current: number; limit: number }) {
