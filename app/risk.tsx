@@ -295,7 +295,7 @@ export default function Risk() {
       <article className="glass-card protections-card">
         <div className="section-head"><div><p className="eyebrow">Protezioni e avvisi</p><h2>Le soglie che sorvegliano il conto.</h2></div><BellRing size={20} /></div>
         <p className="protections-intro">Ogni regola analizza i dati sincronizzati e genera un avviso. BlueSpherix non apre, modifica o chiude operazioni.</p>
-        <div className="protection-list">{protectionRules.map(rule => {
+        <div className="protection-list" data-glass-multiple>{protectionRules.map(rule => {
           const enabled = protections[rule.id];
           return <div className={`protection-row ${rule.tone} ${enabled ? "enabled" : "disabled"}`} key={rule.id}>
             <span className="protection-icon">{rule.icon}</span>

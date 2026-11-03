@@ -141,7 +141,10 @@ nav button b { margin-left: auto; font-size: 8px; color: #091110; background: va
 }
 /* The isolated content stack keeps the glass above the page background and
    below all DOM content. Only the material transmits the backdrop. */
-.ice-glass-canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; pointer-events: none; z-index: -1; }
+/* Explicit material/content planes avoid a negative WebGL compositing layer
+   being dropped while Safari rebuilds its layers during page zoom. */
+.ice-glass-canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; pointer-events: none; z-index: 0; }
+.content > :not(.ice-glass-canvas) { position: relative; z-index: 1; }
 .content:not([data-ice-glass="ready"]) > .ice-glass-canvas { visibility: hidden; }
 .content[data-ice-glass="ready"] :is(.glass-card, .calendar-strip, .demo-notice) { background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
 .content:not([data-ice-glass="ready"]) :is(.glass-card, .calendar-strip, .demo-notice) { background: rgba(17,27,40,.26); }
@@ -1717,3 +1720,41 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
 }
 /* Only show a focus outline while navigating the otherwise borderless controls. */
 .filter-field input:focus-visible { outline: 2px solid var(--aqua); outline-offset: 4px; }
+
+/* Short vertical dividers separate adjacent data groups without adding frames
+   or taking space from their columns. Remove them when those groups stack. */
+.diary-facts > span + span { position: relative; }
+.diary-facts > span + span::before {
+  content: ""; position: absolute; width: 1px; inset-block: 1px;
+  left: -8px; background: var(--stroke); pointer-events: none;
+}
+@container (min-width: 721px) {
+  .position-table .table-row:not(.table-header) > :is(:nth-child(3),:last-child) { position: relative; }
+  .position-table .table-row:not(.table-header) > :is(:nth-child(3),:last-child)::before {
+    content: ""; position: absolute; width: 1px; inset-block: -2px;
+    left: -10px; background: var(--stroke); pointer-events: none;
+  }
+}
+@media (min-width: 901px) {
+  .exposure-row > .exposure-share,
+  .exposure-row > strong,
+  .protection-row > .protection-value,
+  .timeline-trade > :is(.long,.short),
+  .timeline-trade > strong,
+  .monte-carlo-controls > div + div,
+  .session-metrics > span + span { position: relative; }
+  .exposure-row > .exposure-share::before,
+  .exposure-row > strong::before,
+  .protection-row > .protection-value::before,
+  .timeline-trade > :is(.long,.short)::before,
+  .timeline-trade > strong::before,
+  .monte-carlo-controls > div + div::before,
+  .session-metrics > span + span::before {
+    content: ""; position: absolute; width: 1px; inset-block: 2px;
+    left: -7px; background: var(--stroke); pointer-events: none;
+  }
+  .timeline-trade > :is(.long,.short)::before,
+  .timeline-trade > strong::before { left: -6px; }
+  .monte-carlo-controls > div + div::before { left: -10px; inset-block: 4px; }
+  .session-metrics > span + span::before { left: -9px; }
+}

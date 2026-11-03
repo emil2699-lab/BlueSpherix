@@ -71,7 +71,10 @@ for (const [name, selector] of sections) {
   await page.locator('nav').getByRole('button', { name: name === 'Lab' ? /^Lab/ : name, exact: true }).click(); await step(1200);
   await page.evaluate(() => { window.underlightFrames = []; });
   await page.mouse.move(500, 100); await step(200);
-  assert(await page.evaluate(() => window.underlightFrames.every(f => f.values[0] === 0 && f.spill[3] === 0)), `${name}: navigation clears the old emitter`);
+  assert.equal(await page.locator('[data-glass-selection]:not([data-glass-persistent])').count(),0, `${name}: navigation clears the old temporary selection`);
+  if (!await page.locator('[data-glass-persistent]').count()) {
+    assert(await page.evaluate(() => window.underlightFrames.every(f => f.values[0] === 0 && f.spill[3] === 0)), `${name}: no remaining emitter`);
+  }
   await page.locator(selector).first().click(); await page.clock.runFor(2); await step(1000);
   await page.evaluate(() => { window.underlightFrames = []; }); await step(200);
   assert(await page.evaluate(() => window.underlightFrames.some(f => f.values[0] === 1)), `${name}: selected control emits`);
@@ -86,8 +89,18 @@ for (const [name, selector] of sections) {
     assert(await page.evaluate(v => window.underlightFrames.some(f => Math.abs(f.values[0] - v) < 1e-6), ceiling), `${name}: P&L ceiling reaches shader`);
   }
   await page.keyboard.press('Escape'); await step(1000); await step(1000);
+  const persistent = page.locator('[data-glass-persistent]');
+  if (await persistent.count()) {
+    assert(await page.evaluate(() => window.underlightFrames.some(f=>f.values[0]>0)), `${name}: multi-select light survives Escape`);
+    for (let remaining = 30; await persistent.count() && remaining > 0; remaining--) {
+      await persistent.first().click(); await page.clock.runFor(2); await step(1000);
+    }
+    assert.equal(await persistent.count(),0,`${name}: all multi-select emitters deselect`);
+    await step(1000);
+  }
   await page.evaluate(() => { window.underlightFrames = []; }); await page.clock.runFor(200);
   assert.equal(await page.evaluate(() => window.underlightFrames.length), 0, `${name}: no idle animation after deselection`);
+  console.log(name,'checked');
 }
 assert.equal(await page.locator('canvas').count(), 1);
 const reduced = await browser.newPage({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });

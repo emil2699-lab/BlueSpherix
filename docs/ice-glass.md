@@ -139,6 +139,8 @@ Lo stato `ready` viene applicato dopo un disegno su un buffer effettivamente
 allocato. Se l'allocazione fallisce, il renderer prova risoluzioni inferiori e
 mantiene disponibile il materiale CSS invece di lasciare superfici vuote.
 I limiti vengono riletti dopo il ripristino del contesto.
+Il canvas e il contenuto DOM usano piani espliciti a z-index 0 e 1: il materiale
+non dipende più da un layer WebGL negativo durante il ricompositing dello zoom.
 
 `scripts/check-glass-zoom.mjs` verifica viewport/DPR, pinch zoom, cambi di solo
 DPR, allocazioni fallite, fallback e ripristino WebGL con limiti GPU ridotti.

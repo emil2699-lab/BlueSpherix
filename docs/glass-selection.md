@@ -1,6 +1,21 @@
 # Rivestimento vetroso della selezione
 
-I controlli selezionabili nelle sezioni della dashboard usano lo stesso canvas e lo stesso shader delle card. `app/glass-selection.ts` gestisce una sola selezione visiva, indipendente dai valori funzionali di filtri, tab, note e tag. I controlli comprendono periodi, viste, righe, celle, opzioni, menu, checkbox e radio. I pulsanti di azione (esportazione, salvataggio) e la navigazione laterale esterna al canvas mantengono il proprio comportamento.
+I controlli selezionabili nelle sezioni della dashboard usano lo stesso canvas e lo stesso shader delle card. `app/glass-selection.ts` gestisce una selezione temporanea per i controlli esclusivi e selezioni persistenti per i controlli multipli. I controlli comprendono periodi, viste, righe, celle, opzioni, menu, checkbox e radio. I pulsanti di azione (esportazione, salvataggio) e la navigazione laterale esterna al canvas mantengono il proprio comportamento.
+
+### Multiselezione
+
+Checkbox, tag e gruppi di pulsanti indipendenti marcati `data-glass-multiple`
+restano rivestiti mentre il loro stato funzionale è attivo. Click fuori, Escape
+e selezione di altri elementi non li rimuovono; la deselezione del singolo
+controllo dissolve soltanto quel rivestimento. I valori già attivi vengono
+rappresentati direttamente con il vetro, anche al ritorno in una sezione. Il
+clic continua invece ad avviare stesura e crescita dal punto premuto.
+
+L'osservazione degli stati ARIA, dei checkbox e del montaggio dei componenti
+elimina i rivestimenti obsoleti quando cambia una revisione o un filtro. Ogni
+selezione mantiene la propria luce interna; il pass esistente sui bordi vicini
+usa la selezione attiva più recente. Le animazioni condividono un solo canvas
+e un solo scheduler. `scripts/check-glass-multiselect.mjs` copre queste interazioni.
 
 In **Oggi**, anche le righe delle posizioni aperte sono pulsanti nativi rivestibili, raggiungibili con Tab e selezionabili con Space/Invio. Prima erano blocchi `div` statici, mentre il periodo del grafico era già collegato. La selezione è soltanto visiva: non cambia dati o apre operazioni. Il negativo mantiene materiale e riflessi tinti di rosso. Il controllo specifico è `scripts/check-glass-selection-today.mjs` (stesse variabili della suite generale).
 
@@ -32,10 +47,10 @@ La transizione dal contributo diffuso centrale al trasporto ottico segue l'incli
 - La tinta deriva dallo stile originale del controllo dopo il commit React, leggendo il colore di destinazione delle transizioni CSS. Un piccolo parser 2D legge anche colori CSS `color(srgb ...)`, una volta per selezione. Tinta del materiale e riflessi vengono filtrati rispettivamente in modo più evidente e più leggero, mantenendo la dispersione RGB.
 - Non vengono aggiunti contorni o ombre di selezione. Le cornici di selezione CSS precedenti sono rimosse; gli indicatori piatti dei tab vengono nascosti quando quel gruppo è rivestito. Gli outline di focus da tastiera rimangono disponibili.
 - I trade negativi conservano la tinta rossa anche nello stile piatto selezionato, senza ereditare il riempimento acqua delle righe positive.
-- Altro controllo o click fuori: dissolvenza in 200 ms, congelando copertura e volume correnti anche se l'ingresso non è ancora terminato. Escape rimuove il rivestimento; Space/Invio funzionano con i pulsanti nativi.
+- Per i controlli esclusivi, altro controllo o click fuori avviano una dissolvenza in 200 ms, congelando copertura e volume correnti anche se l'ingresso non è ancora terminato. Escape rimuove quel rivestimento; le multiselezioni restano attive. Space/Invio funzionano con i pulsanti nativi.
 - I valori rimangono impostati dopo la deselezione visiva. Toggle, tag o checkbox disattivati non rimangono rivestiti.
 - Nei menu personalizzati e nei calendari il rivestimento rimane sul trigger dopo la scelta.
-- Un solo contesto WebGL; un canvas 2D non montato serve soltanto a leggere i colori. Geometrie riutilizzate durante l'animazione; nessun loop perpetuo per la selezione stabile. Observer, timer e attributi vengono puliti allo smontaggio e durante la navigazione.
+- Un solo contesto WebGL; un canvas 2D non montato serve soltanto a leggere i colori. Geometrie riutilizzate durante l'animazione; l'ingresso si ferma a volume completo, mentre la luce interna mantiene il proprio ritmo lento se il movimento è consentito. Observer, timer e attributi vengono puliti allo smontaggio e durante la navigazione.
 - Reduced motion applica direttamente il volume finale. Senza WebGL viene usato un rivestimento CSS statico discreto nella stessa tinta, senza ritagliare o animare il contenuto.
 
 Lo shader riceve `uCoating = (coverage, isControl, opacity, volume)` e `uCoatingOrigin = (localX, localY)`. Le card esistenti usano `(1, 0, 1, 1)`: nessuna modifica ai loro parametri ottici. Il confronto in framebuffer float con cinque posizioni della sorgente ha restituito una differenza massima di 7.46e-9 (precisione numerica).

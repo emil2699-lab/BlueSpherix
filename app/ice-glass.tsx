@@ -182,11 +182,17 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       gl.enable(gl.SCISSOR_TEST);
       let coatingMoving = false;
       let underlightMoving = false;
-      // One selected area emits; retain a fading selection only during its exit.
-      // Reuse measured rectangles so this adds no layout reads to pointer frames.
-      const emitter = cards.find(({element}) => coatings.current.has(element)
-        && coatings.current.get(element)?.exiting === undefined)
-        ?? cards.find(({element}) => coatings.current.has(element));
+      // Multiple checked controls retain their own glass and underlight. Keep
+      // the existing neighbouring-rim pass anchored to the latest active choice.
+      // Reuse measurements; this adds no DOM reads to pointer frames.
+      const emitter = cards.reduce<Measurement | undefined>((latest,card) => {
+        const candidate = coatings.current.get(card.element);
+        if (!candidate) return latest;
+        const previous = latest && coatings.current.get(latest.element);
+        if (!previous) return card;
+        if ((candidate.exiting === undefined) !== (previous.exiting === undefined)) return candidate.exiting === undefined ? card : latest;
+        return candidate.started > previous.started ? card : latest;
+      },undefined);
       const emission = emitter && coatings.current.get(emitter.element);
       const power = emitter ? Math.max(0,Math.min(1,Number(emitter.element.dataset.glassUnderlight ?? 1)||0)) : 0;
       const emissionPhase = emission ? coatingProgress(emission,time,reduced.matches) : [0,0,0,0,0];

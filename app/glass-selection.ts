@@ -18,6 +18,7 @@ const SELECTABLE = [
 ].join(',');
 export type Coating = {
   started: number; origin: [number, number]; tint: number[];
+  persistent?: boolean;
   exiting?: number; exitProgress?: number; exitVolume?: number;
   timer?: ReturnType<typeof setTimeout>; riseTimer?: ReturnType<typeof setTimeout>;
 };
@@ -68,7 +69,8 @@ function materialTint(element: HTMLElement, context: CanvasRenderingContext2D | 
   return [.56, .64, .71];
 }
 
-// One visual selection, independent from filter/tab/note values.
+// Exclusive controls have one temporary selection. Multi-select controls keep
+// their material for as long as their actual checked/pressed state is enabled.
 export function useGlassSelection(rootRef: RefObject<HTMLElement | null>) {
   const coatings = useRef(new Map<HTMLElement, Coating>());
   useEffect(() => {
@@ -79,21 +81,21 @@ export function useGlassSelection(rootRef: RefObject<HTMLElement | null>) {
     const parser = document.createElement('canvas'); parser.width = parser.height = 1;
     const context = parser.getContext('2d', { willReadFrequently: true });
     let selected: HTMLElement | null = null;
+    let pendingClick: HTMLElement | null = null;
     let disposed = false;
     const remove = (element: HTMLElement) => {
       const coating = materials.get(element);
       if (coating?.timer) clearTimeout(coating.timer);
       if (coating?.riseTimer) clearTimeout(coating.riseTimer);
       delete element.dataset.glassSelection;
+      delete element.dataset.glassPersistent;
       for (const name of ['--glass-origin-x', '--glass-origin-y', '--glass-control-tint']) element.style.removeProperty(name);
       materials.delete(element);
     };
-    const clear = () => {
-      if (!selected) return;
-      const element = selected;
-      selected = null;
+    const release = (element: HTMLElement) => {
+      if (selected === element) selected = null;
       const coating = materials.get(element);
-      if (!coating) return;
+      if (!coating || coating.exiting !== undefined) return;
       if (coating.timer) clearTimeout(coating.timer);
       if (coating.riseTimer) clearTimeout(coating.riseTimer);
       if (reduced.matches || !element.isConnected) { remove(element); return; }
@@ -104,25 +106,60 @@ export function useGlassSelection(rootRef: RefObject<HTMLElement | null>) {
       element.dataset.glassSelection = 'leaving';
       coating.timer = setTimeout(() => remove(element), EXIT_MS);
     };
-    const select = (element: HTMLElement | null, origin: [number, number]) => {
-      if (disposed) return;
-      const input = element?.matches('input') ? element as HTMLInputElement : element?.querySelector<HTMLInputElement>('input[type="checkbox"], input[type="radio"]');
-      if (!element || !element.isConnected || !root.contains(element) || element.matches(':disabled, [aria-disabled="true"], [aria-pressed="false"], [aria-selected="false"], button[aria-expanded="false"]:not(.filter-select-control):not(.date-picker-control)') || (input && (!input.checked || input.disabled))) { clear(); return; }
-      if (selected === element) return;
-      clear(); remove(element);
+    const clear = () => { if (selected) release(selected); };
+    const inputOf = (element: HTMLElement) => element.matches('input') ? element as HTMLInputElement
+      : element.querySelector<HTMLInputElement>('input[type="checkbox"], input[type="radio"]');
+    const multiple = (element: HTMLElement) => inputOf(element)?.type === 'checkbox' || !!element.closest('[data-glass-multiple]');
+    const enabled = (element: HTMLElement) => {
+      const input = inputOf(element);
+      return element.isConnected && root.contains(element) && !element.closest('[hidden]')
+        && !element.matches(':disabled, [aria-disabled="true"], [aria-pressed="false"], [aria-selected="false"], button[aria-expanded="false"]:not(.filter-select-control):not(.date-picker-control)')
+        && (!input || (input.checked && !input.matches(':disabled')));
+    };
+    const paint = (element: HTMLElement, origin: [number, number], persistent: boolean, animate: boolean) => {
+      remove(element);
       const tint = materialTint(element, context);
-      selected = element;
-      const coating: Coating = { started: performance.now(), origin, tint };
+      const coating: Coating = { started: performance.now()-(animate ? 0 : ENTER_MS), origin, tint, persistent };
       materials.set(element, coating);
+      if (persistent) element.dataset.glassPersistent = '';
       element.style.setProperty('--glass-origin-x', `${origin[0] * 100}%`);
       element.style.setProperty('--glass-origin-y', `${origin[1] * 100}%`);
       element.style.setProperty('--glass-control-tint', tint.map(n => Math.round(n * 255)).join(' '));
-      element.dataset.glassSelection = reduced.matches ? 'selected' : 'entering';
-      if (!reduced.matches) coating.riseTimer = setTimeout(() => { element.dataset.glassSelection = 'lifting'; }, SPREAD_MS);
-      coating.timer = setTimeout(() => {
-        element.dataset.glassSelection = 'selected';
-        coating.timer = undefined;
-      }, reduced.matches ? 0 : ENTER_MS);
+      element.dataset.glassSelection = reduced.matches || !animate ? 'selected' : 'entering';
+      if (!reduced.matches && animate) {
+        coating.riseTimer = setTimeout(() => { element.dataset.glassSelection = 'lifting'; }, SPREAD_MS);
+        coating.timer = setTimeout(() => {
+          element.dataset.glassSelection = 'selected';
+          coating.timer = undefined;
+        }, ENTER_MS);
+      }
+    };
+    const syncMultiple = () => {
+      if (disposed) return;
+      const active = new Set<HTMLElement>();
+      root.querySelectorAll<HTMLElement>('[data-glass-multiple] button[aria-pressed], [data-glass-multiple] button[aria-selected], input[type="checkbox"]').forEach(control => {
+        const element = control.matches('input') ? (control as HTMLInputElement).closest('label') ?? control : control;
+        if (enabled(element)) active.add(element);
+      });
+      for (const [element, coating] of materials) {
+        if (!element.isConnected || element.closest('[hidden]')) { if (selected === element) selected = null; remove(element); }
+        else if (coating.persistent && !active.has(element)) release(element);
+      }
+      // Existing selected values return fully coated after navigation. Only an
+      // actual click starts the two-stage animation, from its click position.
+      for (const element of active) {
+        if (element !== pendingClick && !materials.has(element)) paint(element,[.5,.5],true,false);
+      }
+      if (selected && !enabled(selected)) clear();
+    };
+    const select = (element: HTMLElement | null, origin: [number, number]) => {
+      if (disposed) return;
+      if (!element || !enabled(element)) { if (element) release(element); clear(); return; }
+      const persistent = multiple(element);
+      if (selected !== element) clear();
+      if (materials.has(element) && materials.get(element)?.exiting === undefined) return;
+      if (!persistent) selected = element;
+      paint(element,origin,persistent,true);
     };
     const click = (event: MouseEvent) => {
       const target = event.target instanceof Element ? event.target : null;
@@ -140,15 +177,23 @@ export function useGlassSelection(rootRef: RefObject<HTMLElement | null>) {
         Math.max(0, Math.min(1, (event.clientY - bounds.top) / Math.max(bounds.height, 1))),
       ] : [.5, .5];
       // Wait for React to commit ARIA, checkbox and toggle state.
-      setTimeout(() => select(element, origin), 0);
+      pendingClick = element;
+      setTimeout(() => { pendingClick = null; select(element, origin); syncMultiple(); }, 0);
     };
     const key = (event: KeyboardEvent) => { if (event.key === 'Escape') clear(); };
-    const navigation = () => { for (const element of materials.keys()) remove(element); selected = null; };
+    const navigation = () => { for (const element of materials.keys()) remove(element); selected = null; queueMicrotask(syncMultiple); };
+    const change = () => queueMicrotask(syncMultiple);
+    const observer = new MutationObserver(syncMultiple);
+    observer.observe(root,{ childList: true, subtree: true, attributes: true, attributeFilter: ['aria-pressed','aria-selected','checked','disabled','hidden','data-glass-multiple'] });
+    root.addEventListener('change',change);
     document.addEventListener('click', click, true);
     document.addEventListener('keydown', key);
     window.addEventListener('hashchange', navigation);
+    syncMultiple();
     return () => {
       disposed = true;
+      observer.disconnect();
+      root.removeEventListener('change',change);
       document.removeEventListener('click', click, true);
       document.removeEventListener('keydown', key);
       window.removeEventListener('hashchange', navigation);
