@@ -64,6 +64,8 @@ La transizione dal contributo diffuso centrale al trasporto ottico segue l'incli
 
 Lo shader riceve `uCoating = (coverage, isControl, opacity, volume)` e `uCoatingOrigin = (localX, localY)`. Le card esistenti usano `(1, 0, 1, 1)`: nessuna modifica ai loro parametri ottici. Il confronto in framebuffer float con cinque posizioni della sorgente ha restituito una differenza massima di 7.46e-9 (precisione numerica).
 
+I selettori segmentati compatti e gli switch fisici ricevono anche `uControlLight = (620, .25)`: la distanza ottica segue il cursore fino a 372 px, poi si assesta gradualmente a 620 px. Oltre questo limite l'attenuazione resta al 25% e l'angolo d'incidenza mantiene un'altezza finita, conservando riflessi e spalla 3D. Anche la concentrazione tangenziale della fascia riflessa mantiene un minimo graduale del 35%, così una sorgente lontana in diagonale non spegne tutti i bordi dei controlli piccoli. La direzione continua a seguire il cursore; sia il raggio locale sia quello di riferimento Snell usano lo stesso limite. Le altre superfici ricevono `(0, 0)` e conservano l'attenuazione originale. Uscita del puntatore e reduced motion mantengono il comportamento esistente.
+
 ## Verifica
 
 Le celle di correlazione trasferiscono allo shader anche la tinta del proprio

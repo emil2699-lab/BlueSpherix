@@ -8,8 +8,9 @@ import { soapSample } from "./ice-glass-volume";
 
 type ViewportRect = { left: number; top: number; width: number; height: number };
 type GlassRect = ViewportRect & { right: number; bottom: number };
-type Measurement = { element: HTMLElement; rect: GlassRect; radius: number; tint: number[]; crownHeight: number };
+type Measurement = { element: HTMLElement; rect: GlassRect; radius: number; tint: number[]; crownHeight: number; isSwitch: boolean };
 const GLASS_SURFACE_SELECTOR = ".glass-card, .calendar-strip, .demo-notice, .heatmap button, [data-glass-selection]";
+const GLASS_SWITCH_SELECTOR = ".range-switch button, .lab-parameter button, .monte-carlo-switch button, .focus-tabs button, .protection-switch, .lab-cost-toggle";
 // Keep the overscanned backing store below a conservative Safari allocation
 // budget as well as the GPU's per-axis limits. These are physical pixels.
 const BUFFER_PIXEL_BUDGET = 8_388_608;
@@ -130,7 +131,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         const opticalRadius=Math.min(Math.min(halfWidth,halfHeight)*.95,Math.max(radius*1.75,24));
         const thickness=Math.min(config.glassThickness*2.1,Math.min(halfWidth,halfHeight)*.5);
         const crownHeight=rect.width && rect.height ? soapSample(0,0,halfWidth,halfHeight,opticalRadius,thickness)[2] : 0;
-        return { element, rect, radius, tint, crownHeight };
+        return { element, rect, radius, tint, crownHeight, isSwitch: element.matches(GLASS_SWITCH_SELECTOR) };
       });
       cards = cards.filter(card=>card.rect.width>0 && card.rect.height>0);
       dirty = false;
@@ -202,7 +203,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       gl.uniform4f(uniform("uSpillRect"), emitter?.rect.left ?? 0,emitter?.rect.top ?? 0,emitter?.rect.width ?? 1,emitter?.rect.height ?? 1);
       gl.uniform2f(uniform("uSpillOrigin"),...(emission?.origin ?? [.5,.5] as [number,number]));
       gl.uniform3f(uniform("uSpillTint"),emissionTint[0],emissionTint[1],emissionTint[2]);
-      for (const { element, rect, radius, tint, crownHeight } of cards) {
+      for (const { element, rect, radius, tint, crownHeight, isSwitch } of cards) {
         if (rect.bottom <= 0 || rect.top >= viewHeight || rect.right <= 0 || rect.left >= viewWidth || !rect.width) continue;
         // A scissored full-card quad keeps the slab continuous while avoiding work outside it.
         gl.viewport(0,0,width,height);
@@ -221,6 +222,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         gl.uniform2f(uniform("uUnderlight"), underlight,
           reduced.matches ? 0 : coating ? (time-coating.started)/1000 : 0);
         gl.uniform4f(uniform("uCoating"), reveal, isControl, opacity, volume);
+        gl.uniform2f(uniform("uControlLight"), isSwitch ? config.switchLightReach : 0, isSwitch ? config.switchLightFloor : 0);
         gl.uniform2f(uniform("uCoatingOrigin"), ...(coating?.origin ?? [.5, .5] as [number, number]));
         gl.uniform4f(uniform("uRect"),rect.left,rect.top,rect.width,rect.height);
         gl.uniform1f(uniform("uRadius"),radius);
