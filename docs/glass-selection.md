@@ -30,6 +30,8 @@ rispettivamente tinta acqua e rossa.
 
 ### Luce sotto il vetro, tutte le sezioni
 
+In **Strategy Lab**, i selettori di Regola simulata, Campione e Rischio per trade espongono lo stato `aria-pressed` al gestore condiviso. L'opzione attiva mantiene vetro e luce interna anche al caricamento e dopo click fuori; il cambio di opzione dissolve la precedente e accende la nuova con le animazioni esistenti. La luce usa il campo dinamico e il trasporto ottico già approvati, con tetto standard dei controlli non finanziari. I riflessi del cursore usano nuovamente la calibrazione originale, senza estensione della distanza o luminosità minima.
+
 I controlli selezionati di tutte le sezioni ricevono una luce interna diffusa mentre il volume cresce. Due campi noise con una dimensione temporale indipendente fanno nascere, attenuare e spegnere completamente i punti luminosi sul posto: nessuna direzione di scorrimento fissa. Le normali e i riflessi esistenti rimangono invariati. Le parti soffuse conservano il colore del materiale; le creste più intense tendono gradualmente al bianco. Il contributo rimane entro la sagoma e sfuma prima del bordo, senza bloom, aloni esterni o cambi di opacità. La saturazione e la radiance della sola luce interna sono aumentate del 15%, mantenendo tinta, spegnimento locale e progressione dei picchi verso il bianco. Le card vicine possono ricevere soltanto sui bordi un contributo secondario della selezione luminosa, senza aloni nello spazio vuoto.
 
 Per le posizioni di Oggi e Rischio e i trade di Operazioni e Diario, `positionUnderlight(result, balance)` usa `abs(result) / balance`: il tetto luminoso parte dal 25% del massimo fino allo 0,1% del saldo, cresce linearmente fino al massimo al 3%, poi rimane costante. Un risultato zero o un saldo non valido spengono il contributo. La stessa scala vale per profitti e perdite; il colore resta quello originale. Questa scala controlla il tetto, non il minimo temporale: ogni punto può sempre spegnersi. I picchi diventano più bianchi in funzione dell'intensità effettiva dopo la scala P&L. Gli altri controlli non finanziari mantengono il tetto standard.
@@ -63,8 +65,6 @@ La transizione dal contributo diffuso centrale al trasporto ottico segue l'incli
 - Reduced motion applica direttamente il volume finale. Senza WebGL viene usato un rivestimento CSS statico discreto nella stessa tinta, senza ritagliare o animare il contenuto.
 
 Lo shader riceve `uCoating = (coverage, isControl, opacity, volume)` e `uCoatingOrigin = (localX, localY)`. Le card esistenti usano `(1, 0, 1, 1)`: nessuna modifica ai loro parametri ottici. Il confronto in framebuffer float con cinque posizioni della sorgente ha restituito una differenza massima di 7.46e-9 (precisione numerica).
-
-I selettori segmentati compatti e gli switch fisici ricevono anche `uControlLight = (620, .25)`: la distanza ottica segue il cursore fino a 372 px, poi si assesta gradualmente a 620 px. Oltre questo limite l'attenuazione resta al 25% e l'angolo d'incidenza mantiene un'altezza finita, conservando riflessi e spalla 3D. Anche la concentrazione tangenziale della fascia riflessa mantiene un minimo graduale del 35%, così una sorgente lontana in diagonale non spegne tutti i bordi dei controlli piccoli. La direzione continua a seguire il cursore; sia il raggio locale sia quello di riferimento Snell usano lo stesso limite. Le altre superfici ricevono `(0, 0)` e conservano l'attenuazione originale. Uscita del puntatore e reduced motion mantengono il comportamento esistente.
 
 ## Verifica
 

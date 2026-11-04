@@ -103,22 +103,9 @@ uniform vec4 uGlass; // IOR, thickness, roughness, opacity
 uniform float uBodyOpacity;
 uniform vec4 uOptics; // Fresnel, dispersion, refraction, internal reflection
 uniform vec4 uEnergy; // ambient, intensity, light height, falloff
-uniform vec2 uControlLight; // switch reach in CSS pixels, minimum cursor intensity
 uniform vec3 uFinish; // sharpness, bloom intensity, bloom radius
 
 ${glassGeometry}
-vec3 cursorDelta(vec2 pixel, float height) {
-  vec2 offset=uLight.xy-pixel;
-  if(uControlLight.x>0.0) {
-    // Preserve the cursor's bearing. Ease its optical distance to a finite
-    // limit, so both incidence and radiance retain the glass's curved volume.
-    float distanceXY=length(offset);
-    float reach=uControlLight.x;
-    float bounded=mix(distanceXY,reach,smoothstep(reach*.6,reach,distanceXY));
-    offset*=bounded/max(distanceXY,.001);
-  }
-  return vec3(offset,max(uEnergy.z-height,1.0));
-}
 vec3 environment(vec3 ray) {
   float sky = smoothstep(-.55,.72,ray.y);
   float cool = pow(max(0.0, .5 + .5 * ray.x), 2.4);
@@ -294,16 +281,12 @@ void main() {
   vec2 normalXY = -surface.xy + waveGradient*3.2*bevel*smoothstep(0.0,thickness*.4,depth);
   vec3 N = normalize(vec3(normalXY*volume,1.0));
   vec3 V = vec3(0,0,1);
-  vec3 delta = cursorDelta(pixel,surfaceHeight);
+  vec3 delta = vec3(uLight.xy-pixel,max(uEnergy.z-surfaceHeight,1.0));
   float distanceXY = length(delta.xy);
   vec3 L = normalize(delta);
   vec3 H = normalize(L+V);
   float attenuation = 1.0/(1.0+pow(distanceXY/uEnergy.w,2.0)*3.0);
   attenuation *= 1.0-smoothstep(uEnergy.w*1.75,uEnergy.w*2.75,distanceXY);
-  if(uControlLight.x>0.0) {
-    float floorIntensity=clamp(uControlLight.y,.001,1.0);
-    attenuation=1.0/(1.0+(1.0/floorIntensity-1.0)*pow(distanceXY/uControlLight.x,2.0));
-  }
   attenuation *= uLight.z;
   float ndl = max(dot(N,L),0.0);
   float ndh = max(dot(N,H),0.0);
@@ -322,7 +305,7 @@ void main() {
   // A parallel source produces an edge-parallel, straight spectral band.
   // Only the difference between local Snell paths and that parallel reference
   // bends it. There is no UV/noise curve or distance-driven bend animation.
-  vec3 referenceL=normalize(cursorDelta(uRect.xy+halfSize,mix(.6,uCrownHeight,volume)));
+  vec3 referenceL=normalize(vec3(uLight.xy-uRect.xy-halfSize,max(uEnergy.z-mix(.6,uCrownHeight,volume),1.0)));
   vec3 referenceR=refract(-referenceL,N,1.0/(uGlass.x-uOptics.y));
   vec3 referenceG=refract(-referenceL,N,1.0/uGlass.x);
   vec3 referenceB=refract(-referenceL,N,1.0/(uGlass.x+uOptics.y));
@@ -359,13 +342,6 @@ void main() {
   float light = attenuation*uEnergy.y*facing;
   float alongEdge = dot(delta.xy,tangent);
   float spectralFocus = exp(-pow(alongEdge/(uEnergy.z*1.8),2.0));
-  if(uControlLight.x>0.0) {
-    // Tiny switches otherwise lose their entire spectral shoulder when the
-    // distant cursor lies diagonally to every edge. Keep a broad reflection
-    // inside the same curved material as the distance reaches its plateau.
-    float distant=smoothstep(uEnergy.z*1.25,uControlLight.x,length(uLight.xy-pixel));
-    spectralFocus=max(spectralFocus,.35*distant);
-  }
   float rim=exp(-depth/max(1.5,thickness*.07));
   // Keep the white reflection on the rim as a broad streak, without isolated
   // GGX dots on the front or rounded shoulders of neighbouring cards.
