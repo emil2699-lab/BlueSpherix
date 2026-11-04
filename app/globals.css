@@ -87,13 +87,46 @@ nav button b { margin-left: auto; font-size: 8px; color: #091110; background: va
 .legend i.equity { background: var(--aqua); }
 .legend i.balance { background: #556170; }
 .legend button { color: #687481; background: transparent; border: 0; cursor: pointer; letter-spacing: 2px; }
-.chart-wrap { height: 265px; margin-top: 13px; position: relative; }
+.equity-variant-switch { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 5px; margin-top: 18px; padding: 4px; border-radius: 13px; background: rgba(4,9,14,.34); }
+.equity-variant-switch button { min-width: 0; min-height: 46px; padding: 7px 10px; border: 0; border-radius: 10px; background: transparent; color: #63717e; cursor: pointer; display: grid; grid-template-columns: auto minmax(0,1fr); grid-template-rows: auto auto; column-gap: 8px; text-align: left; transition: color .28s var(--ease-apple-fade),background .38s var(--ease-apple-layout),transform .32s var(--ease-apple-spring),box-shadow .38s var(--ease-apple-layout),scale .16s var(--ease-apple-press); }
+.equity-variant-switch button > span { grid-row: 1 / 3; align-self: center; color: #46535f; font-size: 8px; letter-spacing: .08em; }
+.equity-variant-switch button strong { color: #8996a1; font-size: 9px; font-weight: 650; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.equity-variant-switch button small { color: #53606c; font-size: 7px; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.equity-variant-switch button.active { color: var(--aqua); background: linear-gradient(105deg,rgba(86,217,202,.12),rgba(157,139,255,.045)); box-shadow: inset 0 0 0 1px rgba(86,217,202,.08); }
+.equity-variant-switch button.active > span { color: rgba(86,217,202,.62); }
+.equity-variant-switch button.active strong { color: #e5fbf7; }
+.equity-variant-switch button.active small { color: #7f9d9a; }
+.equity-variant-switch button:active { scale: .97; }
+.chart-wrap { height: 265px; margin-top: 9px; position: relative; }
 .chart-wrap svg { width: 100%; height: calc(100% - 20px); overflow: visible; }
 .grid-line { stroke: rgba(255,255,255,.045); stroke-width: 1; stroke-dasharray: 3 7; }
 .equity-path, .balance-path { fill: none; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; }
 .equity-path { stroke: var(--aqua); stroke-width: 2; }
 .balance-path { stroke: #586473; stroke-width: 1.2; stroke-dasharray: 4 5; }
 .end-dot { fill: var(--aqua); stroke: rgba(86,217,202,.25); stroke-width: 8; }
+.equity-variant-layer { animation: equity-variant-arrive .5s var(--ease-apple-layout) both; transform-origin: 50% 55%; }
+.tide-area { opacity: .86; }
+.tide-depth { stroke: rgba(86,217,202,.105); stroke-width: 1; stroke-dasharray: 1 7; vector-effect: non-scaling-stroke; }
+.ribbon-body { stroke: rgba(204,255,247,.17); stroke-width: .8; vector-effect: non-scaling-stroke; }
+.ribbon-thread { stroke: rgba(215,255,250,.15); stroke-width: .8; vector-effect: non-scaling-stroke; }
+.ribbon-edge.equity-path { stroke-width: 1.8; }
+.ribbon-edge.balance-path { stroke: rgba(157,139,255,.6); stroke-dasharray: none; }
+.strata-line { fill: none; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.strata-0 { stroke: #b9fff6; stroke-width: 1.9; }
+.strata-1 { stroke: rgba(86,217,202,.67); stroke-width: 1.5; }
+.strata-2 { stroke: rgba(104,191,193,.43); stroke-width: 1.25; }
+.strata-3 { stroke: rgba(133,145,194,.31); stroke-width: 1.1; }
+.strata-4 { stroke: rgba(157,139,255,.35); stroke-width: 1; stroke-dasharray: 3 6; }
+.strata-node { fill: #cafff8; stroke: rgba(86,217,202,.24); stroke-width: 5; vector-effect: non-scaling-stroke; }
+.pulse-guide { fill: none; stroke: rgba(86,217,202,.22); stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.pulse-stem { stroke-width: 1.2; vector-effect: non-scaling-stroke; }
+.pulse-positive .pulse-stem { stroke: rgba(86,217,202,.48); }
+.pulse-negative .pulse-stem { stroke: rgba(255,111,125,.58); }
+.pulse-halo { fill: url(#pulseCore); opacity: .55; }
+.pulse-dot { fill: #dffffa; }
+.pulse-negative .pulse-halo { fill: rgba(255,111,125,.22); }
+.pulse-negative .pulse-dot { fill: var(--red); }
+@keyframes equity-variant-arrive { from { opacity: 0; transform: translateY(5px) scaleY(.97); } to { opacity: 1; transform: translateY(0) scaleY(1); } }
 .chart-axis { display: flex; justify-content: space-between; color: #53606c; font-size: 8px; padding: 0 5px; }
 .chart-summary { border-top: 1px solid var(--stroke); display: grid; grid-template-columns: repeat(3,1fr); padding-top: 14px; }
 .chart-summary > div { padding-left: 15px; border-left: 1px solid var(--stroke); }
@@ -1293,6 +1326,8 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
   .negative-surface:hover { box-shadow: 0 23px 70px rgba(54,4,14,.2); }
   .range-switch button:hover { color: #c7d3da; background: rgba(255,255,255,.045); transform: translateY(-1px); }
   .range-switch button.active:hover { color: #effffc; background: rgba(86,217,202,.17); }
+  .equity-variant-switch button:hover { color: #d7e3e8; background: rgba(255,255,255,.035); transform: translateY(-1px); }
+  .equity-variant-switch button.active:hover { background: linear-gradient(105deg,rgba(86,217,202,.15),rgba(157,139,255,.06)); }
   .portfolio-export, .text-action, .quiet-button, .operation-expand, .trade-filters button { transition: color .28s var(--ease-apple-fade),background .36s var(--ease-apple-layout),border-color .36s var(--ease-apple-layout),transform .32s var(--ease-apple-spring),box-shadow .36s var(--ease-apple-layout),scale .16s var(--ease-apple-press); }
   .portfolio-export:hover, .operation-expand:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(86,217,202,.07); }
   .text-action:hover, .quiet-button:hover { transform: translateX(2px); }
@@ -1453,6 +1488,10 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
   .today-welcome .risk-live-status { width: 100%; justify-content: center; }
   .today-notice { align-items: flex-start; font-size: 10px; }
   .equity-card { padding: 17px 14px 14px; }
+  .equity-variant-switch { grid-template-columns: repeat(2,minmax(0,1fr)); margin-top: 14px; }
+  .equity-variant-switch button { min-height: 44px; }
+  .equity-variant-switch button strong { font-size: 10px; }
+  .equity-variant-switch button small { font-size: 8px; }
   .card-head { flex-direction: column; }
   .today-chart-controls { width: 100%; align-items: stretch; }
   .today-chart-controls .range-switch { width: 100%; }

@@ -39,8 +39,16 @@ import { IceGlass } from "./ice-glass";
 import { positionUnderlight } from "./glass-underlight";
 
 type Range = DashboardRange;
+type EquityVariant = "tide" | "ribbon" | "strata" | "pulse";
 const equitySeries = DEMO_EQUITY_SERIES;
 const balanceSeries = DEMO_BALANCE_SERIES;
+
+const equityVariants: { id: EquityVariant; label: string; caption: string }[] = [
+  { id: "tide", label: "Marea", caption: "valore e profondità" },
+  { id: "ribbon", label: "Nastro vivo", caption: "equity meno balance" },
+  { id: "strata", label: "Strati", caption: "distanze di capitale" },
+  { id: "pulse", label: "Battito", caption: "variazioni nel tempo" },
+];
 
 const navItems = [
   { label: "Oggi", icon: LayoutDashboard, target: "overview" },
@@ -68,14 +76,8 @@ function pathFor(values: number[], width: number, height: number, padding = 4) {
     .join(" ");
 }
 
-function pointFor(values: number[], index: number, width: number, height: number, padding = 4) {
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = max - min || 1;
-  return {
-    x: padding + (index / Math.max(1, values.length - 1)) * (width - padding * 2),
-    y: height - padding - ((values[index] - min) / span) * (height - padding * 2),
-  };
+function pathFromPoints(points: { x: number; y: number }[]) {
+  return points.map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
 }
 
 function orbitalNodeStyle(pressure: number, startAngle: number, sweep: number, radius = 88) {
@@ -98,28 +100,86 @@ function MiniChart({ values, color = "#56d9ca" }: { values: number[]; color?: st
   );
 }
 
-function EquityChart({ range }: { range: Range }) {
+function EquityChart({ range, variant }: { range: Range; variant: EquityVariant }) {
   const equity = equitySeries[range];
   const balance = balanceSeries[range];
-  const equityPath = pathFor(equity, 760, 255, 14);
-  const balancePath = pathFor(balance, 760, 255, 14);
+  const chartMin = Math.min(...equity, ...balance);
+  const chartMax = Math.max(...equity, ...balance);
+  const chartSpan = chartMax - chartMin || 1;
+  const chartPoints = (values: number[]) => values.map((value, index) => ({
+    x: 14 + (index / Math.max(1, values.length - 1)) * 732,
+    y: 241 - ((value - chartMin) / chartSpan) * 227,
+  }));
+  const equityPoints = chartPoints(equity);
+  const balancePoints = chartPoints(balance);
+  const equityPath = pathFromPoints(equityPoints);
+  const balancePath = pathFromPoints(balancePoints);
   const areaPath = `${equityPath} L746,241 L14,241 Z`;
-  const equityEnd = pointFor(equity, equity.length - 1, 760, 255, 14);
+  const equityEnd = equityPoints[equityPoints.length - 1];
+  const ribbonPath = `${pathFromPoints(equityPoints)} ${pathFromPoints([...balancePoints].reverse()).replace(/^M/, "L")} Z`;
+  const strata = [0, .25, .5, .75, 1].map((weight) => equityPoints.map((point, index) => ({
+    x: point.x,
+    y: point.y + (balancePoints[index].y - point.y) * weight,
+  })));
+  const sampledIndexes = equityPoints.map((_, index) => index).filter((index) => index % Math.max(1, Math.floor(equityPoints.length / 18)) === 0 || index === equityPoints.length - 1);
+  const descriptions: Record<EquityVariant, string> = {
+    tide: "Marea mostra il valore come una superficie che acquista profondità verso il presente.",
+    ribbon: "Nastro vivo rende visibile la distanza tra equity e balance lungo tutto il periodo.",
+    strata: "Strati scompone lo spazio tra equity e balance in livelli successivi di capitale.",
+    pulse: "Battito trasforma ogni campione in un impulso tra balance ed equity.",
+  };
   return (
-    <div className="chart-wrap" aria-label={`Grafico equity e balance, periodo ${range}`}>
-      <svg viewBox="0 0 760 255" preserveAspectRatio="none" role="img">
+    <div className={`chart-wrap equity-chart equity-chart-${variant}`} role="img" aria-label={`${descriptions[variant]} Periodo ${range}.`}>
+      <svg viewBox="0 0 760 255" preserveAspectRatio="none" aria-hidden="true" focusable="false">
         <defs>
           <linearGradient id="equityArea" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#54ded0" stopOpacity="0.22" />
             <stop offset="100%" stopColor="#54ded0" stopOpacity="0" />
           </linearGradient>
+          <linearGradient id="equityRibbon" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#9d8bff" stopOpacity="0.08" />
+            <stop offset="52%" stopColor="#56d9ca" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="#d9fff9" stopOpacity="0.48" />
+          </linearGradient>
+          <radialGradient id="pulseCore">
+            <stop offset="0%" stopColor="#f1fffd" />
+            <stop offset="38%" stopColor="#56d9ca" />
+            <stop offset="100%" stopColor="#56d9ca" stopOpacity="0" />
+          </radialGradient>
           <filter id="glow"><feGaussianBlur stdDeviation="3" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
         </defs>
         {[46, 94, 142, 190, 238].map((y) => <line key={y} x1="14" x2="746" y1={y} y2={y} className="grid-line" />)}
-        <path d={areaPath} fill="url(#equityArea)" />
-        <path d={balancePath} className="balance-path" />
-        <path d={equityPath} className="equity-path" filter="url(#glow)" />
-        <circle cx={equityEnd.x} cy={equityEnd.y} r="4.5" className="end-dot" />
+        {variant === "tide" && <g className="equity-variant-layer">
+          <path d={areaPath} className="tide-area" fill="url(#equityArea)" />
+          {sampledIndexes.map((index) => <line key={index} x1={equityPoints[index].x} x2={equityPoints[index].x} y1={equityPoints[index].y} y2="241" className="tide-depth" />)}
+          <path d={balancePath} className="balance-path" />
+          <path d={equityPath} className="equity-path" filter="url(#glow)" />
+          <circle cx={equityEnd.x} cy={equityEnd.y} r="4.5" className="end-dot" />
+        </g>}
+        {variant === "ribbon" && <g className="equity-variant-layer">
+          <path d={ribbonPath} className="ribbon-body" fill="url(#equityRibbon)" />
+          {sampledIndexes.map((index) => <line key={index} x1={equityPoints[index].x} x2={balancePoints[index].x} y1={equityPoints[index].y} y2={balancePoints[index].y} className="ribbon-thread" />)}
+          <path d={balancePath} className="balance-path ribbon-edge" />
+          <path d={equityPath} className="equity-path ribbon-edge" />
+          <circle cx={equityEnd.x} cy={equityEnd.y} r="4.5" className="end-dot" />
+        </g>}
+        {variant === "strata" && <g className="equity-variant-layer strata-layer">
+          {strata.map((points, index) => <path key={index} d={pathFromPoints(points)} className={`strata-line strata-${index}`} />)}
+          {sampledIndexes.map((index) => <circle key={index} cx={equityPoints[index].x} cy={equityPoints[index].y} r="2.2" className="strata-node" />)}
+          <circle cx={equityEnd.x} cy={equityEnd.y} r="4.5" className="end-dot" />
+        </g>}
+        {variant === "pulse" && <g className="equity-variant-layer pulse-layer">
+          <path d={equityPath} className="pulse-guide" />
+          {sampledIndexes.map((index) => {
+            const negative = equity[index] < balance[index];
+            return <g key={index} className={negative ? "pulse-negative" : "pulse-positive"}>
+              <line x1={equityPoints[index].x} x2={balancePoints[index].x} y1={equityPoints[index].y} y2={balancePoints[index].y} className="pulse-stem" />
+              <circle cx={equityPoints[index].x} cy={equityPoints[index].y} r={index === equityPoints.length - 1 ? 8 : 5} className="pulse-halo" />
+              <circle cx={equityPoints[index].x} cy={equityPoints[index].y} r={index === equityPoints.length - 1 ? 2.8 : 1.8} className="pulse-dot" />
+            </g>;
+          })}
+          <path d={balancePath} className="balance-path" />
+        </g>}
       </svg>
       <div className="chart-axis"><span>Inizio</span><span>Metà periodo</span><span>Oggi</span></div>
     </div>
@@ -159,6 +219,7 @@ export default function Home() {
     };
   }, []);
   const [range, setRange] = useState<Range>("1M");
+  const [equityVariant, setEquityVariant] = useState<EquityVariant>("tide");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [privateMode, setPrivateMode] = useState(true);
   const performance = useMemo(() => `${DASHBOARD_RANGE_STATS[range].returnPct >= 0 ? "+" : ""}${DASHBOARD_RANGE_STATS[range].returnPct.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`, [range]);
@@ -231,7 +292,10 @@ export default function Home() {
                 <div><p className="eyebrow">Equity totale</p><div className="equity-value"><strong>{money(ALPHA_ACCOUNT.equity)}</strong><span data-sign={valueSign(OPEN_PNL)}>{OPEN_PNL >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />} {signedMoney(OPEN_PNL)} oggi</span></div></div>
                 <div className="today-chart-controls"><div className="range-switch" aria-label="Periodo grafico">{(["1W", "1M", "3M", "1Y"] as Range[]).map((item) => <button key={item} aria-pressed={range === item} className={range === item ? "active" : ""} onClick={() => setRange(item)}>{item}</button>)}</div><div className="legend"><span><i className="equity" /> Equity</span><span><i className="balance" /> Balance</span></div></div>
               </div>
-              <EquityChart range={range} />
+              <div className="equity-variant-switch" role="group" aria-label="Varianti del grafico equity">
+                {equityVariants.map((variant, index) => <button key={variant.id} type="button" aria-pressed={equityVariant === variant.id} className={equityVariant === variant.id ? "active" : ""} onClick={() => setEquityVariant(variant.id)}><span>0{index + 1}</span><strong>{variant.label}</strong><small>{variant.caption}</small></button>)}
+              </div>
+              <EquityChart range={range} variant={equityVariant} />
               <div className="chart-summary"><div><span>Rendimento</span><strong data-sign={valueSign(DASHBOARD_RANGE_STATS[range].returnPct)}>{performance}</strong></div><div><span>Profitto netto</span><strong data-sign={valueSign(rangeProfit)}>{money(rangeProfit)}</strong></div><div><span>Data confidence</span><strong className="confidence"><ShieldCheck size={15} /> {DASHBOARD_RANGE_STATS[range].confidence}%</strong></div></div>
             </article>
 
