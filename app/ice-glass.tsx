@@ -9,7 +9,7 @@ import { soapSample } from "./ice-glass-volume";
 type ViewportRect = { left: number; top: number; width: number; height: number };
 type GlassRect = ViewportRect & { right: number; bottom: number };
 type Measurement = { element: HTMLElement; rect: GlassRect; radius: number; tint: number[]; crownHeight: number };
-const GLASS_SURFACE_SELECTOR = ".glass-card, .calendar-strip, .demo-notice, [data-glass-selection]";
+const GLASS_SURFACE_SELECTOR = ".glass-card, .calendar-strip, .demo-notice, .heatmap button, [data-glass-selection]";
 // Keep the overscanned backing store below a conservative Safari allocation
 // budget as well as the GPU's per-axis limits. These are physical pixels.
 const BUFFER_PIXEL_BUDGET = 8_388_608;
@@ -116,7 +116,8 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       viewport = nextViewport;
       cards = Array.from(root.querySelectorAll<HTMLElement>(GLASS_SURFACE_SELECTOR)).map((element) => {
         const style = getComputedStyle(element);
-        const tint = coatings.current.get(element)?.tint ?? (element.matches(".negative-surface, .negative-strong, .critical, .risk-critical, .failed, .loss, .diary-loss, .negative-row") ? [1,.34,.43]
+        const tint = coatings.current.get(element)?.tint ?? (element.matches(".negative-surface, .negative-strong, .critical, .risk-critical, .failed, .loss, .diary-loss, .negative-row, .heat-negative") ? [1,.34,.43]
+          : element.matches(".heat-neutral") ? [.56,.64,.71]
           : element.matches(".violet, .insight-card, .lab-validation") ? [.64,.46,1]
           : element.matches(".amber, .calendar-strip, .warning, .risk-warning") ? [1,.62,.24]
           : [.31,.77,.87]);

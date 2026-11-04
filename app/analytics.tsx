@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { BarChart3, Clock3, Crosshair, ShieldCheck, Sparkles, TrendingUp } from "lucide-react";
 import { DEMO_ANALYTICS, DEMO_PERIOD_STATS, EXIT_OPPORTUNITY_PCT, TRADE_DNA, type DemoPeriod } from "./demo-data";
 import { valueSign } from "./value-sign";
@@ -22,6 +22,7 @@ export default function Analytics() {
   const analytics = DEMO_ANALYTICS[period];
   const sessions = analytics.sessions;
   const instruments = analytics.instruments;
+  const strongestHeat = Math.max(...analytics.heat.flatMap(row => row.map(item => Math.abs(item.net))), 1);
   const session = sessions.find(item => item.id === sessionId) ?? sessions[1];
   const selectedCell = analytics.heat[cell.day][cell.window];
   const selectedValue = selectedCell.net;
@@ -29,8 +30,10 @@ export default function Analytics() {
   const selectedFactor = selectedCell.factor.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const cellStyle = (value: number) => {
     const intensity = Math.min(.28, .055 + Math.abs(value) / 3500);
-    return { background: value >= 0 ? `rgba(86,217,202,${intensity})` : `rgba(255,111,125,${intensity})` };
+    const rgb = value > 0 ? "86 217 202" : value < 0 ? "255 111 125" : "157 169 184";
+    return { "--heat-rgb": rgb, "--heat-base-alpha": intensity } as CSSProperties;
   };
+  const cellLight = (value: number) => value === 0 ? 0 : .25 + .75 * Math.abs(value) / strongestHeat;
 
   return <div className="analytics-view">
     <section className="welcome"><div><p className="date-line">Dai risultati alle decisioni</p><h1>Analisi.</h1><p>Scopri quando il tuo metodo funziona e quanto è affidabile.</p></div><div className="range-switch analytics-period" aria-label="Periodo analisi">{(["30G", "90G", "1A"] as Period[]).map(item => <button key={item} aria-pressed={period === item} className={period === item ? "active" : ""} onClick={() => setPeriod(item)}>{item}</button>)}</div></section>
@@ -47,7 +50,7 @@ export default function Analytics() {
       <article className="glass-card edge-map-card">
         <div className="section-head"><div><p className="eyebrow">Edge map</p><h2>Dove nasce il risultato.</h2></div><div className="range-switch edge-toggle" aria-label="Metrica mappa">{(["Risultato", "Profit factor"] as HeatMetric[]).map(item => <button key={item} aria-pressed={metric === item} className={metric === item ? "active" : ""} onClick={() => setMetric(item)}>{item}</button>)}</div></div>
         <p className="portfolio-caption">Ogni cella combina giorno e orario di apertura. Selezionala per leggere il contesto.</p>
-        <div className="heatmap" role="grid" aria-label={`${metric} per giorno e fascia oraria`}><span />{windows.map(window => <span className="heat-label" key={window}>{window}</span>)}{days.flatMap((day, dayIndex) => [<span className="heat-label" key={`${day}-label`}>{day}</span>, ...windows.map((window, windowIndex) => { const heatCell = analytics.heat[dayIndex][windowIndex]; const value = heatCell.net; const label = metric === "Risultato" ? euro(value) : `${heatCell.factor.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PF`; return <button role="gridcell" aria-selected={cell.day === dayIndex && cell.window === windowIndex} aria-label={`${day}, ${window}: ${label}`} key={`${day}-${window}`} className={cell.day === dayIndex && cell.window === windowIndex ? "selected" : ""} style={cellStyle(value)} onClick={() => setCell({ day: dayIndex, window: windowIndex })}><strong data-sign={metric === "Risultato" ? valueSign(value) : undefined}>{metric === "Risultato" ? `${value >= 0 ? "+" : "−"}$${Math.abs(Math.round(value)).toLocaleString("it-IT")}` : label}</strong><small>{heatCell.trades} trade</small></button>; })])}</div>
+        <div className="heatmap" role="grid" aria-label={`${metric} per giorno e fascia oraria`}><span />{windows.map(window => <span className="heat-label" key={window}>{window}</span>)}{days.flatMap((day, dayIndex) => [<span className="heat-label" key={`${day}-label`}>{day}</span>, ...windows.map((window, windowIndex) => { const heatCell = analytics.heat[dayIndex][windowIndex]; const value = heatCell.net; const label = metric === "Risultato" ? euro(value) : `${heatCell.factor.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PF`; const tone = value > 0 ? "positive" : value < 0 ? "negative" : "neutral"; return <button role="gridcell" aria-selected={cell.day === dayIndex && cell.window === windowIndex} aria-label={`${day}, ${window}: ${label}`} key={`${day}-${window}`} className={`heat-${tone}${cell.day === dayIndex && cell.window === windowIndex ? " selected" : ""}`} data-glass-base data-glass-underlight={cellLight(value)} style={cellStyle(value)} onClick={() => setCell({ day: dayIndex, window: windowIndex })}><strong data-sign={metric === "Risultato" ? valueSign(value) : undefined}>{metric === "Risultato" ? `${value >= 0 ? "+" : "−"}$${Math.abs(Math.round(value)).toLocaleString("it-IT")}` : label}</strong><small>{heatCell.trades} trade</small></button>; })])}</div>
         <div className="heat-legend"><span>Debole</span><i className="negative" /><i /><i /><i className="positive" /><span>Forte</span></div>
       </article>
 

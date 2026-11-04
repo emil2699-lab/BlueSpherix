@@ -19,6 +19,15 @@ e un solo scheduler. `scripts/check-glass-multiselect.mjs` copre queste interazi
 
 In **Oggi**, anche le righe delle posizioni aperte sono pulsanti nativi rivestibili, raggiungibili con Tab e selezionabili con Space/Invio. Prima erano blocchi `div` statici, mentre il periodo del grafico era già collegato. La selezione è soltanto visiva: non cambia dati o apre operazioni. Il negativo mantiene materiale e riflessi tinti di rosso. Il controllo specifico è `scripts/check-glass-selection-today.mjs` (stesse variabili della suite generale).
 
+Nella **Edge Map** di Analisi tutte le celle sono registrate come superfici del
+canvas condiviso. La base semantica resta visibile a riposo su uno strato
+separato, ritagliato con un raggio di 24 px che segue la sagoma ottica a
+saponetta. Quando una cella viene selezionata, scompare soltanto questa base e
+resta il vetro animato. La potenza della luce confronta il valore assoluto con
+il massimo della mappa corrente: zero spento, valori non nulli dal 25% e massimo
+al 100%. Profitti e perdite equivalenti hanno la stessa potenza e conservano
+rispettivamente tinta acqua e rossa.
+
 ### Luce sotto il vetro, tutte le sezioni
 
 I controlli selezionati di tutte le sezioni ricevono una luce interna diffusa mentre il volume cresce. Due campi noise con una dimensione temporale indipendente fanno nascere, attenuare e spegnere completamente i punti luminosi sul posto: nessuna direzione di scorrimento fissa. Le normali e i riflessi esistenti rimangono invariati. Le parti soffuse conservano il colore del materiale; le creste più intense tendono gradualmente al bianco. Il contributo rimane entro la sagoma e sfuma prima del bordo, senza bloom, aloni esterni o cambi di opacità. La saturazione e la radiance della sola luce interna sono aumentate del 15%, mantenendo tinta, spegnimento locale e progressione dei picchi verso il bianco. Le card vicine possono ricevere soltanto sui bordi un contributo secondario della selezione luminosa, senza aloni nello spazio vuoto.
