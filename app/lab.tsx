@@ -179,7 +179,7 @@ export default function Lab() {
       <div className="lab-controls">
         <div><span>Campione</span><div className="range-switch" data-glass-multiple>{(["90G", "1A"] as Sample[]).map(item => <button className={sample === item ? "active" : ""} aria-pressed={sample === item} data-glass-underlight="1" key={item} onClick={() => setSample(item)}>{item}</button>)}</div></div>
         <div><span>Rischio per trade</span><div className="range-switch" data-glass-multiple>{([.25, .5, 1] as Risk[]).map(item => <button className={risk === item ? "active" : ""} aria-pressed={risk === item} data-glass-underlight="1" key={item} onClick={() => setRisk(item)}>{item.toLocaleString("it-IT")}%</button>)}</div></div>
-        <label className="lab-cost-toggle"><span><strong>Costi reali</strong><small>Commissioni e swap</small></span><input type="checkbox" checked={includeCosts} onChange={event => setIncludeCosts(event.target.checked)} /><i aria-hidden="true" /></label>
+        <label className="lab-cost-toggle"><span><strong>Costi reali</strong><small>Commissioni e swap</small></span><input type="checkbox" checked={includeCosts} onChange={event => setIncludeCosts(event.target.checked)} /><i aria-hidden="true"><b className="glass-switch-thumb" /></i></label>
       </div>
     </section>
 

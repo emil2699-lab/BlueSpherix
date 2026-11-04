@@ -66,6 +66,12 @@ La transizione dal contributo diffuso centrale al trasporto ottico segue l'incli
 
 Lo shader riceve `uCoating = (coverage, isControl, opacity, volume)` e `uCoatingOrigin = (localX, localY)`. Le card esistenti usano `(1, 0, 1, 1)`: nessuna modifica ai loro parametri ottici. Il confronto in framebuffer float con cinque posizioni della sorgente ha restituito una differenza massima di 7.46e-9 (precisione numerica).
 
+## Switch luminosi e movimento elastico
+
+Gli interruttori on/off e i selettori a più posizioni condividono un aumento del 50% della radiance (`uControlBrightness = 1.5`), mantenendo alpha, tinte e parametri ottici. Le altre superfici usano 1. I selettori trasferiscono lo stesso materiale dalla precedente opzione a quella nuova: nei primi 300 ms il fronte si allunga verso la destinazione, poi si ricompatta con un assestamento smorzato di 360 ms. Rettangolo e normali sono ricalcolati nel canvas; testi, layout e aree cliccabili restano fermi. Se manca un'opzione di partenza, il consueto rivestimento termina con un piccolo rimbalzo del volume (picco circa +7%, ritorno inferiore all'1%, durata totale 880 ms).
+
+Le manopole di Rischio e Lab sono superfici vetrose dello stesso canvas. Il loro movimento dura 660 ms: stiramento iniziale, arrivo, compressione e ritorno alla sagoma originale. I clic rapidi ripartono dalla trasformazione corrente; animazioni e risorse sono pulite alla navigazione e allo smontaggio. Reduced motion applica subito lo stato finale. Senza WebGL restano visibili le manopole CSS.
+
 ## Verifica
 
 Le celle di correlazione trasferiscono allo shader anche la tinta del proprio

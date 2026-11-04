@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useRef, type RefObject } from "react";
+import { SWITCH_MOTION_MS, switchRecoil, switchRect, thumbKeyframes, type SwitchTravel } from "./glass-switch-motion";
 
 export const SPREAD_MS = 280;
 export const RISE_MS = 360;
+export const SETTLE_MS = 240;
 const ENTER_MS = SPREAD_MS + RISE_MS;
 const EXIT_MS = 200;
+const SWITCH_GROUPS = '.range-switch, .stress-tabs, .monte-carlo-switch, .focus-tabs, .session-tabs, .risk-presets, .lab-parameter, .lab-friction-profiles, .lab-sensitivity, .proposal-picker, [role="tablist"]';
 const SELECTABLE = [
   'button[aria-pressed]', 'button[aria-selected]', 'button[role="tab"]', 'button[aria-expanded]',
   '.range-switch button', '.trade-filters button', '.proposal-picker button',
@@ -18,17 +21,32 @@ const SELECTABLE = [
 ].join(',');
 export type Coating = {
   started: number; origin: [number, number]; tint: number[];
+  luminous?: boolean; travel?: SwitchTravel;
   persistent?: boolean;
   exiting?: number; exitProgress?: number; exitVolume?: number;
   timer?: ReturnType<typeof setTimeout>; riseTimer?: ReturnType<typeof setTimeout>;
 };
 const smooth = (n: number) => { n = Math.min(1, Math.max(0, n)); return n * n * (3 - 2 * n); };
+function elasticVolume(elapsed: number) {
+  if (elapsed <= 0) return 0;
+  if (elapsed >= RISE_MS + SETTLE_MS) return 1;
+  // Damped spring: about 7% overshoot, followed by one very small recoil.
+  // Animate optical height/normals only; the DOM and footprint stay still.
+  const time = elapsed / RISE_MS;
+  const displacement = Math.exp(-3.6 * time)
+    * (Math.cos(4.2 * time) + (3.6 / 4.2) * Math.sin(4.2 * time));
+  // Bring the remaining sub-percent motion smoothly to an exact rest.
+  const finish = smooth((elapsed - (RISE_MS + SETTLE_MS - 80)) / 80);
+  return 1 - displacement * (1 - finish);
+}
 export function coatingProgress(coating: Coating, now: number, reduced: boolean) {
   const elapsed = now - coating.started;
-  const progress = coating.exitProgress ?? smooth(elapsed / SPREAD_MS);
-  const volume = coating.exitVolume ?? smooth((elapsed - SPREAD_MS) / RISE_MS);
+  const duration = coating.travel ? SWITCH_MOTION_MS : ENTER_MS + (coating.luminous ? SETTLE_MS : 0);
+  const progress = coating.exitProgress ?? (coating.travel ? 1 : smooth(elapsed / SPREAD_MS));
+  const volume = coating.exitVolume ?? (coating.travel ? 1 + .05 * switchRecoil(elapsed)
+    : coating.luminous ? elasticVolume(elapsed - SPREAD_MS) : smooth((elapsed - SPREAD_MS) / RISE_MS));
   const alpha = coating.exiting === undefined ? 1 : 1 - smooth((now - coating.exiting) / EXIT_MS);
-  const moving = !reduced && (coating.exiting === undefined ? elapsed < ENTER_MS : now - coating.exiting < EXIT_MS);
+  const moving = !reduced && (coating.exiting === undefined ? elapsed < duration : now - coating.exiting < EXIT_MS);
   return [reduced ? 1 : progress, 1, reduced ? (coating.exiting === undefined ? 1 : 0) : alpha, moving ? 1 : 0, reduced ? 1 : volume];
 }
 
@@ -83,6 +101,14 @@ export function useGlassSelection(rootRef: RefObject<HTMLElement | null>) {
     let selected: HTMLElement | null = null;
     let pendingClick: HTMLElement | null = null;
     let disposed = false;
+    const thumbAnimations = new Map<HTMLElement, Animation>();
+    const thumbSnapshots = new WeakMap<HTMLElement, DOMMatrixReadOnly>();
+    const rememberThumb = (event: Event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      const thumb = target?.closest('.protection-switch, .lab-cost-toggle')?.querySelector<HTMLElement>('.glass-switch-thumb');
+      if (thumb) thumbSnapshots.set(thumb,new DOMMatrixReadOnly(getComputedStyle(thumb).transform));
+    };
+    const labelSurface = (label: HTMLLabelElement) => label.matches('.lab-cost-toggle') ? label.querySelector<HTMLElement>('i') ?? label : label;
     const remove = (element: HTMLElement) => {
       const coating = materials.get(element);
       if (coating?.timer) clearTimeout(coating.timer);
@@ -108,7 +134,7 @@ export function useGlassSelection(rootRef: RefObject<HTMLElement | null>) {
     };
     const clear = () => { if (selected) release(selected); };
     const inputOf = (element: HTMLElement) => element.matches('input') ? element as HTMLInputElement
-      : element.querySelector<HTMLInputElement>('input[type="checkbox"], input[type="radio"]');
+      : (element.matches('.lab-cost-toggle > i') ? element.parentElement : element)?.querySelector<HTMLInputElement>('input[type="checkbox"], input[type="radio"]');
     const multiple = (element: HTMLElement) => inputOf(element)?.type === 'checkbox' || !!element.closest('[data-glass-multiple]');
     const enabled = (element: HTMLElement) => {
       const input = inputOf(element);
@@ -116,10 +142,12 @@ export function useGlassSelection(rootRef: RefObject<HTMLElement | null>) {
         && !element.matches(':disabled, [aria-disabled="true"], [aria-pressed="false"], [aria-selected="false"], button[aria-expanded="false"]:not(.filter-select-control):not(.date-picker-control)')
         && (!input || (input.checked && !input.matches(':disabled')));
     };
-    const paint = (element: HTMLElement, origin: [number, number], persistent: boolean, animate: boolean) => {
+    const paint = (element: HTMLElement, origin: [number, number], persistent: boolean, animate: boolean, travel?: SwitchTravel) => {
       remove(element);
       const tint = materialTint(element, context);
-      const coating: Coating = { started: performance.now()-(animate ? 0 : ENTER_MS), origin, tint, persistent };
+      const luminous = element.matches('.protection-switch, .lab-cost-toggle > i') || !!element.closest(SWITCH_GROUPS);
+      const duration = travel ? SWITCH_MOTION_MS : ENTER_MS + (luminous ? SETTLE_MS : 0);
+      const coating: Coating = { started: performance.now()-(animate ? 0 : duration), origin, tint, persistent, luminous, travel };
       materials.set(element, coating);
       if (persistent) element.dataset.glassPersistent = '';
       element.style.setProperty('--glass-origin-x', `${origin[0] * 100}%`);
@@ -127,18 +155,19 @@ export function useGlassSelection(rootRef: RefObject<HTMLElement | null>) {
       element.style.setProperty('--glass-control-tint', tint.map(n => Math.round(n * 255)).join(' '));
       element.dataset.glassSelection = reduced.matches || !animate ? 'selected' : 'entering';
       if (!reduced.matches && animate) {
-        coating.riseTimer = setTimeout(() => { element.dataset.glassSelection = 'lifting'; }, SPREAD_MS);
+        if (!travel) coating.riseTimer = setTimeout(() => { element.dataset.glassSelection = 'lifting'; }, SPREAD_MS);
         coating.timer = setTimeout(() => {
           element.dataset.glassSelection = 'selected';
           coating.timer = undefined;
-        }, ENTER_MS);
+        }, duration);
       }
     };
     const syncMultiple = () => {
       if (disposed) return;
       const active = new Set<HTMLElement>();
       root.querySelectorAll<HTMLElement>('[data-glass-multiple] button[aria-pressed], [data-glass-multiple] button[aria-selected], input[type="checkbox"]').forEach(control => {
-        const element = control.matches('input') ? (control as HTMLInputElement).closest('label') ?? control : control;
+        const label = control.matches('input') ? (control as HTMLInputElement).closest('label') : null;
+        const element = label ? labelSurface(label) : control;
         if (enabled(element)) active.add(element);
       });
       for (const [element, coating] of materials) {
@@ -152,25 +181,44 @@ export function useGlassSelection(rootRef: RefObject<HTMLElement | null>) {
       }
       if (selected && !enabled(selected)) clear();
     };
-    const select = (element: HTMLElement | null, origin: [number, number]) => {
+    const select = (element: HTMLElement | null, origin: [number, number], travel?: SwitchTravel) => {
       if (disposed) return;
       if (!element || !enabled(element)) { if (element) release(element); clear(); return; }
       const persistent = multiple(element);
+      if (travel) {
+        const group = element.closest(SWITCH_GROUPS);
+        for (const previous of materials.keys()) {
+          if (previous !== element && previous.closest(SWITCH_GROUPS) === group && !enabled(previous)) remove(previous);
+        }
+      }
+      if (travel && selected && selected.closest(SWITCH_GROUPS) === element.closest(SWITCH_GROUPS)) { remove(selected); selected = null; }
       if (selected !== element) clear();
       if (materials.has(element) && materials.get(element)?.exiting === undefined) return;
       if (!persistent) selected = element;
-      paint(element,origin,persistent,true);
+      paint(element,origin,persistent,true,travel);
     };
     const click = (event: MouseEvent) => {
       const target = event.target instanceof Element ? event.target : null;
       let element = target?.closest<HTMLElement>(SELECTABLE) ?? null;
       const label = target?.closest<HTMLLabelElement>('label');
-      if (label?.control?.matches('input[type="checkbox"], input[type="radio"]')) element = label;
+      if (label?.control?.matches('input[type="checkbox"], input[type="radio"]')) element = labelSurface(label);
+      // A label forwards a second click to its input; animate its thumb once.
+      const thumb = target?.matches('input') && event.detail > 0 ? null : target?.closest('.protection-switch, .lab-cost-toggle')?.querySelector<HTMLElement>('.glass-switch-thumb');
+      const from = thumb ? thumbSnapshots.get(thumb) ?? new DOMMatrixReadOnly(getComputedStyle(thumb).transform) : null;
+      if (thumb) thumbSnapshots.delete(thumb);
       // Removed popup choices coat the surviving trigger, starting from its centre.
       let remapped = false;
       if (target?.closest('[role="option"]')) { element = target.closest('.filter-select')?.querySelector<HTMLElement>('.filter-select-control') ?? null; remapped = true; }
       if (target?.closest('.date-days button')) { element = target.closest('.date-picker')?.querySelector<HTMLElement>('.date-picker-control') ?? null; remapped = true; }
       const bounds = element?.getBoundingClientRect();
+      const group = element?.closest(SWITCH_GROUPS);
+      const previous = group?.querySelector<HTMLElement>('button[aria-pressed="true"], button[aria-selected="true"], button.active');
+      let previousBounds: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'> | null = previous && previous !== element ? previous.getBoundingClientRect() : null;
+      const previousCoating = previous && materials.get(previous);
+      if (previousBounds && previousCoating?.travel && !reduced.matches) {
+        previousBounds = switchRect(previousBounds,previousCoating.travel,(previousCoating.exiting ?? performance.now())-previousCoating.started);
+      }
+      const travel = bounds && previousBounds ? { x: previousBounds.left-bounds.left, y: previousBounds.top-bounds.top, width: previousBounds.width, height: previousBounds.height } : undefined;
       const pointer = event.detail > 0 && !remapped && bounds;
       const origin: [number, number] = pointer ? [
         Math.max(0, Math.min(1, (event.clientX - bounds.left) / Math.max(bounds.width, 1))),
@@ -178,14 +226,36 @@ export function useGlassSelection(rootRef: RefObject<HTMLElement | null>) {
       ] : [.5, .5];
       // Wait for React to commit ARIA, checkbox and toggle state.
       pendingClick = element;
-      setTimeout(() => { pendingClick = null; select(element, origin); syncMultiple(); }, 0);
+      setTimeout(() => {
+        if (disposed) return;
+        if (thumb && from && thumb.isConnected) {
+          thumbAnimations.get(thumb)?.cancel();
+          if (!reduced.matches) {
+            const to = new DOMMatrixReadOnly(getComputedStyle(thumb).transform);
+            if (Math.abs(from.m41-to.m41) > .01 || Math.abs(from.a-1) > .01) {
+              const animation = thumb.animate(thumbKeyframes(from.m41,to.m41,from.a,from.d), { duration: SWITCH_MOTION_MS });
+              thumbAnimations.set(thumb,animation);
+              animation.onfinish = () => { if (thumbAnimations.get(thumb) === animation) thumbAnimations.delete(thumb); };
+              thumb.dispatchEvent(new Event('glassswitchmotion', { bubbles: true }));
+            }
+          }
+        }
+        pendingClick = null; select(element, origin, travel); syncMultiple();
+      }, 0);
     };
-    const key = (event: KeyboardEvent) => { if (event.key === 'Escape') clear(); };
-    const navigation = () => { for (const element of materials.keys()) remove(element); selected = null; queueMicrotask(syncMultiple); };
+    const key = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') clear();
+      // Native checkboxes toggle before click listeners run; snapshot on keydown.
+      else if (event.key === ' ' || event.key === 'Enter') rememberThumb(event);
+    };
+    const stopThumbs = () => { for (const animation of thumbAnimations.values()) animation.cancel(); thumbAnimations.clear(); };
+    const navigation = () => { stopThumbs(); for (const element of materials.keys()) remove(element); selected = null; queueMicrotask(syncMultiple); };
     const change = () => queueMicrotask(syncMultiple);
     const observer = new MutationObserver(syncMultiple);
     observer.observe(root,{ childList: true, subtree: true, attributes: true, attributeFilter: ['aria-pressed','aria-selected','checked','disabled','hidden','data-glass-multiple'] });
     root.addEventListener('change',change);
+    root.addEventListener('pointerdown',rememberThumb,{passive:true});
+    reduced.addEventListener('change',stopThumbs);
     document.addEventListener('click', click, true);
     document.addEventListener('keydown', key);
     window.addEventListener('hashchange', navigation);
@@ -193,7 +263,10 @@ export function useGlassSelection(rootRef: RefObject<HTMLElement | null>) {
     return () => {
       disposed = true;
       observer.disconnect();
+      stopThumbs();
       root.removeEventListener('change',change);
+      root.removeEventListener('pointerdown',rememberThumb);
+      reduced.removeEventListener('change',stopThumbs);
       document.removeEventListener('click', click, true);
       document.removeEventListener('keydown', key);
       window.removeEventListener('hashchange', navigation);

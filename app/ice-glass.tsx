@@ -5,11 +5,12 @@ import { ICE_GLASS as config } from "./ice-glass-config";
 import { glassFragment, glassVertex } from "./ice-glass-shader";
 import { coatingProgress, useGlassSelection } from "./glass-selection";
 import { soapSample } from "./ice-glass-volume";
+import { switchRect } from "./glass-switch-motion";
 
 type ViewportRect = { left: number; top: number; width: number; height: number };
 type GlassRect = ViewportRect & { right: number; bottom: number };
 type Measurement = { element: HTMLElement; rect: GlassRect; radius: number; tint: number[]; crownHeight: number };
-const GLASS_SURFACE_SELECTOR = ".glass-card, .calendar-strip, .demo-notice, .heatmap button, [data-glass-selection]";
+const GLASS_SURFACE_SELECTOR = ".glass-card, .calendar-strip, .demo-notice, .heatmap button, [data-glass-selection], .glass-switch-thumb";
 // Keep the overscanned backing store below a conservative Safari allocation
 // budget as well as the GPU's per-axis limits. These are physical pixels.
 const BUFFER_PIXEL_BUDGET = 8_388_608;
@@ -116,7 +117,8 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       viewport = nextViewport;
       cards = Array.from(root.querySelectorAll<HTMLElement>(GLASS_SURFACE_SELECTOR)).map((element) => {
         const style = getComputedStyle(element);
-        const tint = coatings.current.get(element)?.tint ?? (element.matches(".negative-surface, .negative-strong, .critical, .risk-critical, .failed, .loss, .diary-loss, .negative-row, .heat-negative") ? [1,.34,.43]
+        const thumbTint = element.matches('.glass-switch-thumb') ? style.color.match(/[\d.]+/g)?.slice(0,3).map(n=>Number(n)/255) : undefined;
+        const tint = coatings.current.get(element)?.tint ?? thumbTint ?? (element.matches(".negative-surface, .negative-strong, .critical, .risk-critical, .failed, .loss, .diary-loss, .negative-row, .heat-negative") ? [1,.34,.43]
           : element.matches(".heat-neutral") ? [.56,.64,.71]
           : element.matches(".violet, .insight-card, .lab-validation") ? [.64,.46,1]
           : element.matches(".amber, .calendar-strip, .warning, .risk-warning") ? [1,.62,.24]
@@ -199,16 +201,24 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       const emissionPhase = emission ? coatingProgress(emission,time,reduced.matches) : [0,0,0,0,0];
       coatingMoving ||= emissionPhase[3]>0;
       const emissionTint = emission?.tint ?? [1,1,1];
-      gl.uniform4f(uniform("uSpillRect"), emitter?.rect.left ?? 0,emitter?.rect.top ?? 0,emitter?.rect.width ?? 1,emitter?.rect.height ?? 1);
+      const emitterRect = emitter && emission?.travel && !reduced.matches
+        ? switchRect(emitter.rect,emission.travel,(emission.exiting ?? time)-emission.started) : emitter?.rect;
+      gl.uniform4f(uniform("uSpillRect"), emitterRect?.left ?? 0,emitterRect?.top ?? 0,emitterRect?.width ?? 1,emitterRect?.height ?? 1);
       gl.uniform2f(uniform("uSpillOrigin"),...(emission?.origin ?? [.5,.5] as [number,number]));
       gl.uniform3f(uniform("uSpillTint"),emissionTint[0],emissionTint[1],emissionTint[2]);
-      for (const { element, rect, radius, tint, crownHeight } of cards) {
+      for (const { element, rect: measuredRect, radius, tint, crownHeight } of cards) {
+        const coating = coatings.current.get(element);
+        const thumb = element.matches('.glass-switch-thumb');
+        const thumbOn = thumb && (element.closest('.protection-switch')?.classList.contains('on')
+          || element.closest('.lab-cost-toggle')?.querySelector<HTMLInputElement>('input')?.checked);
+        const rect = coating?.travel && !reduced.matches
+          ? switchRect(measuredRect,coating.travel,(coating.exiting ?? time)-coating.started) : measuredRect;
         if (rect.bottom <= 0 || rect.top >= viewHeight || rect.right <= 0 || rect.left >= viewWidth || !rect.width) continue;
         // A scissored full-card quad keeps the slab continuous while avoiding work outside it.
         gl.viewport(0,0,width,height);
         gl.scissor(Math.max(0,Math.floor(rect.left*dpr)),Math.max(0,Math.floor((viewHeight-rect.bottom)*dpr)),Math.ceil(Math.min(rect.right,viewWidth)*dpr)-Math.max(0,Math.floor(rect.left*dpr)),Math.ceil(Math.min(rect.bottom,viewHeight)*dpr)-Math.max(0,Math.floor(rect.top*dpr)));
-        const coating = coatings.current.get(element);
-        const [reveal, isControl, opacity, moving, volume] = coating ? coatingProgress(coating, time, reduced.matches) : [1, 0, 1, 0, 1];
+        const [reveal, isControl, opacity, moving, volume] = coating ? coatingProgress(coating, time, reduced.matches) : [1, thumb ? 1 : 0, 1, 0, 1];
+        gl.uniform1f(uniform("uControlBrightness"), coating?.luminous || thumb ? 1.5 : 1);
         coatingMoving ||= moving > 0;
         const receivesSpill = !!(emitter && power > .35 && element.matches('.glass-card')
           && !element.contains(emitter.element) && !emitter.element.contains(element));
@@ -216,15 +226,18 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
           emissionPhase[0]*emissionPhase[2]*emissionPhase[4],receivesSpill ? 1 : 0);
         underlightMoving ||= receivesSpill && power > .35 && !reduced.matches && emission?.exiting === undefined;
         const underlight = coating
-          ? Math.max(0, Math.min(1, Number(element.dataset.glassUnderlight ?? 1) || 0)) : 0;
+          ? Math.max(0, Math.min(1, Number(element.dataset.glassUnderlight ?? 1) || 0)) : thumbOn ? .45 : 0;
         underlightMoving ||= underlight > 0 && !reduced.matches && coating?.exiting === undefined;
         gl.uniform2f(uniform("uUnderlight"), underlight,
-          reduced.matches ? 0 : coating ? (time-coating.started)/1000 : 0);
+          reduced.matches ? 0 : coating ? (time-coating.started)/1000 : thumb ? time/1000 : 0);
         gl.uniform4f(uniform("uCoating"), reveal, isControl, opacity, volume);
         gl.uniform2f(uniform("uCoatingOrigin"), ...(coating?.origin ?? [.5, .5] as [number, number]));
         gl.uniform4f(uniform("uRect"),rect.left,rect.top,rect.width,rect.height);
         gl.uniform1f(uniform("uRadius"),radius);
-        gl.uniform1f(uniform("uCrownHeight"),crownHeight);
+        const movingCrown = coating?.travel ? soapSample(0,0,rect.width*.5,rect.height*.5,
+          Math.min(Math.min(rect.width,rect.height)*.475,Math.max(radius*1.75,24)),
+          Math.min(config.glassThickness*2.1,Math.min(rect.width,rect.height)*.25))[2] : crownHeight;
+        gl.uniform1f(uniform("uCrownHeight"),movingCrown);
         gl.uniform3f(uniform("uTint"),tint[0],tint[1],tint[2]);
         gl.drawArrays(gl.TRIANGLES,0,6);
       }
@@ -303,6 +316,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     window.visualViewport?.addEventListener("scroll",invalidate,{passive:true});
     root.addEventListener("transitionrun",settleLayout);
     root.addEventListener("transitionend",invalidate);
+    root.addEventListener("glassswitchmotion",settleLayout);
     document.addEventListener("visibilitychange",visibility);
     reduced.addEventListener("change",schedule);
     canvas.addEventListener("webglcontextlost",contextLost);
@@ -314,6 +328,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       window.removeEventListener("pointermove",move); window.removeEventListener("pointerrawupdate",move);
       window.removeEventListener("pointerout",leave); window.removeEventListener("resize",settleLayout);
       window.removeEventListener("scroll",invalidate,true); root.removeEventListener("transitionrun",settleLayout); root.removeEventListener("transitionend",invalidate);
+      root.removeEventListener("glassswitchmotion",settleLayout);
       window.visualViewport?.removeEventListener("resize",settleLayout); window.visualViewport?.removeEventListener("scroll",invalidate);
       document.removeEventListener("visibilitychange",visibility); reduced.removeEventListener("change",schedule);
       canvas.removeEventListener("webglcontextlost",contextLost); canvas.removeEventListener("webglcontextrestored",contextRestored);

@@ -301,7 +301,7 @@ export default function Risk() {
             <span className="protection-icon">{rule.icon}</span>
             <div className="protection-copy"><strong>{rule.label}</strong><p>{rule.detail}</p><div className="protection-progress"><i style={{ width: `${Math.min(100, rule.used)}%` }} /></div></div>
             <div className="protection-value"><strong>{rule.value}</strong><small>{enabled ? rule.triggered ? "Soglia raggiunta" : rule.tone === "warning" ? "Da monitorare" : "Nella norma" : "Disattivato"}</small></div>
-            <button type="button" className={`protection-switch ${enabled ? "on" : ""}`} aria-pressed={enabled} aria-label={`${enabled ? "Disattiva" : "Attiva"} avviso ${rule.label}`} onClick={() => setProtections(current => ({ ...current, [rule.id]: !current[rule.id] }))}><span /></button>
+            <button type="button" className={`protection-switch ${enabled ? "on" : ""}`} aria-pressed={enabled} aria-label={`${enabled ? "Disattiva" : "Attiva"} avviso ${rule.label}`} onClick={() => setProtections(current => ({ ...current, [rule.id]: !current[rule.id] }))}><span className="glass-switch-thumb" /></button>
           </div>;
         })}</div>
       </article>

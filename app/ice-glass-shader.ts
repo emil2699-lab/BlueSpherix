@@ -89,6 +89,7 @@ uniform float uRadius;
 uniform float uCrownHeight;
 // x: radial coverage, y: control flag, z: deselection fade, w: convex volume.
 uniform vec4 uCoating;
+uniform float uControlBrightness;
 uniform vec2 uCoatingOrigin;
 // Selected under-glass light: P&L ceiling and seconds since selection.
 uniform vec2 uUnderlight;
@@ -395,6 +396,8 @@ void main() {
     // the material geometry and the crisp interface above the optical layer.
     outColor.rgb+=illumination*coverage;
   }
+  // Lift switch radiance by 50% without changing coverage, hue or card optics.
+  outColor.rgb *= max(1.0,uControlBrightness);
   if(uCoating.y>.5) {
     vec2 origin=uCoatingOrigin*uRect.zw;
     // CSS-pixel distance keeps the spreading front circular on wide controls.

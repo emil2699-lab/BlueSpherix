@@ -716,16 +716,13 @@ button.correlation-cell.selected { transform: scale(1.04); box-shadow: 0 8px 22p
 .protection-value small { margin-top: 5px; color: #71808b; font-size: 7px; }
 .protection-row.critical.enabled .protection-value small { color: var(--red); }
 .protection-switch { width: 46px; height: 26px; padding: 3px; border: 1px solid transparent; border-radius: 99px; background: rgba(255,255,255,.055); cursor: pointer; transition: background .42s var(--ease-apple-layout),border-color .42s var(--ease-apple-layout),transform .2s var(--ease-apple-press); }
-.protection-switch span { width: 18px; height: 18px; display: block; border-radius: 50%; background: #7e8993; box-shadow: 0 2px 7px rgba(0,0,0,.35); transition: transform .48s var(--ease-apple-spring),width .2s var(--ease-apple-press),background .32s var(--ease-apple-fade),box-shadow .32s var(--ease-apple-fade); }
-.protection-switch:active { transform: scale(1.04,.96); }
-.protection-switch:active span { width: 22px; }
+.protection-switch span { width: 18px; height: 18px; display: block; border-radius: 50%; color: #7e8993; background: #7e8993; box-shadow: 0 2px 7px rgba(0,0,0,.35); }
 .protection-switch.on { background: rgba(86,217,202,.17); }
 .protection-row.warning .protection-switch.on { background: rgba(255,184,92,.18); }
 .protection-row.critical .protection-switch.on { background: rgba(255,111,125,.2); }
-.protection-switch.on span { background: #e8fffc; transform: translateX(20px); }
-.protection-switch.on:active span { transform: translateX(16px); }
-.protection-row.warning .protection-switch.on span { background: #ffe0aa; }
-.protection-row.critical .protection-switch.on span { background: #ffd4d8; }
+.protection-switch.on span { color: var(--aqua); background: #e8fffc; transform: translateX(20px); }
+.protection-row.warning .protection-switch.on span { color: var(--amber); background: #ffe0aa; }
+.protection-row.critical .protection-switch.on span { color: var(--red); background: #ffd4d8; }
 .protection-summary { display: flex; flex-direction: column; align-items: flex-start; position: relative; overflow: hidden; }
 .protection-summary.has-alert { background: radial-gradient(circle at 100% 0%,rgba(255,111,125,.17),transparent 57%),linear-gradient(145deg,rgba(34,20,26,.93),rgba(13,16,22,.86)); }
 .protection-summary.all-clear { background: radial-gradient(circle at 100% 0%,rgba(86,217,202,.12),transparent 55%),linear-gradient(145deg,rgba(17,27,29,.92),rgba(11,17,23,.84)); }
@@ -1151,12 +1148,9 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
 .lab-cost-toggle span small { margin-top: 3px; color: var(--muted); font-size: 7px; }
 .lab-cost-toggle input { position: absolute; opacity: 0; pointer-events: none; }
 .lab-cost-toggle > i { width: 46px; height: 26px; padding: 3px; position: relative; border: 1px solid transparent; border-radius: 99px; background: rgba(255,255,255,.055); transition: background .42s var(--ease-apple-layout),border-color .42s var(--ease-apple-layout),transform .2s var(--ease-apple-press); }
-.lab-cost-toggle > i::after { content: ""; width: 18px; height: 18px; display: block; border-radius: 50%; background: #87929d; box-shadow: 0 3px 9px rgba(0,0,0,.35); transition: transform .48s var(--ease-apple-spring),width .2s var(--ease-apple-press),background .32s var(--ease-apple-fade); }
+.lab-cost-toggle > i > b { width: 18px; height: 18px; display: block; border-radius: 50%; color: #87929d; background: #87929d; box-shadow: 0 3px 9px rgba(0,0,0,.35); }
 .lab-cost-toggle input:checked + i { background: rgba(86,217,202,.18); }
-.lab-cost-toggle input:checked + i::after { transform: translateX(18px); background: var(--aqua); }
-.lab-cost-toggle:active > i { transform: scale(1.04,.96); }
-.lab-cost-toggle:active > i::after { width: 22px; }
-.lab-cost-toggle:active input:checked + i::after { transform: translateX(14px); }
+.lab-cost-toggle input:checked + i > b { transform: translateX(18px); color: var(--aqua); background: var(--aqua); }
 .lab-cost-toggle input:focus-visible + i { outline: 2px solid rgba(157,139,255,.7); outline-offset: 3px; }
 .lab-results { display: grid; grid-template-columns: 1.25fr repeat(3,minmax(150px,.75fr)); gap: 15px; margin-top: 15px; }
 .lab-results > article { min-height: 135px; padding: 19px; overflow: hidden; }
@@ -1826,6 +1820,7 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
 /* This full-size flat plate has a tighter corner radius than the soap glass.
    Its palette is transferred to the shader; keep only the optical material. */
 .content[data-ice-glass="ready"] button.correlation-cell[data-glass-selection]::before { background: none !important; }
+.content[data-ice-glass="ready"] .glass-switch-thumb { background: transparent !important; box-shadow: none; }
 /* These older sliding plates would cover the shared glass drawn behind them. */
 .content :is(.diary-segment,.focus-tabs):has([data-glass-selection]) > :is(.diary-tab-indicator,.focus-tab-indicator) { visibility: hidden; }
 .content:not([data-ice-glass="ready"]) [data-glass-selection] {
