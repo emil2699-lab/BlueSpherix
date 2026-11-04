@@ -43,6 +43,7 @@
 
 ## Casi approvati
 
+- Oggi → Equity totale: quattro composizioni confrontabili — Respiro, Riva, Soglia e Scia. Cambia il layout della card, mentre grafico, dati, periodi e riepilogo restano identici; su mobile tutte usano una gerarchia verticale senza overflow.
 - Edge Map: base colorata separata e ritagliata sulla sagoma; la base sparisce solo nella cella selezionata. Potenza dalla grandezza assoluta rispetto al massimo della mappa.
 - Righe negative: rimangono rosse anche su hover e selezione.
 - Portfolio: selettori a destra del grafico su desktop e sotto il grafico su mobile; punti del grafico aprono il dettaglio trade.
