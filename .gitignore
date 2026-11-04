@@ -6,4 +6,3 @@ out/
 .env*
 !.env.example
 .npm-cache/
-graphify-out/
