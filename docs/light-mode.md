@@ -12,14 +12,16 @@ Lo shader mantiene la stessa SDF arrotondata e lo stesso campo di altezza
 convesso `soapSurface`. In Light Mode il quad di ogni card principale include
 un piccolo overscan. I frammenti interni disegnano volume, rifrazione Snell,
 Fresnel e dispersione; i frammenti esterni proiettano sul piano della dashboard
-ombra e caustica usando la stessa silhouette, la stessa direzione solare e la
-stessa separazione RGB. Il contributo esterno non viene ritagliato dal DOM della
-card e può quindi raggiungere lo spazio o una superficie vicina.
+la caustica usando la stessa silhouette, la stessa direzione solare e la stessa
+separazione RGB. Non viene aggiunta un'ombra diffusa sotto le card. Il contributo
+esterno non viene ritagliato dal DOM della card e può quindi raggiungere lo
+spazio o una superficie vicina.
 
 Il sollevamento è un valore continuo per card. Modifica insieme distanza della
-proiezione, morbidezza dell'ombra, fuoco della caustica, normale ottica e
-trasformazione visiva del contenitore. Con `prefers-reduced-motion` il valore
-resta a zero e il filtro dinamico viene disattivato.
+proiezione, fuoco della caustica e normale ottica. Il contenitore DOM resta
+immobile: testo, immagini e controlli appartengono alla base, mentre il vetro
+comunica l'altezza attraverso il sistema ottico. Con `prefers-reduced-motion` il
+valore resta a zero e il filtro dinamico viene disattivato.
 
 ## Rifrazione del contenuto DOM
 
@@ -27,8 +29,8 @@ Il browser non espone il contenuto DOM come texture al contesto WebGL senza
 duplicarlo in un secondo renderer. Testi, controlli e immagini restano quindi
 DOM reali. Durante l'hover un filtro SVG `feDisplacementMap` sposta i pixel
 renderizzati usando `public/ice-glass-normal-map.png`, un campo di normali
-derivato da una calotta convessa continua. La scala e il piccolo offset del
-campo seguono sollevamento e posizione del cursore.
+derivato da una calotta convessa continua. La scala segue il sollevamento e la
+posizione del cursore, senza traslare il contenuto della card.
 
 Questa è una rifrazione raster del contenuto basata sulle normali simulate; non
 è un campionamento WebGL del DOM né un path tracing del testo. La dispersione

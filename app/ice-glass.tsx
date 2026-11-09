@@ -48,7 +48,6 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     const lifts = new Map<HTMLElement,{ value: number; updated: number }>();
     const reduced = matchMedia("(prefers-reduced-motion: reduce)");
     const refraction = document.getElementById("ice-glass-refraction-map") as SVGFEDisplacementMapElement | null;
-    const refractionOffset = document.getElementById("ice-glass-refraction-offset") as SVGFEOffsetElement | null;
     const locations = new Map<string, WebGLUniformLocation | null>();
     const uniform = (name: string) => {
       if (!locations.has(name)) locations.set(name, gl.getUniformLocation(program!, name));
@@ -193,6 +192,11 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       gl.uniform4f(uniform("uEnergy"),config.ambientReflection,config.lightIntensity,config.lightHeight,config.lightFalloff);
       gl.uniform3f(uniform("uFinish"),config.specularSharpness,config.bloomIntensity,config.bloomRadius);
       gl.uniform1f(uniform("uTheme"),lightMode ? 1 : 0);
+      // Daylight caustics are transmitted radiance. Preserve that radiance when
+      // a later glass surface receives it; keep ordinary source-over coverage
+      // and retain the original dark-room blend unchanged.
+      if(lightMode) gl.blendFuncSeparate(gl.ONE,gl.ONE,gl.ONE,gl.ONE_MINUS_SRC_ALPHA);
+      else gl.blendFunc(gl.ONE,gl.ONE_MINUS_SRC_ALPHA);
       gl.enable(gl.SCISSOR_TEST);
       let coatingMoving = false;
       let underlightMoving = false;
@@ -281,8 +285,6 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         const edge=Math.min(1,Math.hypot((refracting.x-.5)*1.35,(refracting.y-.5)*1.35));
         const scale=1.2+refracting.lift*(2.45+edge*1.25);
         refraction?.setAttribute("scale",scale.toFixed(3));
-        refractionOffset?.setAttribute("dx",((refracting.x-.5)*refracting.lift*.8).toFixed(3));
-        refractionOffset?.setAttribute("dy",((refracting.y-.5)*refracting.lift*.8).toFixed(3));
       }
       if (root.dataset.iceGlass !== "ready") root.dataset.iceGlass = "ready";
       canvas.dataset.pointer = `${pointer.x},${pointer.y}`;
@@ -387,8 +389,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       <defs>
         <filter id="ice-glass-refraction" x="-4%" y="-6%" width="108%" height="112%" colorInterpolationFilters="sRGB">
           <feImage href="ice-glass-normal-map.png" x="0%" y="0%" width="100%" height="100%" preserveAspectRatio="none" result="soapNormals" />
-          <feDisplacementMap id="ice-glass-refraction-map" in="SourceGraphic" in2="soapNormals" scale="1.1" xChannelSelector="R" yChannelSelector="G" result="refractedColor" />
-          <feOffset id="ice-glass-refraction-offset" in="refractedColor" dx="0" dy="0" />
+          <feDisplacementMap id="ice-glass-refraction-map" in="SourceGraphic" in2="soapNormals" scale="1.1" xChannelSelector="R" yChannelSelector="G" />
         </filter>
       </defs>
     </svg>

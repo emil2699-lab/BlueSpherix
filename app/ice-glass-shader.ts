@@ -261,44 +261,51 @@ void main() {
   float thickness = min(uGlass.y*2.1, min(halfSize.x,halfSize.y)*.50);
   if (coverage <= 0.0) {
     if(uTheme<.5 || uLightGlass<.5) discard;
-    // The same directional daylight that enters the glass projects its shadow
-    // and dispersed caustic onto the dashboard plane. The projection is sampled
-    // outside the DOM bounds on this shared canvas, so neighbouring surfaces can
-    // receive it instead of clipping every pattern to its source card.
-    vec2 sunDirection=normalize(vec2(-.42,-.72));
-    vec2 tangent=vec2(-sunDirection.y,sunDirection.x);
+    // The same directional daylight that enters the glass forms a concentrated,
+    // spectrally split caustic on the dashboard plane. There is intentionally no
+    // generic drop shadow: separation is communicated by the moving focal band.
+    // Sampling outside the DOM bounds lets the band reach neighbouring surfaces.
+    vec2 lightDirection=normalize(vec2(-.42,-.72));
+    vec2 projectionDirection=-lightDirection;
+    vec2 tangent=vec2(-projectionDirection.y,projectionDirection.x);
     float elevation=2.5+uLift*13.5;
-    vec2 projection=sunDirection*(3.5+elevation*1.18);
+    // Light arrives from the upper-left and continues through the glass toward
+    // the lower-right base. Height increases the gap between object and focus.
+    vec2 projection=projectionDirection*(9.0+elevation*1.42);
     vec2 q=p-projection;
     float projectedD=boxSDF(q,halfSize,radius);
-    float blur=3.2+elevation*.38;
-    float shadow=(1.0-smoothstep(-blur,blur*1.7,projectedD))
-      *exp(-max(projectedD,0.0)*max(projectedD,0.0)/(blur*blur*3.5));
-    shadow*=.075*(1.0-.38*uLift);
     float projectedDepth=max(-projectedD,0.0);
-    // Outside the material we need only the projected envelope. Reusing the
-    // analytic shoulder depth avoids evaluating the full soap volume in every
-    // overscan pixel while preserving its contour and directional normal.
-    float slope=exp(-projectedDepth/max(thickness*.72,1.0));
-    float focusDepth=2.3+elevation*.42+min(8.0,slope*thickness*.55);
-    float width=2.2+elevation*.20;
-    float materialPhase=(1.0-slope)*5.4+dot(q,tangent)*.011;
+    // A convex exit surface concentrates rays just inside the projected contour.
+    // Lift increases the focal distance and separates its RGB paths. Low-frequency
+    // modulation comes from distance along that contour, so it remains attached
+    // to the glass geometry instead of behaving like a decorative texture.
+    float focusDepth=2.8+elevation*.22;
+    float width=1.65+elevation*.075;
+    float materialPhase=dot(q,tangent)*.043+projectedDepth*.16;
     vec2 projectedNormal=roundedSurfaceNormal(clamp(q,-halfSize,halfSize),halfSize,radius);
-    float directionalFocus=.03+.97*pow(max(dot(projectedNormal,sunDirection),0.0),1.35);
-    float concentration=(.78+.22*cos(materialPhase))*directionalFocus;
-    float split=.72+uLift*.72;
-    vec3 spectralDepth=vec3(
-      max(-boxSDF(q+tangent*split,halfSize,radius),0.0),
-      projectedDepth,
-      max(-boxSDF(q-tangent*split,halfSize,radius),0.0));
-    vec3 caustic=exp(-pow((spectralDepth-vec3(focusDepth))/width,vec3(2.0)))
-      *concentration*smoothstep(-1.0,2.0,projectedDepth);
-    float reach=1.0-smoothstep(24.0+elevation*.45,34.0+elevation*.55,length(max(abs(p)-halfSize,vec2(0))));
-    caustic*=reach*(.062+.035*uLift);
-    float causticAlpha=clamp(max(max(caustic.r,caustic.g),caustic.b)*.58,0.0,.14);
-    float alpha=1.0-(1.0-shadow)*(1.0-causticAlpha);
-    vec3 causticColor=caustic*vec3(.38,.56,.60)+caustic.bgr*vec3(.055,.018,.028);
-    outColor=vec4(causticColor,alpha);
+    float directionalFocus=.12+.88*pow(max(dot(projectedNormal,projectionDirection),0.0),1.15);
+    float contourPool=.5+.5*cos(materialPhase);
+    float concentration=(.36+.64*pow(contourPool,1.55))*directionalFocus;
+    float split=1.18+uLift*1.62;
+    vec3 spectralSDF=vec3(
+      boxSDF(q+tangent*split,halfSize,radius),
+      projectedD,
+      boxSDF(q-tangent*split,halfSize,radius));
+    vec3 spectralDepth=max(-spectralSDF,vec3(0.0));
+    vec3 primary=exp(-pow((spectralDepth-vec3(focusDepth))/width,vec3(2.0)));
+    vec3 secondary=exp(-pow((spectralDepth-vec3(focusDepth+5.4+uLift*1.7))/(width*1.75),vec3(2.0)))*.48;
+    float reach=1.0-smoothstep(28.0+elevation*.55,42.0+elevation*.65,length(max(abs(p)-halfSize,vec2(0))));
+    vec3 caustic=(primary+secondary)*concentration*reach*(.34+.17*uLift)
+      *smoothstep(-.35,2.2,projectedDepth);
+    float peak=max(max(caustic.r,caustic.g),caustic.b);
+    float causticAlpha=clamp(peak*.34,0.0,.20);
+    // Premultiplied radiance is brighter than the covered daylight base, which
+    // makes the focused curve readable without turning it into a glow or shadow.
+    vec3 causticColor=vec3(
+      caustic.r*.32+caustic.b*.08,
+      caustic.g*.88+caustic.r*.018,
+      caustic.b*.78+caustic.r*.06);
+    outColor=vec4(causticColor,causticAlpha);
     return;
   }
   // Keep the exact rounded silhouette, but move all optical shading onto a
@@ -447,7 +454,7 @@ void main() {
     float solarFocus=pow(max(dot(N,sunL),0.0),7.0)*shoulder;
     vec3 daylightBody=mix(vec3(.045,.12,.14),vec3(.18,.34,.34),daylightFresnel);
     vec3 daylightRadiance=daylightBody*daylightAlpha;
-    daylightRadiance+=caustic*vec3(.028,.038,.043)*spectralReach*rimDirection*(.72+solarFocus);
+    daylightRadiance+=caustic*vec3(.060,.080,.086)*spectralReach*rimDirection*(.78+solarFocus);
     daylightRadiance+=vec3(.66,.80,.78)*solarFocus*.034;
     outColor=vec4(daylightRadiance,daylightAlpha);
   }
