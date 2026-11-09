@@ -33,6 +33,7 @@ import Operations from "./operations";
 import Risk from "./risk";
 import Lab from "./lab";
 import Journal from "./journal";
+import Calendar from "./calendar";
 import { ALPHA_ACCOUNT, BEST_RECENT_TRADE, BEST_SESSION_30D, DASHBOARD_RANGE_STATS, DEMO_BALANCE_SERIES, DEMO_EQUITY_SERIES, DEMO_PERIOD_STATS, OPEN_PNL, OPEN_TRADES, type DashboardRange } from "./demo-data";
 import { valueSign } from "./value-sign";
 import { IceGlass } from "./ice-glass";
@@ -160,7 +161,7 @@ export default function Home() {
       const target = window.location.hash.slice(1) || "overview";
       setView(target);
       requestAnimationFrame(() => {
-        if (target === "portfolio" || target === "analytics" || target === "positions" || target === "risk" || target === "lab" || target === "journal") window.scrollTo({ top: 0, behavior });
+        if (target === "portfolio" || target === "analytics" || target === "positions" || target === "risk" || target === "lab" || target === "journal" || target === "calendar") window.scrollTo({ top: 0, behavior });
         else document.getElementById(target)?.scrollIntoView({ behavior, block: "start" });
       });
     };
@@ -204,7 +205,7 @@ export default function Home() {
           ))}
           <p className="nav-label spaced">Strumenti</p>
           <button className={view === "journal" ? "active" : ""} aria-current={view === "journal" ? "page" : undefined} onClick={() => goTo("journal")}><BookOpen size={18} /><span>Diario</span></button>
-          <button onClick={() => goTo("calendar")}><CalendarDays size={18} /><span>Calendario</span><b>3</b></button>
+          <button className={view === "calendar" ? "active" : ""} aria-current={view === "calendar" ? "page" : undefined} onClick={() => goTo("calendar")}><CalendarDays size={18} /><span>Calendario</span><b>3</b></button>
         </nav>
         <div className="sidebar-bottom">
           <button><Settings size={18} /><span>Impostazioni</span></button>
@@ -233,7 +234,8 @@ export default function Home() {
           {view === "risk" && <Risk />}
           {view === "lab" && <Lab />}
           {view === "journal" && <Journal />}
-          <div className="today-dashboard" hidden={view === "portfolio" || view === "analytics" || view === "positions" || view === "risk" || view === "lab" || view === "journal"}>
+          {view === "calendar" && <Calendar />}
+          <div className="today-dashboard" hidden={view === "portfolio" || view === "analytics" || view === "positions" || view === "risk" || view === "lab" || view === "journal" || view === "calendar"}>
           <section className="welcome today-welcome" id="overview">
             <div><p className="date-line">Mercoledì, 28 ottobre</p><h1>Buongiorno, Luca.</h1><p>Il portafoglio è stabile. Il rischio è sotto controllo.</p></div>
             <span className={`risk-live-status ${riskUsed < 80 ? "calm" : riskUsed < 100 ? "warning" : "critical"}`}><i /> Dati aggiornati · 28 ott, 18:42</span>
@@ -301,7 +303,7 @@ export default function Home() {
             <div className="story-line"><div className="story-item positive"><span>1</span><div><small>{BEST_RECENT_TRADE.date}</small><strong>{BEST_RECENT_TRADE.setup} · {BEST_RECENT_TRADE.symbol}</strong><p>La migliore operazione del periodo ha aggiunto <span data-sign={valueSign(BEST_RECENT_TRADE.netPnl)}>{money(BEST_RECENT_TRADE.netPnl)}</span> con un risultato di <span data-sign={valueSign(BEST_RECENT_TRADE.rMultiple)}>{BEST_RECENT_TRADE.rMultiple.toLocaleString("it-IT")}R</span>.</p></div></div><div className="story-item caution"><span>2</span><div><small>Rischio corrente</small><strong>{positions.length} posizioni aperte</strong><p>Il rischio complessivo è {ALPHA_ACCOUNT.activeRisk.toLocaleString("it-IT")}% dell’equity, contro un limite di {ALPHA_ACCOUNT.riskLimit.toLocaleString("it-IT")}%.</p></div></div><div className="story-item positive"><span>3</span><div><small>Equity riconciliata</small><strong>{money(ALPHA_ACCOUNT.equity)}</strong><p>Balance {money(ALPHA_ACCOUNT.balance)} più P&amp;L aperto <span data-sign={valueSign(OPEN_PNL)}>{signedMoney(OPEN_PNL)}</span>.</p></div></div></div>
           </section>
 
-          <section className="calendar-strip" id="calendar"><div><CalendarDays size={19} /><span><strong>3 eventi ad alto impatto</strong> nelle prossime 24 ore</span></div><div className="event-pills"><span>14:30 · USD GDP</span><span>16:00 · USD Consumer Confidence</span><button>Apri calendario <ArrowRight size={14} /></button></div></section>
+          <section className="calendar-strip"><div><CalendarDays size={19} /><span><strong>3 eventi ad alto impatto</strong> nelle prossime 24 ore</span></div><div className="event-pills"><span>13:30 · USD GDP</span><span>15:00 · USD Consumer Confidence</span><button onClick={() => goTo("calendar")}>Apri calendario <ArrowRight size={14} /></button></div></section>
           </div>
         </div>
       </section>
