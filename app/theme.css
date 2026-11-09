@@ -1,0 +1,146 @@
+:root { color-scheme: dark; }
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #edf4f3;
+  --panel: rgb(248 252 251 / .54);
+  --panel-strong: rgb(250 253 252 / .78);
+  --stroke: rgb(39 75 78 / .13);
+  --stroke-strong: rgb(27 67 70 / .21);
+  --text: #17272e;
+  --muted: #5d6e75;
+  --aqua: #087f75;
+  --violet: #6650ad;
+  --amber: #966013;
+  --red: #b52e42;
+}
+
+html[data-theme="light"] body {
+  background:
+    radial-gradient(circle at 75% -8%, rgb(255 255 255 / .96), transparent 30%),
+    radial-gradient(circle at 8% 42%, rgb(111 207 195 / .16), transparent 30%),
+    linear-gradient(145deg,#f4f8f6 0%,#eaf2f2 48%,#e6eff0 100%);
+}
+html[data-theme="light"] .ambient { opacity: .1; filter: blur(110px); }
+html[data-theme="light"] .ambient-one { background: #58d8c8; }
+html[data-theme="light"] .ambient-two { background: #9ba6ff; opacity: .07; }
+html[data-theme="light"] .sidebar {
+  background: rgb(245 250 249 / .72);
+  box-shadow: 18px 0 55px rgb(40 74 75 / .055);
+}
+html[data-theme="light"] .topbar {
+  background: rgb(241 248 247 / .68);
+  box-shadow: 0 15px 40px rgb(44 78 80 / .035);
+}
+html[data-theme="light"] .account-pill,
+html[data-theme="light"] .command-search,
+html[data-theme="light"] :is(.privacy,.icon-button,.menu-button,.mobile-close),
+html[data-theme="light"] .range-switch,
+html[data-theme="light"] .risk-live-status,
+html[data-theme="light"] .calendar-timezone,
+html[data-theme="light"] .calendar-search,
+html[data-theme="light"] .calendar-week-head button {
+  background: rgb(255 255 255 / .46);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .82);
+}
+html[data-theme="light"] .account-pill .avatar {
+  color: #28454b;
+  background: linear-gradient(145deg,#e7f2f1,#cbdcdd);
+}
+html[data-theme="light"] nav button:hover,
+html[data-theme="light"] .sidebar-bottom > button:hover { color: #20383f; background: rgb(255 255 255 / .5); }
+html[data-theme="light"] nav button.active { color: #075f59; background: linear-gradient(90deg,rgb(8 127 117 / .13),rgb(255 255 255 / .18)); }
+
+.theme-toggle {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  position: relative;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: #96a2ad;
+  background: rgb(255 255 255 / .025);
+  cursor: pointer;
+  overflow: hidden;
+}
+.theme-toggle svg { grid-area: 1 / 1; transition: opacity .28s var(--ease-apple-fade),transform .46s var(--ease-apple-layout); }
+.theme-icon-dark { opacity: 0; transform: translateY(7px) rotate(24deg); }
+html[data-theme="light"] .theme-toggle { color: #536a70; background: rgb(255 255 255 / .52); box-shadow: inset 0 1px 0 rgb(255 255 255 / .82); }
+html[data-theme="light"] .theme-icon-light { opacity: 0; transform: translateY(-7px) rotate(-24deg); }
+html[data-theme="light"] .theme-icon-dark { opacity: 1; transform: none; }
+
+html[data-theme="light"] .content:not([data-ice-glass="ready"]) :is(.glass-card,.calendar-strip,.demo-notice) {
+  background: linear-gradient(145deg,rgb(255 255 255 / .68),rgb(235 246 244 / .42));
+  border: 1px solid rgb(255 255 255 / .75);
+  box-shadow: 0 18px 44px rgb(47 81 81 / .1),inset 0 1px 0 rgb(255 255 255 / .95);
+  backdrop-filter: blur(16px) saturate(112%);
+  -webkit-backdrop-filter: blur(16px) saturate(112%);
+}
+html[data-theme="light"] .content[data-ice-glass="ready"] :is(.glass-card,.calendar-strip,.demo-notice) {
+  background: transparent;
+  box-shadow: none;
+}
+html[data-theme="light"] .content[data-ice-glass="ready"] .glass-card:not(.timeline-card):not(.trade-inspector):hover,
+html[data-theme="light"] .content[data-ice-glass="ready"] :is(.calendar-strip,.demo-notice):hover {
+  transform: translateY(-5px) scale(1.001) !important;
+  filter: url("#ice-glass-refraction");
+  z-index: 3;
+}
+.ice-glass-refraction-defs { position: absolute !important; width: 0; height: 0; overflow: hidden; pointer-events: none; }
+
+/* The dark theme uses translucent white controls. In daylight these controls
+   receive a neutral ink/frost treatment while semantic colours stay intact. */
+html[data-theme="light"] .content :is(
+  .equity-layout-picker button > i,.range-switch,.comparison-choices label,.session-tabs button,
+  .session-score,.instrument-track,.dna-row > div,.risk-budget-track,.stress-tabs,
+  .simulator-controls,.simulator-projection,.simulator-result,.risk-presets,.projection-track,
+  .correlation-insight dl > div,.drawdown-readout dl > div,.monte-carlo-switch,
+  .monte-carlo-readout dl > div,.proposal-picker,.advanced-filters,.focus-tabs,
+  .inspector-values > div,.trade-costs > div,.lab-experiments button,.lab-parameter,
+  .lab-oos-flow > article,.lab-friction-profiles button,.lab-friction-result,
+  .lab-friction-result dl div,.lab-sensitivity button,.lab-vault-list article,
+  .today-risk-legend > div,.edge-detail-grid div,.risk-budget-values > div,
+  .exposure-focus dl > div,.stress-values > div,.simulator-result dl > div,
+  .net-breakdown > div,.hybrid-values > div,.calendar-release-values
+) { background: rgb(255 255 255 / .38); }
+
+html[data-theme="light"] .content :is(.filter-select-menu,.date-picker-menu,.advanced-filters) {
+  background: rgb(247 251 250 / .94);
+  box-shadow: 0 18px 44px rgb(42 74 76 / .14),inset 0 1px 0 white;
+}
+html[data-theme="light"] .content :is(.journal-field textarea,.journal-field select,.diary-field textarea) {
+  color: var(--text);
+  background: rgb(255 255 255 / .55);
+}
+html[data-theme="light"] .portfolio-trade-dialog::backdrop { background: rgb(54 76 78 / .24); }
+html[data-theme="light"] .content .portfolio-trade-dialog .portfolio-trade-sheet {
+  background: linear-gradient(145deg,rgb(250 253 252 / .94),rgb(229 240 240 / .91));
+  box-shadow: 0 24px 80px rgb(42 71 73 / .22),inset 0 1px 0 white;
+}
+html[data-theme="light"] :is(.today-risk-core::before,.risk-score-ring::before,.projection-orbit::before,.protection-ring::before) {
+  background: radial-gradient(circle at 35% 24%,rgb(255 255 255 / .9),rgb(191 213 212 / .72) 68%);
+}
+html[data-theme="light"] .calendar-exposure-orbit .exposure-core {
+  background: radial-gradient(circle at 35% 25%,rgb(255 255 255 / .9),rgb(237 226 199 / .72) 70%);
+}
+html[data-theme="light"] .calendar-exposure-orbit .exposure-node { color: #29434a; background: #e6efee; }
+html[data-theme="light"] .diary-attachments button { background: #e5eeee; }
+html[data-theme="light"] .grid-line { stroke: rgb(38 75 78 / .1); }
+html[data-theme="light"] .balance-path { stroke: #77888d; }
+html[data-theme="light"] .comparison-trade-dot { stroke: #eef5f4; }
+html[data-theme="light"] .mini-chart path { stroke: var(--aqua); }
+html[data-theme="light"] .today-kpi.violet .mini-chart path { stroke: var(--violet); }
+html[data-theme="light"] .today-kpi.amber .mini-chart path { stroke: var(--amber); }
+html[data-theme="light"] select { color-scheme: light; }
+
+html[data-theme-changing="true"] :is(body,.sidebar,.topbar,.glass-card,.calendar-strip,.demo-notice,button,input,select,textarea) {
+  transition-property: color,background-color,background-image,border-color,box-shadow,filter,transform;
+  transition-duration: .48s;
+  transition-timing-function: var(--ease-apple-layout);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme-changing="true"] :is(body,.sidebar,.topbar,.glass-card,.calendar-strip,.demo-notice,button,input,select,textarea) { transition-duration: 0s; }
+  html[data-theme="light"] .content[data-ice-glass="ready"] .glass-card:hover,
+  html[data-theme="light"] .content[data-ice-glass="ready"] :is(.calendar-strip,.demo-notice):hover { transform: none !important; filter: none; }
+}

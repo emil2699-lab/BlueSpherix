@@ -11,6 +11,7 @@ type ViewportRect = { left: number; top: number; width: number; height: number }
 type GlassRect = ViewportRect & { right: number; bottom: number };
 type Measurement = { element: HTMLElement; rect: GlassRect; radius: number; tint: number[]; crownHeight: number };
 const GLASS_SURFACE_SELECTOR = ".glass-card, .calendar-strip, .demo-notice, .heatmap button, [data-glass-selection], .glass-switch-thumb";
+const LIFTABLE_SURFACE_SELECTOR = ".glass-card, .calendar-strip, .demo-notice";
 // Keep the overscanned backing store below a conservative Safari allocation
 // budget as well as the GPU's per-axis limits. These are physical pixels.
 const BUFFER_PIXEL_BUDGET = 8_388_608;
@@ -44,7 +45,10 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     let resize: ResizeObserver | null = null;
     const observedSurfaces = new Set<Element>();
     const pointer = { x: -10000, y: -10000, presence: 0 };
+    const lifts = new Map<HTMLElement,{ value: number; updated: number }>();
     const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+    const refraction = document.getElementById("ice-glass-refraction-map") as SVGFEDisplacementMapElement | null;
+    const refractionOffset = document.getElementById("ice-glass-refraction-offset") as SVGFEOffsetElement | null;
     const locations = new Map<string, WebGLUniformLocation | null>();
     const uniform = (name: string) => {
       if (!locations.has(name)) locations.set(name, gl.getUniformLocation(program!, name));
@@ -135,13 +139,15 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         return { element, rect, radius, tint, crownHeight };
       });
       cards = cards.filter(card=>card.rect.width>0 && card.rect.height>0);
+      const currentElements=new Set(cards.map(card=>card.element));
+      for(const element of lifts.keys()) if(!currentElements.has(element)) lifts.delete(element);
       dirty = false;
     };
-    const fitDrawingBuffer = () => {
+    const fitDrawingBuffer = (quality = 1) => {
       // Page zoom can enlarge the CSS viewport without reducing Safari's DPR.
       // Reduce only raster resolution; all optical lengths stay in CSS pixels.
       for (let attempt = 0; attempt < 3; attempt++) {
-        dpr = Math.min(devicePixelRatio || 1,dprCap,
+        dpr = Math.min((devicePixelRatio || 1)*quality,dprCap,
           maxBufferWidth/viewport.width,maxBufferHeight/viewport.height,
           Math.sqrt(BUFFER_PIXEL_BUDGET/(viewport.width*viewport.height)));
         const width = Math.max(1,Math.floor(viewport.width*dpr));
@@ -165,7 +171,11 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       const nextViewport = readViewport();
       if (dirty || viewportChanged(nextViewport)) measure(nextViewport);
       const viewWidth = viewport.width, viewHeight = viewport.height;
-      const buffer = fitDrawingBuffer();
+      const lightMode = document.documentElement.dataset.theme === "light";
+      // Daylight caustics extend beyond every silhouette. A modest shared raster
+      // scale offsets that extra fill cost without creating a second render loop
+      // or changing CSS-pixel geometry, pointer coordinates or optical lengths.
+      const buffer = fitDrawingBuffer(lightMode ? .82 : 1);
       if (!buffer) return;
       const { width, height } = buffer;
       gl.disable(gl.SCISSOR_TEST);
@@ -182,9 +192,12 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       gl.uniform4f(uniform("uOptics"),config.fresnelStrength,config.chromaticDispersion,config.edgeRefraction,config.internalReflection);
       gl.uniform4f(uniform("uEnergy"),config.ambientReflection,config.lightIntensity,config.lightHeight,config.lightFalloff);
       gl.uniform3f(uniform("uFinish"),config.specularSharpness,config.bloomIntensity,config.bloomRadius);
+      gl.uniform1f(uniform("uTheme"),lightMode ? 1 : 0);
       gl.enable(gl.SCISSOR_TEST);
       let coatingMoving = false;
       let underlightMoving = false;
+      let liftMoving = false;
+      let refracting: { lift: number; x: number; y: number } | null = null;
       // Multiple checked controls retain their own glass and underlight. Keep
       // the existing neighbouring-rim pass anchored to the latest active choice.
       // Reuse measurements; this adds no DOM reads to pointer frames.
@@ -213,10 +226,29 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
           || element.closest('.lab-cost-toggle')?.querySelector<HTMLInputElement>('input')?.checked);
         const rect = coating?.travel && !reduced.matches
           ? switchRect(measuredRect,coating.travel,(coating.exiting ?? time)-coating.started) : measuredRect;
-        if (rect.bottom <= 0 || rect.top >= viewHeight || rect.right <= 0 || rect.left >= viewWidth || !rect.width) continue;
+        const liftable = element.matches(LIFTABLE_SURFACE_SELECTOR);
+        const pointerX=pointer.x-viewport.left, pointerY=pointer.y-viewport.top;
+        const hovered=lightMode && liftable && pointer.presence>0 && pointerX>=rect.left && pointerX<=rect.right && pointerY>=rect.top && pointerY<=rect.bottom;
+        let liftState=lifts.get(element);
+        if(!liftState) { liftState={ value: 0, updated: time }; lifts.set(element,liftState); }
+        const liftTarget=hovered && !reduced.matches ? 1 : 0;
+        const elapsed=Math.min(64,Math.max(0,time-liftState.updated));
+        const response=1-Math.exp(-elapsed/(liftTarget>.5 ? 118 : 185));
+        liftState.value+= (liftTarget-liftState.value)*response;
+        liftState.updated=time;
+        if(Math.abs(liftTarget-liftState.value)<.002) liftState.value=liftTarget;
+        else liftMoving=true;
+        const lift=liftState.value;
+        const localX=Math.max(0,Math.min(1,(pointerX-rect.left)/Math.max(rect.width,1)));
+        const localY=Math.max(0,Math.min(1,(pointerY-rect.top)/Math.max(rect.height,1)));
+        if(hovered) refracting={ lift, x: localX, y: localY };
+        const projectionPad=lightMode && liftable ? 38+lift*10 : 0;
+        const drawRect={ left:rect.left-projectionPad, top:rect.top-projectionPad, width:rect.width+projectionPad*2,
+          height:rect.height+projectionPad*2, right:rect.right+projectionPad, bottom:rect.bottom+projectionPad };
+        if (drawRect.bottom <= 0 || drawRect.top >= viewHeight || drawRect.right <= 0 || drawRect.left >= viewWidth || !rect.width) continue;
         // A scissored full-card quad keeps the slab continuous while avoiding work outside it.
         gl.viewport(0,0,width,height);
-        gl.scissor(Math.max(0,Math.floor(rect.left*dpr)),Math.max(0,Math.floor((viewHeight-rect.bottom)*dpr)),Math.ceil(Math.min(rect.right,viewWidth)*dpr)-Math.max(0,Math.floor(rect.left*dpr)),Math.ceil(Math.min(rect.bottom,viewHeight)*dpr)-Math.max(0,Math.floor(rect.top*dpr)));
+        gl.scissor(Math.max(0,Math.floor(drawRect.left*dpr)),Math.max(0,Math.floor((viewHeight-drawRect.bottom)*dpr)),Math.ceil(Math.min(drawRect.right,viewWidth)*dpr)-Math.max(0,Math.floor(drawRect.left*dpr)),Math.ceil(Math.min(drawRect.bottom,viewHeight)*dpr)-Math.max(0,Math.floor(drawRect.top*dpr)));
         const [reveal, isControl, opacity, moving, volume] = coating ? coatingProgress(coating, time, reduced.matches) : [1, thumb ? 1 : 0, 1, 0, 1];
         gl.uniform1f(uniform("uControlBrightness"), coating?.luminous || thumb ? 1.5 : 1);
         coatingMoving ||= moving > 0;
@@ -233,13 +265,24 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         gl.uniform4f(uniform("uCoating"), reveal, isControl, opacity, volume);
         gl.uniform2f(uniform("uCoatingOrigin"), ...(coating?.origin ?? [.5, .5] as [number, number]));
         gl.uniform4f(uniform("uRect"),rect.left,rect.top,rect.width,rect.height);
+        gl.uniform4f(uniform("uDrawRect"),drawRect.left,drawRect.top,drawRect.width,drawRect.height);
         gl.uniform1f(uniform("uRadius"),radius);
+        gl.uniform1f(uniform("uLift"),lift);
+        gl.uniform1f(uniform("uLightGlass"),liftable ? 1 : 0);
+        gl.uniform3f(uniform("uPointer"),localX,localY,hovered ? 1 : 0);
         const movingCrown = coating?.travel ? soapSample(0,0,rect.width*.5,rect.height*.5,
           Math.min(Math.min(rect.width,rect.height)*.475,Math.max(radius*1.75,24)),
           Math.min(config.glassThickness*2.1,Math.min(rect.width,rect.height)*.25))[2] : crownHeight;
         gl.uniform1f(uniform("uCrownHeight"),movingCrown);
         gl.uniform3f(uniform("uTint"),tint[0],tint[1],tint[2]);
         gl.drawArrays(gl.TRIANGLES,0,6);
+      }
+      if(refracting && !reduced.matches) {
+        const edge=Math.min(1,Math.hypot((refracting.x-.5)*1.35,(refracting.y-.5)*1.35));
+        const scale=1.2+refracting.lift*(2.45+edge*1.25);
+        refraction?.setAttribute("scale",scale.toFixed(3));
+        refractionOffset?.setAttribute("dx",((refracting.x-.5)*refracting.lift*.8).toFixed(3));
+        refractionOffset?.setAttribute("dy",((refracting.y-.5)*refracting.lift*.8).toFixed(3));
       }
       if (root.dataset.iceGlass !== "ready") root.dataset.iceGlass = "ready";
       canvas.dataset.pointer = `${pointer.x},${pointer.y}`;
@@ -252,7 +295,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       // A browser zoom can move a card for several frames while responsive CSS
       // and font metrics settle. ResizeObserver sees size changes, not every
       // positional shift caused by siblings, so remeasure briefly after zoom.
-      if (settling || coatingMoving) { if (settling) dirty = true; schedule(); }
+      if (settling || coatingMoving || liftMoving) { if (settling) dirty = true; schedule(); }
       // Slow under-glass motion needs only about 30 fps at rest. Pointer/layout
       // events bypass the timer and still render on the next available frame.
       else if (underlightMoving) underlightTimer = setTimeout(schedule, 16);
@@ -294,6 +337,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       dispose();delete root.dataset.iceGlass;
     };
     const contextRestored = () => { dispose(); lost = false; initialize(); invalidate(); };
+    const themeChanged = () => { settleUntil=performance.now()+650; invalidate(); };
     initialize();
     watchResolution();
     resize = new ResizeObserver(settleLayout);
@@ -318,6 +362,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     root.addEventListener("transitionend",invalidate);
     root.addEventListener("glassswitchmotion",settleLayout);
     document.addEventListener("visibilitychange",visibility);
+    window.addEventListener("bluespherix:theme",themeChanged);
     reduced.addEventListener("change",schedule);
     canvas.addEventListener("webglcontextlost",contextLost);
     canvas.addEventListener("webglcontextrestored",contextRestored);
@@ -331,9 +376,21 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       root.removeEventListener("glassswitchmotion",settleLayout);
       window.visualViewport?.removeEventListener("resize",settleLayout); window.visualViewport?.removeEventListener("scroll",invalidate);
       document.removeEventListener("visibilitychange",visibility); reduced.removeEventListener("change",schedule);
+      window.removeEventListener("bluespherix:theme",themeChanged);
       canvas.removeEventListener("webglcontextlost",contextLost); canvas.removeEventListener("webglcontextrestored",contextRestored);
       delete root.dataset.iceGlass;dispose();
     };
   },[rootRef, coatings]);
-  return <canvas ref={canvasRef} className="ice-glass-canvas" aria-hidden="true" />;
+  return <>
+    <canvas ref={canvasRef} className="ice-glass-canvas" aria-hidden="true" />
+    <svg className="ice-glass-refraction-defs" aria-hidden="true">
+      <defs>
+        <filter id="ice-glass-refraction" x="-4%" y="-6%" width="108%" height="112%" colorInterpolationFilters="sRGB">
+          <feImage href="ice-glass-normal-map.png" x="0%" y="0%" width="100%" height="100%" preserveAspectRatio="none" result="soapNormals" />
+          <feDisplacementMap id="ice-glass-refraction-map" in="SourceGraphic" in2="soapNormals" scale="1.1" xChannelSelector="R" yChannelSelector="G" result="refractedColor" />
+          <feOffset id="ice-glass-refraction-offset" in="refractedColor" dx="0" dy="0" />
+        </filter>
+      </defs>
+    </svg>
+  </>;
 }

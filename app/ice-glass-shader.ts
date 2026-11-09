@@ -3,9 +3,10 @@ precision highp float;
 uniform vec2 uResolution;
 uniform float uDPR;
 uniform vec4 uRect;
+uniform vec4 uDrawRect;
 void main() {
   vec2 corners[6] = vec2[6](vec2(0,0),vec2(1,0),vec2(0,1),vec2(0,1),vec2(1,0),vec2(1,1));
-  vec2 pixel = uRect.xy+corners[gl_VertexID]*uRect.zw;
+  vec2 pixel = uDrawRect.xy+corners[gl_VertexID]*uDrawRect.zw;
   vec2 clip = pixel*uDPR/uResolution*2.0-1.0;
   gl_Position = vec4(clip.x,-clip.y,0,1);
 }`;
@@ -105,12 +106,18 @@ uniform float uBodyOpacity;
 uniform vec4 uOptics; // Fresnel, dispersion, refraction, internal reflection
 uniform vec4 uEnergy; // ambient, intensity, light height, falloff
 uniform vec3 uFinish; // sharpness, bloom intensity, bloom radius
+uniform float uTheme; // 0: preserved dark room, 1: daylight room
+uniform float uLift;
+uniform float uLightGlass;
+uniform vec3 uPointer; // local 0..1 position and presence over this surface
 
 ${glassGeometry}
 vec3 environment(vec3 ray) {
   float sky = smoothstep(-.55,.72,ray.y);
   float cool = pow(max(0.0, .5 + .5 * ray.x), 2.4);
-  return vec3(.008,.016,.024) + vec3(.025,.055,.085)*sky + vec3(.010,.026,.044)*cool;
+  vec3 darkRoom=vec3(.008,.016,.024) + vec3(.025,.055,.085)*sky + vec3(.010,.026,.044)*cool;
+  vec3 dayRoom=vec3(.46,.58,.62) + vec3(.34,.35,.31)*sky + vec3(.08,.17,.18)*cool;
+  return mix(darkRoom,dayRoom,uTheme);
 }
 float underlightNoise(vec2 p) {
   vec2 cell=floor(p), f=fract(p);
@@ -250,9 +257,50 @@ void main() {
   float d = boxSDF(p,halfSize,radius);
   float aa = 1.25/uDPR;
   float coverage = 1.0-smoothstep(-aa,0.0,d);
-  if (coverage <= 0.0) discard;
   float depth = -d;
   float thickness = min(uGlass.y*2.1, min(halfSize.x,halfSize.y)*.50);
+  if (coverage <= 0.0) {
+    if(uTheme<.5 || uLightGlass<.5) discard;
+    // The same directional daylight that enters the glass projects its shadow
+    // and dispersed caustic onto the dashboard plane. The projection is sampled
+    // outside the DOM bounds on this shared canvas, so neighbouring surfaces can
+    // receive it instead of clipping every pattern to its source card.
+    vec2 sunDirection=normalize(vec2(-.42,-.72));
+    vec2 tangent=vec2(-sunDirection.y,sunDirection.x);
+    float elevation=2.5+uLift*13.5;
+    vec2 projection=sunDirection*(3.5+elevation*1.18);
+    vec2 q=p-projection;
+    float projectedD=boxSDF(q,halfSize,radius);
+    float blur=3.2+elevation*.38;
+    float shadow=(1.0-smoothstep(-blur,blur*1.7,projectedD))
+      *exp(-max(projectedD,0.0)*max(projectedD,0.0)/(blur*blur*3.5));
+    shadow*=.075*(1.0-.38*uLift);
+    float projectedDepth=max(-projectedD,0.0);
+    // Outside the material we need only the projected envelope. Reusing the
+    // analytic shoulder depth avoids evaluating the full soap volume in every
+    // overscan pixel while preserving its contour and directional normal.
+    float slope=exp(-projectedDepth/max(thickness*.72,1.0));
+    float focusDepth=2.3+elevation*.42+min(8.0,slope*thickness*.55);
+    float width=2.2+elevation*.20;
+    float materialPhase=(1.0-slope)*5.4+dot(q,tangent)*.011;
+    vec2 projectedNormal=roundedSurfaceNormal(clamp(q,-halfSize,halfSize),halfSize,radius);
+    float directionalFocus=.03+.97*pow(max(dot(projectedNormal,sunDirection),0.0),1.35);
+    float concentration=(.78+.22*cos(materialPhase))*directionalFocus;
+    float split=.72+uLift*.72;
+    vec3 spectralDepth=vec3(
+      max(-boxSDF(q+tangent*split,halfSize,radius),0.0),
+      projectedDepth,
+      max(-boxSDF(q-tangent*split,halfSize,radius),0.0));
+    vec3 caustic=exp(-pow((spectralDepth-vec3(focusDepth))/width,vec3(2.0)))
+      *concentration*smoothstep(-1.0,2.0,projectedDepth);
+    float reach=1.0-smoothstep(24.0+elevation*.45,34.0+elevation*.55,length(max(abs(p)-halfSize,vec2(0))));
+    caustic*=reach*(.062+.035*uLift);
+    float causticAlpha=clamp(max(max(caustic.r,caustic.g),caustic.b)*.58,0.0,.14);
+    float alpha=1.0-(1.0-shadow)*(1.0-causticAlpha);
+    vec3 causticColor=caustic*vec3(.38,.56,.60)+caustic.bgr*vec3(.055,.018,.028);
+    outColor=vec4(causticColor,alpha);
+    return;
+  }
   // Keep the exact rounded silhouette, but move all optical shading onto a
   // continuous face blend before the box SDF reaches its diagonal medial axes.
   float normalSoftness = max(9.0,thickness*1.35);
@@ -281,14 +329,19 @@ void main() {
   // into the vertical sides so it cannot cut a crease into the outer silhouette.
   vec2 normalXY = -surface.xy + waveGradient*3.2*bevel*smoothstep(0.0,thickness*.4,depth);
   vec3 N = normalize(vec3(normalXY*volume,1.0));
+  vec2 pointerTilt=(uPointer.xy-.5)*uPointer.z*uLift;
+  N=normalize(vec3(N.xy+pointerTilt*.055,N.z));
   vec3 V = vec3(0,0,1);
   vec3 delta = vec3(uLight.xy-pixel,max(uEnergy.z-surfaceHeight,1.0));
   float distanceXY = length(delta.xy);
-  vec3 L = normalize(delta);
+  vec3 cursorL = normalize(delta);
+  vec3 sunL = normalize(vec3(-.42,-.72,1.55));
+  vec3 L = normalize(mix(cursorL,sunL,uTheme));
   vec3 H = normalize(L+V);
   float attenuation = 1.0/(1.0+pow(distanceXY/uEnergy.w,2.0)*3.0);
   attenuation *= 1.0-smoothstep(uEnergy.w*1.75,uEnergy.w*2.75,distanceXY);
   attenuation *= uLight.z;
+  attenuation=mix(attenuation,1.0,uTheme);
   float ndl = max(dot(N,L),0.0);
   float ndh = max(dot(N,H),0.0);
   float f0 = pow((uGlass.x-1.0)/(uGlass.x+1.0),2.0);
@@ -306,7 +359,7 @@ void main() {
   // A parallel source produces an edge-parallel, straight spectral band.
   // Only the difference between local Snell paths and that parallel reference
   // bends it. There is no UV/noise curve or distance-driven bend animation.
-  vec3 referenceL=normalize(vec3(uLight.xy-uRect.xy-halfSize,max(uEnergy.z-mix(.6,uCrownHeight,volume),1.0)));
+  vec3 referenceL=normalize(mix(vec3(uLight.xy-uRect.xy-halfSize,max(uEnergy.z-mix(.6,uCrownHeight,volume),1.0)),sunL,uTheme));
   vec3 referenceR=refract(-referenceL,N,1.0/(uGlass.x-uOptics.y));
   vec3 referenceG=refract(-referenceL,N,1.0/uGlass.x);
   vec3 referenceB=refract(-referenceL,N,1.0/(uGlass.x+uOptics.y));
@@ -384,6 +437,20 @@ void main() {
   float alpha=mix(uBodyOpacity*coverage,opticalAlpha,exp(-depth/(thickness*.45)));
   vec3 body=face*(.72+uOptics.x*fresnel);
   outColor=vec4(color*opticalAlpha-body*(opticalAlpha-alpha),alpha);
+  if(uTheme>.5) {
+    // In daylight the transparent body is read mostly through Fresnel, edge
+    // thickness and focused transmitted sunlight. Radiance remains separate
+    // from coverage so the material stays clear instead of becoming a white card.
+    float rimDirection=.08+.92*pow(max(dot(surfaceNormal,normalize(sunL.xy)),0.0),1.25);
+    float daylightFresnel=clamp(fresnel*1.8+edge*.28+shoulder*.10,0.0,1.0);
+    float daylightAlpha=clamp((.008+.052*daylightFresnel*rimDirection+.010*(1.0-N.z))*coverage,0.0,.09);
+    float solarFocus=pow(max(dot(N,sunL),0.0),7.0)*shoulder;
+    vec3 daylightBody=mix(vec3(.045,.12,.14),vec3(.18,.34,.34),daylightFresnel);
+    vec3 daylightRadiance=daylightBody*daylightAlpha;
+    daylightRadiance+=caustic*vec3(.028,.038,.043)*spectralReach*rimDirection*(.72+solarFocus);
+    daylightRadiance+=vec3(.66,.80,.78)*solarFocus*.034;
+    outColor=vec4(daylightRadiance,daylightAlpha);
+  }
   if(uSpill.w>.5 && depth<26.0) outColor.rgb+=underlightSpill(pixel,depth)*coverage;
   if(uUnderlight.x>0.0 && uCoating.y>.5) {
     vec3 illumination=softUnderlight(materialPixel,depth,fresnel,volume);

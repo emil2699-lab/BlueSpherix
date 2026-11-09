@@ -38,6 +38,7 @@ import { ALPHA_ACCOUNT, BEST_RECENT_TRADE, BEST_SESSION_30D, DASHBOARD_RANGE_STA
 import { valueSign } from "./value-sign";
 import { IceGlass } from "./ice-glass";
 import { positionUnderlight } from "./glass-underlight";
+import { ThemeToggle } from "./theme-toggle";
 
 type Range = DashboardRange;
 type EquityLayout = "breath" | "shore" | "threshold" | "wake";
@@ -220,6 +221,7 @@ export default function Home() {
           <button className="menu-button" onClick={() => setSidebarOpen(true)} aria-label="Apri menu"><Menu size={20} /></button>
           <button className="command-search"><Search size={17} /><span>Cerca metriche, trade o strumenti…</span><kbd><Command size={12} /> K</kbd></button>
           <div className="top-actions">
+            <ThemeToggle />
             <button className={`privacy ${privateMode ? "on" : ""}`} onClick={() => setPrivateMode(!privateMode)}><LockKeyhole size={15} /><span>{privateMode ? "Privato" : "Condiviso"}</span></button>
             <button className="icon-button" aria-label="Notifiche"><Bell size={18} /><i /></button>
             <div className="user-avatar">LS</div>
