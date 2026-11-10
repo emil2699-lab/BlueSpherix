@@ -65,15 +65,51 @@ senza WebGL, comandi del calendario e assenza di overflow a 1024 e 390 px.
 
 Il browser non espone il contenuto DOM come texture al contesto WebGL senza
 duplicarlo in un secondo renderer. Testi, controlli e immagini restano quindi
-DOM reali. Durante l'hover un filtro SVG `feDisplacementMap` sposta i pixel
-renderizzati usando `public/ice-glass-normal-map.png`, un campo di normali
-derivato da una calotta convessa continua. La scala e il piccolo offset del
-campo seguono sollevamento e posizione del cursore.
+DOM reali. Il filtro SVG `feDisplacementMap` campiona questi pixel usando una
+mappa inversa distinta per geometria, generata da `ice-glass-lens.ts`. I raggi
+di osservazione quasi ortogonali attraversano entrambe le interfacce curve:
+normali e spessore provengono dallo stesso `soapSample` dello shader, con indice
+di rifrazione 1,5 e legge di Snell all'ingresso e all'uscita. L'intersezione con
+la faccia inferiore è risolta con le derivate analitiche della superficie.
 
-Questa è una rifrazione raster del contenuto basata sulle normali simulate; non
-è un campionamento WebGL del DOM né un path tracing del testo. La dispersione
-RGB fisica resta nello shader del materiale, mentre il filtro del contenuto usa
-un solo campione per contenere il costo e preservare la leggibilità.
+La deviazione aggiuntiva sulla base è la pendenza del raggio uscente moltiplicata
+per la distanza del vetro: a distanza zero la mappa è identità. Nella zona
+parassiale questo produce la relazione di ingrandimento `m = 1 / (1 - d / f)`;
+la potenza locale dipende dalla curvatura, quindi le card larghe non si
+comportano come lenti sferiche. L'ingrandimento e la deformazione crescono
+insieme alla corsa di 48 px. La proiezione prospettica espande anche il campo
+delle normali intorno allo stesso centro del volume, senza traslare il testo.
+
+Per la leggibilità il modello è regolarizzato: spostamenti limitati a 18 px,
+transizione verso l'identità sulla spalla radente e Jacobiano inverso limitato
+prima della quantizzazione, per evitare inversioni o incroci dell'immagine.
+La rifrazione propria dello spessore a riposo viene compensata per conservare
+la leggibilità iniziale. Non è una simulazione completa della camera, della
+riflessione totale interna o della dispersione RGB del testo: quest'ultima
+resta nel materiale WebGL. È un campionamento raster non uniforme del DOM,
+senza `scale()` del contenuto, duplicazioni o immagini statiche del testo.
+
+La mappa viene generata una volta per geometria e conservata in una cache
+limitata; nessun PNG viene rigenerato durante l'animazione. Il frame globale
+aggiorna solo scala e proiezione del filtro quando cambiano. Ogni card mantiene
+il proprio filtro anche durante il ritorno: spostare il cursore su una card
+vicina non tronca la rifrazione precedente. Dimensioni, hit area, selezione e
+controlli restano DOM reali; tema scuro, movimento ridotto e fallback non
+applicano il filtro. Le risorse vengono eliminate al cambio vista, alla perdita
+del contesto o allo smontaggio.
+
+`npm run glass:check` verifica indice coincidente con l'aria, asse ottico,
+potenza focale parassiale, simmetria, crescita dell'ingrandimento e assenza di
+ripiegamenti anche dopo la quantizzazione della mappa.
+Verifica raster in Chromium, su una card campione 400×134: a cinque distanze
+crescenti i glifi reali passano da 14 a 16 px di altezza, un elemento HTML e
+un'immagine da 38 a 42 px. I rettangoli DOM restano identici; verificati anche
+selezione del testo, pulsante, disattivazione con movimento ridotto e ritorno
+continuo all'identità. Questi valori dipendono dalla geometria del campione.
+
+Riferimenti consultati: [formula del displacement SVG (MDN)](https://github.com/mdn/content/blob/main/files/en-us/web/svg/reference/element/fedisplacementmap/index.md),
+[rifrazione dielettrica (PBRT)](https://github.com/mmp/pbrt-v4/blob/master/src/pbrt/util/scattering.h)
+e [trasmissione volumetrica (Three.js)](https://github.com/mrdoob/three.js/blob/dev/src/renderers/shaders/ShaderChunk/transmission_pars_fragment.glsl.js).
 
 ## Tema e fallback
 

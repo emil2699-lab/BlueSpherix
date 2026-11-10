@@ -88,9 +88,7 @@ html[data-theme="light"] .content[data-ice-glass="ready"] :is(.glass-card,.calen
   box-shadow: none;
   transform: none !important;
 }
-html[data-theme="light"] .content[data-ice-glass="ready"] .glass-card:not(.timeline-card):not(.trade-inspector):hover,
-html[data-theme="light"] .content[data-ice-glass="ready"] :is(.calendar-strip,.demo-notice):hover {
-  filter: url("#ice-glass-refraction");
+html[data-theme="light"] .content[data-ice-glass="ready"] [data-ice-lens-active] {
   z-index: 3;
 }
 /* Card hover must not carry decorative content off the base with the glass. */
@@ -154,6 +152,5 @@ html[data-theme-changing="true"] :is(body,.sidebar,.topbar,.glass-card,.calendar
 
 @media (prefers-reduced-motion: reduce) {
   html[data-theme-changing="true"] :is(body,.sidebar,.topbar,.glass-card,.calendar-strip,.demo-notice,button,input,select,textarea) { transition-duration: 0s; }
-  html[data-theme="light"] .content[data-ice-glass="ready"] .glass-card:not(.timeline-card):not(.trade-inspector):hover,
-  html[data-theme="light"] .content[data-ice-glass="ready"] :is(.calendar-strip,.demo-notice):hover { transform: none !important; filter: none; }
+  html[data-theme="light"] .content[data-ice-glass="ready"] [data-ice-lens-active] { filter: none !important; }
 }

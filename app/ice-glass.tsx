@@ -5,6 +5,7 @@ import { ICE_GLASS as config } from "./ice-glass-config";
 import { glassFragment, glassVertex } from "./ice-glass-shader";
 import { coatingProgress, useGlassSelection } from "./glass-selection";
 import { soapSample } from "./ice-glass-volume";
+import { createGlassLenses } from "./ice-glass-lens";
 import { switchRect } from "./glass-switch-motion";
 
 type ViewportRect = { left: number; top: number; width: number; height: number };
@@ -18,13 +19,16 @@ const BUFFER_PIXEL_BUDGET = 8_388_608;
 
 export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const definitionsRef = useRef<SVGDefsElement>(null);
   const coatings = useGlassSelection(rootRef);
   useEffect(() => {
     const canvas = canvasRef.current;
     const root = rootRef.current;
-    if (!canvas || !root) return;
+    const definitions = definitionsRef.current;
+    if (!canvas || !root || !definitions) return;
     const gl = canvas.getContext("webgl2", { alpha: true, antialias: false, depth: false, premultipliedAlpha: true, powerPreference: "low-power" });
     if (!gl) return; // The original dark cards are the no-WebGL fallback.
+    const lenses = createGlassLenses(definitions);
     let program: WebGLProgram | null = null;
     let vao: WebGLVertexArrayObject | null = null;
     let shaders: WebGLShader[] = [];
@@ -47,14 +51,13 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     const pointer = { x: -10000, y: -10000, presence: 0 };
     const lifts = new Map<HTMLElement,{ value: number; updated: number }>();
     const reduced = matchMedia("(prefers-reduced-motion: reduce)");
-    const refraction = document.getElementById("ice-glass-refraction-map") as SVGFEDisplacementMapElement | null;
-    const refractionOffset = document.getElementById("ice-glass-refraction-offset") as SVGFEOffsetElement | null;
     const locations = new Map<string, WebGLUniformLocation | null>();
     const uniform = (name: string) => {
       if (!locations.has(name)) locations.set(name, gl.getUniformLocation(program!, name));
       return locations.get(name)!;
     };
     const dispose = () => {
+      lenses.clear();
       shaders.forEach((shader) => gl.deleteShader(shader));
       shaders = [];
       if (program) gl.deleteProgram(program);
@@ -142,6 +145,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       cards = cards.filter(card=>card.rect.width>0 && card.rect.height>0);
       const currentElements=new Set(cards.map(card=>card.element));
       for(const element of lifts.keys()) if(!currentElements.has(element)) lifts.delete(element);
+      lenses.retain(currentElements);
       dirty = false;
     };
     const fitDrawingBuffer = (quality = 1) => {
@@ -200,7 +204,6 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       let coatingMoving = false;
       let underlightMoving = false;
       let liftMoving = false;
-      let refracting: { lift: number; x: number; y: number } | null = null;
       // Multiple checked controls retain their own glass and underlight. Keep
       // the existing neighbouring-rim pass anchored to the latest active choice.
       // Reuse measurements; this adds no DOM reads to pointer frames.
@@ -242,13 +245,16 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         if(Math.abs(liftTarget-liftState.value)<.002) liftState.value=liftTarget;
         else liftMoving=true;
         const lift=liftState.value;
-        const localX=Math.max(0,Math.min(1,(pointerX-rect.left)/Math.max(rect.width,1)));
-        const localY=Math.max(0,Math.min(1,(pointerY-rect.top)/Math.max(rect.height,1)));
-        if(hovered) refracting={ lift, x: localX, y: localY };
         // Project only the optical layer towards the viewer. Hit testing and
         // DOM content keep the original rectangle, with no X/Y translation.
         const projection=lightMode && liftable
           ? config.daylightPerspective/(config.daylightPerspective-lift*config.daylightLift) : 1;
+        lenses.update(element,{
+          width:rect.width,height:rect.height,
+          radius:Math.min(rect.width*.475,rect.height*.475,radius),
+          thickness:Math.min(config.daylightThickness,rect.width*.25,rect.height*.25),
+          ior:config.glassIOR,distance:config.daylightLift,
+        },lightMode && liftable && !reduced.matches ? lift : 0,projection);
         const projectionPad=lightMode && liftable ? 38+lift*10 : 0;
         const padX=projectionPad+rect.width*(projection-1)*.5;
         const padY=projectionPad+rect.height*(projection-1)*.5;
@@ -285,13 +291,6 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         gl.uniform1f(uniform("uCrownHeight"),movingCrown);
         gl.uniform3f(uniform("uTint"),tint[0],tint[1],tint[2]);
         gl.drawArrays(gl.TRIANGLES,0,6);
-      }
-      if(refracting && !reduced.matches) {
-        const edge=Math.min(1,Math.hypot((refracting.x-.5)*1.35,(refracting.y-.5)*1.35));
-        const scale=1.2+refracting.lift*(2.45+edge*1.25);
-        refraction?.setAttribute("scale",scale.toFixed(3));
-        refractionOffset?.setAttribute("dx",((refracting.x-.5)*refracting.lift*.8).toFixed(3));
-        refractionOffset?.setAttribute("dy",((refracting.y-.5)*refracting.lift*.8).toFixed(3));
       }
       if (root.dataset.iceGlass !== "ready") root.dataset.iceGlass = "ready";
       canvas.dataset.pointer = `${pointer.x},${pointer.y}`;
@@ -353,7 +352,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     resize.observe(root);
     syncObservedSurfaces();
     const mutation = new MutationObserver(records => {
-      if(records.every(record=>record.target===canvas))return;
+      if(records.every(record=>record.target===canvas || definitions.contains(record.target)))return;
       syncObservedSurfaces();
       // A coating changes material coverage, not layout. Reuse cached rectangles.
       if (records.every(record => record.attributeName === "data-glass-selection")) invalidate();
@@ -393,13 +392,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
   return <>
     <canvas ref={canvasRef} className="ice-glass-canvas" aria-hidden="true" />
     <svg className="ice-glass-refraction-defs" aria-hidden="true">
-      <defs>
-        <filter id="ice-glass-refraction" x="-4%" y="-6%" width="108%" height="112%" colorInterpolationFilters="sRGB">
-          <feImage href="ice-glass-normal-map.png" x="0%" y="0%" width="100%" height="100%" preserveAspectRatio="none" result="soapNormals" />
-          <feDisplacementMap id="ice-glass-refraction-map" in="SourceGraphic" in2="soapNormals" scale="1.1" xChannelSelector="R" yChannelSelector="G" result="refractedColor" />
-          <feOffset id="ice-glass-refraction-offset" in="refractedColor" dx="0" dy="0" />
-        </filter>
-      </defs>
+      <defs ref={definitionsRef} />
     </svg>
   </>;
 }
