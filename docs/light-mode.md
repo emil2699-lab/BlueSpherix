@@ -45,9 +45,10 @@ card. Il compositing della caustica aggiunge luce in ogni canale, evitando
 frange scure dovute alla copertura alfa dei canali meno intensi.
 
 Il sollevamento è un valore continuo per card lungo l'asse Z, verso lo
-spettatore: corsa di 16 px e distanza prospettica di 900 px. La proiezione
+spettatore: corsa di 48 px e distanza prospettica di 900 px. La proiezione
 `900 / (900 - altezza)` espande solo il volume e il suo labbro attorno al centro
 fisso della card, senza traslazioni X/Y, inclinazioni o trasformazioni del DOM.
+In hover completo il vetro arriva al 105,63% della proiezione a riposo.
 Testi, immagini, controlli e hit area rimangono sulla base. La stessa progressione
 guida proiezione della luce e rifrazione; le caustiche restano sul piano
 della dashboard. Con `prefers-reduced-motion` il valore resta a zero e il filtro
