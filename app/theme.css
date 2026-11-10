@@ -80,12 +80,11 @@ html[data-theme="light"] .content[data-ice-glass="ready"] :is(.glass-card,.calen
   background: transparent;
   box-shadow: none;
 }
-html[data-theme="light"] .content[data-ice-glass="ready"] .glass-card:not(.timeline-card):not(.trade-inspector):hover,
-html[data-theme="light"] .content[data-ice-glass="ready"] :is(.calendar-strip,.demo-notice):hover {
+html[data-theme="light"] .content[data-ice-glass="ready"] :is(.glass-card,.calendar-strip,.demo-notice) {
   /* The dashboard content is the stationary base. Only its sampled pixels are
      displaced by the raised glass; the DOM box, text and controls never move. */
   transform: none !important;
-  filter: url("#ice-glass-refraction");
+  filter: var(--glass-lens, none);
 }
 .ice-glass-refraction-defs { position: absolute !important; width: 0; height: 0; overflow: hidden; pointer-events: none; }
 

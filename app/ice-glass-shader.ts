@@ -259,53 +259,30 @@ void main() {
   float coverage = 1.0-smoothstep(-aa,0.0,d);
   float depth = -d;
   float thickness = min(uGlass.y*2.1, min(halfSize.x,halfSize.y)*.50);
-  if (coverage <= 0.0) {
-    if(uTheme<.5 || uLightGlass<.5) discard;
-    // The same directional daylight that enters the glass forms a concentrated,
-    // spectrally split caustic on the dashboard plane. There is intentionally no
-    // generic drop shadow: separation is communicated by the moving focal band.
-    // Sampling outside the DOM bounds lets the band reach neighbouring surfaces.
-    vec2 lightDirection=normalize(vec2(-.42,-.72));
-    vec2 projectionDirection=-lightDirection;
-    vec2 tangent=vec2(-projectionDirection.y,projectionDirection.x);
-    float elevation=2.5+uLift*13.5;
-    // Light arrives from the upper-left and continues through the glass toward
-    // the lower-right base. Height increases the gap between object and focus.
-    vec2 projection=projectionDirection*(9.0+elevation*1.42);
-    vec2 q=p-projection;
-    float projectedD=boxSDF(q,halfSize,radius);
-    float projectedDepth=max(-projectedD,0.0);
-    // A convex exit surface concentrates rays just inside the projected contour.
-    // Lift increases the focal distance and separates its RGB paths. Low-frequency
-    // modulation comes from distance along that contour, so it remains attached
-    // to the glass geometry instead of behaving like a decorative texture.
-    float focusDepth=2.8+elevation*.22;
-    float width=1.65+elevation*.075;
-    float materialPhase=dot(q,tangent)*.043+projectedDepth*.16;
-    vec2 projectedNormal=roundedSurfaceNormal(clamp(q,-halfSize,halfSize),halfSize,radius);
-    float directionalFocus=.12+.88*pow(max(dot(projectedNormal,projectionDirection),0.0),1.15);
-    float contourPool=.5+.5*cos(materialPhase);
-    float concentration=(.36+.64*pow(contourPool,1.55))*directionalFocus;
-    float split=1.18+uLift*1.62;
-    vec3 spectralSDF=vec3(
-      boxSDF(q+tangent*split,halfSize,radius),
-      projectedD,
-      boxSDF(q-tangent*split,halfSize,radius));
-    vec3 spectralDepth=max(-spectralSDF,vec3(0.0));
-    vec3 primary=exp(-pow((spectralDepth-vec3(focusDepth))/width,vec3(2.0)));
-    vec3 secondary=exp(-pow((spectralDepth-vec3(focusDepth+5.4+uLift*1.7))/(width*1.75),vec3(2.0)))*.48;
-    float reach=1.0-smoothstep(28.0+elevation*.55,42.0+elevation*.65,length(max(abs(p)-halfSize,vec2(0))));
-    vec3 caustic=(primary+secondary)*concentration*reach*(.34+.17*uLift)
-      *smoothstep(-.35,2.2,projectedDepth);
-    float peak=max(max(caustic.r,caustic.g),caustic.b);
-    float causticAlpha=clamp(peak*.34,0.0,.20);
-    // Premultiplied radiance is brighter than the covered daylight base, which
-    // makes the focused curve readable without turning it into a glow or shadow.
-    vec3 causticColor=vec3(
-      caustic.r*.32+caustic.b*.08,
-      caustic.g*.88+caustic.r*.018,
-      caustic.b*.78+caustic.r*.06);
-    outColor=vec4(causticColor,causticAlpha);
+  if (coverage <= 0.0) discard;
+  if(uTheme>.5 && uLightGlass>.5) {
+    // The same biconvex solid used by the forward sunlight and reverse camera
+    // rays. Reflected window light reveals curvature without a luminous outline.
+    float dayThickness=min(14.0,min(halfSize.x,halfSize.y)*.5);
+    vec3 soap=soapSurface(p,halfSize,radius,dayThickness);
+    vec3 normal=normalize(vec3(-soap.xy,1));
+    vec3 view=normalize(vec3((uPointer.xy-.5)*uLift*.025,1));
+    vec3 reflected=reflect(-view,normal);
+    float f0=pow((uGlass.x-1.0)/(uGlass.x+1.0),2.0);
+    float F=f0+(1.0-f0)*pow(1.0-max(dot(normal,view),0.0),5.0);
+    // Broad daylight window on one side; a quieter room on the opposite side.
+    float windowLight=exp(-pow((reflected.x+.48)/.55,2.0)-pow((reflected.y+.60)/.85,2.0));
+    float frame=exp(-pow((reflected.x+.12)/.065,2.0))*windowLight;
+    vec3 room=mix(vec3(.22,.29,.30),vec3(.99,1.0,.98),windowLight);
+    room-=frame*.12;
+    float rolled=exp(-depth/3.0);
+    float lowerRim=max(dot(normal.xy,normalize(vec2(.55,.72))),0.0);
+    float alpha=(F*.62+.025+rolled*lowerRim*.12)*coverage;
+    vec3 radiance=room*alpha;
+    // Finite thickness causes a narrow, cool transmission edge. It remains
+    // inside the solid and has no external blur, halo or diffuse shadow.
+    radiance+=vec3(.96,.99,1.0)*windowLight*F*.10*coverage;
+    outColor=vec4(radiance,alpha);
     return;
   }
   // Keep the exact rounded silhouette, but move all optical shading onto a
