@@ -2,6 +2,8 @@
 export const ICE_GLASS = {
   glassIOR: 1.5,
   glassThickness: 14,
+  // Match the shallow convex section of the calendar's reference notice.
+  daylightThickness: 12,
   glassRoughness: .21,
   glassOpacity: .58,
   glassBodyOpacity: .14,

@@ -6,6 +6,31 @@ al cursore e i valori precedenti; la modalità chiara usa una sorgente solare
 direzionale sempre attiva, un ambiente più luminoso e una diversa calibrazione
 di copertura, Fresnel e trasmissione.
 
+## Profilo condiviso delle card
+
+Tutte le `.glass-card`, `.demo-notice` e `.calendar-strip` riusano il profilo
+della saponetta mostrata nell'avviso del calendario: spessore nominale di 12 px
+e angoli di 28 px, limitati dalla dimensione della superficie. La sezione ottica
+non cresce con l'altezza di grafici e tabelle: bordi e riflessi mantengono la
+stessa scala sui pannelli grandi e sulle card compatte. Il raggio CSS viene
+usato anche dalla SDF, mentre la CPU calcola l'altezza centrale con lo stesso
+spessore del materiale. Layout, padding e dimensioni restano invariati.
+Il labbro superiore lucidato usa una luce CSS interna e asimmetrica, visibile
+anche a riposo; lo shader continua a disegnare il materiale ottico e la sua
+risposta dinamica. Questo accento non aggiunge ombre esterne e non viene
+presentato come rifrazione o caustica.
+
+La calibrazione riguarda solo le card in modalità chiara. Profilo scuro,
+controlli selezionati e switch mantengono i parametri precedenti. Non vengono
+aggiunti canvas, texture o dipendenze.
+
+Verifica Chromium: 84 superfici in otto viste mantengono dimensioni e layout;
+il confronto screenshot della modalità scura è identico. Controllati anche
+1024×820 e 390×844 senza overflow. La regola per il movimento ridotto usa la
+stessa specificità dell'hover, così sollevamento e filtro vengono disattivati.
+Safari e prestazioni su GPU reale non sono stati verificati; SwiftShader è
+un renderer software e non costituisce una misura della fluidità su hardware.
+
 ## Materiale e caustiche
 
 Lo shader mantiene la stessa SDF arrotondata e lo stesso campo di altezza

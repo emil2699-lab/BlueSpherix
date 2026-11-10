@@ -133,8 +133,9 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         const rect = { left, top, width: domRect.width, height: domRect.height, right: left+domRect.width, bottom: top+domRect.height };
         const radius=parseFloat(style.borderTopLeftRadius) || 14;
         const halfWidth=rect.width*.5,halfHeight=rect.height*.5;
-        const opticalRadius=Math.min(Math.min(halfWidth,halfHeight)*.95,Math.max(radius*1.75,24));
-        const thickness=Math.min(config.glassThickness*2.1,Math.min(halfWidth,halfHeight)*.5);
+        const daylightCard=document.documentElement.dataset.theme === "light" && element.matches(LIFTABLE_SURFACE_SELECTOR);
+        const opticalRadius=Math.min(Math.min(halfWidth,halfHeight)*.95,daylightCard ? radius : Math.max(radius*1.75,24));
+        const thickness=Math.min(daylightCard ? config.daylightThickness : config.glassThickness*2.1,Math.min(halfWidth,halfHeight)*.5);
         const crownHeight=rect.width && rect.height ? soapSample(0,0,halfWidth,halfHeight,opticalRadius,thickness)[2] : 0;
         return { element, rect, radius, tint, crownHeight };
       });
@@ -193,6 +194,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       gl.uniform4f(uniform("uEnergy"),config.ambientReflection,config.lightIntensity,config.lightHeight,config.lightFalloff);
       gl.uniform3f(uniform("uFinish"),config.specularSharpness,config.bloomIntensity,config.bloomRadius);
       gl.uniform1f(uniform("uTheme"),lightMode ? 1 : 0);
+      gl.uniform1f(uniform("uDaylightThickness"),config.daylightThickness);
       gl.enable(gl.SCISSOR_TEST);
       let coatingMoving = false;
       let underlightMoving = false;

@@ -69,6 +69,11 @@ html[data-theme="light"] .theme-toggle { color: #536a70; background: rgb(255 255
 html[data-theme="light"] .theme-icon-light { opacity: 0; transform: translateY(-7px) rotate(-24deg); }
 html[data-theme="light"] .theme-icon-dark { opacity: 1; transform: none; }
 
+/* A shared soap profile for cards, notices and strips in every dashboard view.
+   The shader reads this radius too; padding and bounding boxes stay unchanged. */
+html[data-theme="light"] .content :is(.glass-card,.calendar-strip,.demo-notice) {
+  border-radius: 28px;
+}
 html[data-theme="light"] .content:not([data-ice-glass="ready"]) :is(.glass-card,.calendar-strip,.demo-notice) {
   background: linear-gradient(145deg,rgb(255 255 255 / .68),rgb(235 246 244 / .42));
   border: 1px solid rgb(255 255 255 / .75);
@@ -78,7 +83,13 @@ html[data-theme="light"] .content:not([data-ice-glass="ready"]) :is(.glass-card,
 }
 html[data-theme="light"] .content[data-ice-glass="ready"] :is(.glass-card,.calendar-strip,.demo-notice) {
   background: transparent;
-  box-shadow: none;
+  /* The polished upper lip stays visible at rest, including on tall panels.
+     All shading is inset: no extra drop shadow around the cards. The shared
+     WebGL material continues to supply the moving optical response. */
+  box-shadow:
+    inset 0 7px 9px -7px rgb(255 255 255 / .96),
+    inset 1px 0 3px rgb(255 255 255 / .34),
+    inset -1px -2px 4px rgb(42 76 78 / .025);
 }
 html[data-theme="light"] .content[data-ice-glass="ready"] .glass-card:not(.timeline-card):not(.trade-inspector):hover,
 html[data-theme="light"] .content[data-ice-glass="ready"] :is(.calendar-strip,.demo-notice):hover {
@@ -141,6 +152,6 @@ html[data-theme-changing="true"] :is(body,.sidebar,.topbar,.glass-card,.calendar
 
 @media (prefers-reduced-motion: reduce) {
   html[data-theme-changing="true"] :is(body,.sidebar,.topbar,.glass-card,.calendar-strip,.demo-notice,button,input,select,textarea) { transition-duration: 0s; }
-  html[data-theme="light"] .content[data-ice-glass="ready"] .glass-card:hover,
+  html[data-theme="light"] .content[data-ice-glass="ready"] .glass-card:not(.timeline-card):not(.trade-inspector):hover,
   html[data-theme="light"] .content[data-ice-glass="ready"] :is(.calendar-strip,.demo-notice):hover { transform: none !important; filter: none; }
 }

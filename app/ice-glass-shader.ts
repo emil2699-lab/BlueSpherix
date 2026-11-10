@@ -109,6 +109,7 @@ uniform vec3 uFinish; // sharpness, bloom intensity, bloom radius
 uniform float uTheme; // 0: preserved dark room, 1: daylight room
 uniform float uLift;
 uniform float uLightGlass;
+uniform float uDaylightThickness;
 uniform vec3 uPointer; // local 0..1 position and presence over this surface
 
 ${glassGeometry}
@@ -253,12 +254,17 @@ void main() {
   vec2 p = pixel-uRect.xy-halfSize;
   // A soap volume needs a broad shoulder and rolled corners, rather than the
   // narrow fillet of the original flat slab. Keep its bounding rectangle fixed.
-  float radius = min(min(halfSize.x,halfSize.y)*.95,max(uRadius*1.75,24.0));
+  float daylightCard = uTheme*uLightGlass;
+  float radius = min(min(halfSize.x,halfSize.y)*.95,
+    mix(max(uRadius*1.75,24.0),uRadius,daylightCard));
   float d = boxSDF(p,halfSize,radius);
   float aa = 1.25/uDPR;
   float coverage = 1.0-smoothstep(-aa,0.0,d);
   float depth = -d;
-  float thickness = min(uGlass.y*2.1, min(halfSize.x,halfSize.y)*.50);
+  // All daylight cards share the reference notice's optical section, even
+  // when a chart or table makes the card taller. Controls retain their profile.
+  float thickness = min(mix(uGlass.y*2.1,uDaylightThickness,daylightCard),
+    min(halfSize.x,halfSize.y)*.50);
   if (coverage <= 0.0) {
     if(uTheme<.5 || uLightGlass<.5) discard;
     // The same directional daylight that enters the glass projects its shadow
