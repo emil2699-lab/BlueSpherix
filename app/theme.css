@@ -141,6 +141,5 @@ html[data-theme-changing="true"] :is(body,.sidebar,.topbar,.glass-card,.calendar
 
 @media (prefers-reduced-motion: reduce) {
   html[data-theme-changing="true"] :is(body,.sidebar,.topbar,.glass-card,.calendar-strip,.demo-notice,button,input,select,textarea) { transition-duration: 0s; }
-  html[data-theme="light"] .content[data-ice-glass="ready"] .glass-card:hover,
-  html[data-theme="light"] .content[data-ice-glass="ready"] :is(.calendar-strip,.demo-notice):hover { transform: none !important; filter: none; }
+  html[data-theme="light"] .content[data-ice-glass="ready"] :is(.glass-card,.calendar-strip,.demo-notice) { transform: none !important; filter: none; }
 }

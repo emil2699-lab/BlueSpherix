@@ -47,7 +47,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     let resize: ResizeObserver | null = null;
     const observedSurfaces = new Set<Element>();
     const pointer = { x: -10000, y: -10000, presence: 0 };
-    const lifts = new Map<HTMLElement,{ value: number; updated: number }>();
+    const lifts = new Map<HTMLElement,{ value: number; updated: number; target: number }>();
     const reduced = matchMedia("(prefers-reduced-motion: reduce)");
     let daylight: DaylightRenderer | null = null;
     let daylightUnavailable=false;
@@ -196,22 +196,22 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       for(const {element,rect,radius} of dayCards) {
         const hovered=pointer.presence>0 && pointerX>=rect.left && pointerX<=rect.right && pointerY>=rect.top && pointerY<=rect.bottom;
         let state=lifts.get(element);
-        if(!state) { state={value:0,updated:time}; lifts.set(element,state); }
+        if(!state) { state={value:0,updated:time,target:0}; lifts.set(element,state); }
         const target=hovered && !reduced.matches ? 1 : 0;
-        const elapsed=Math.min(64,Math.max(0,time-state.updated));
+        // Start at the interaction, not at the last frame rendered while idle.
+        if(target!==state.target) { state.target=target;state.updated=time; }
+        const elapsed=Math.max(0,time-state.updated);
         state.value+=(target-state.value)*(1-Math.exp(-elapsed/(target>.5 ? 145 : 220)));
         state.updated=time;
         if(reduced.matches)state.value=0;
         if(Math.abs(target-state.value)<.002)state.value=target;else liftMoving=true;
-        if(!reduced.matches)lensFilters?.update(element,{width:rect.width,height:rect.height,radius},state.value);
+        lensFilters?.update(element,{width:rect.width,height:rect.height,radius},state.value);
       }
       if(lightMode && !daylightUnavailable) {
         try {
-        daylight ??= new DaylightRenderer(gl);
-        daylight.begin(width,height,dpr);
-        for(const {element,rect,radius} of dayCards)daylight.card(rect.left,rect.top,
-          {width:rect.width,height:rect.height,radius},lifts.get(element)?.value ?? 0);
-        daylight.end(width,height);
+          daylight ??= new DaylightRenderer(gl);
+          daylight.update(width,height,dpr,dayCards.map(({element,rect,radius}) =>
+            ({...rect,radius,lift:lifts.get(element)?.value ?? 0})));
         } catch(error) {
           console.warn("Ice Glass daylight uses the material fallback:",error);
           daylight?.dispose();daylight=null;daylightUnavailable=true;
@@ -345,8 +345,9 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       pointer.x = event.clientX; pointer.y = event.clientY; pointer.presence = 1;
       schedule();
     };
-    const leave = (event: PointerEvent) => { if (!event.relatedTarget) { pointer.presence = 0; schedule(); } };
-    const visibility = () => { if (document.hidden) { clearTimeout(underlightTimer); underlightTimer = undefined; cancelAnimationFrame(frame); frame = 0; } else invalidate(); };
+    const blur = () => { pointer.presence = 0; schedule(); };
+    const leave = (event: PointerEvent) => { if (!event.relatedTarget) blur(); };
+    const visibility = () => { if (document.hidden) { pointer.presence=0; clearTimeout(underlightTimer); underlightTimer = undefined; cancelAnimationFrame(frame); frame = 0; } else invalidate(); };
     const contextLost = (event: Event) => {
       event.preventDefault();lost=true;clearTimeout(underlightTimer);underlightTimer=undefined;cancelAnimationFrame(frame);frame=0;
       // Release references while the context is lost. After restoration these
@@ -361,16 +362,22 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     resize.observe(root);
     syncObservedSurfaces();
     const mutation = new MutationObserver(records => {
-      if(records.every(record=>record.target===canvas || lensDefsRef.current?.contains(record.target)))return;
+      const withoutLens = (style: string | null) => (style ?? "").split(";").map(s=>s.trim())
+        .filter(s=>s && !/^--glass-lens\s*:/.test(s)).join(";");
+      const layoutRecords=records.filter(record=>record.target!==canvas && !lensDefsRef.current?.contains(record.target)
+        && !(record.attributeName==="style" && record.target instanceof HTMLElement
+          && withoutLens(record.oldValue)===withoutLens(record.target.getAttribute("style"))));
+      if(!layoutRecords.length)return;
       syncObservedSurfaces();
       // A coating changes material coverage, not layout. Reuse cached rectangles.
-      if (records.every(record => record.attributeName === "data-glass-selection")) invalidate();
+      if (layoutRecords.every(record => record.attributeName === "data-glass-selection")) invalidate();
       else settleLayout();
     });
-    mutation.observe(root,{ childList: true, subtree: true, attributes: true, attributeFilter: ["hidden", "class", "style", "data-glass-selection", "data-glass-underlight"] });
+    mutation.observe(root,{ childList: true, subtree: true, attributes: true, attributeOldValue: true, attributeFilter: ["hidden", "class", "style", "data-glass-selection", "data-glass-underlight"] });
     window.addEventListener("pointermove",move,{passive:true});
     window.addEventListener("pointerrawupdate",move,{passive:true});
     window.addEventListener("pointerout",leave,{passive:true});
+    window.addEventListener("blur",blur);
     window.addEventListener("resize",settleLayout,{passive:true});
     window.addEventListener("scroll",invalidate,{passive:true,capture:true});
     window.visualViewport?.addEventListener("resize",settleLayout,{passive:true});
@@ -388,7 +395,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       clearTimeout(underlightTimer); cancelAnimationFrame(frame); resize?.disconnect(); mutation.disconnect();
       resolutionQuery?.removeEventListener("change",resolutionChanged);
       window.removeEventListener("pointermove",move); window.removeEventListener("pointerrawupdate",move);
-      window.removeEventListener("pointerout",leave); window.removeEventListener("resize",settleLayout);
+      window.removeEventListener("pointerout",leave); window.removeEventListener("blur",blur); window.removeEventListener("resize",settleLayout);
       window.removeEventListener("scroll",invalidate,true); root.removeEventListener("transitionrun",settleLayout); root.removeEventListener("transitionend",invalidate);
       root.removeEventListener("glassswitchmotion",settleLayout);
       window.visualViewport?.removeEventListener("resize",settleLayout); window.visualViewport?.removeEventListener("scroll",invalidate);

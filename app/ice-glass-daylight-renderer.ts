@@ -1,14 +1,17 @@
 import { daylightTraceVertex, daylightCausticVertex, daylightCausticFragment, daylightCompositeVertex, daylightCompositeFragment } from "./ice-glass-daylight-shader";
-import { createLensMaps, type LensShape } from "./ice-glass-daylight";
+import { createLensMaps, LENS_MAP_NEUTRAL, type LensShape } from "./ice-glass-daylight";
+
+export type DaylightSurface = LensShape & { left: number; top: number; lift: number };
 
 export class DaylightRenderer {
   private programs: WebGLProgram[] = [];
   private shaders: WebGLShader[] = [];
-  private texture: WebGLTexture | null;
-  private target: WebGLFramebuffer | null;
+  private texture: WebGLTexture | null = null;
+  private target: WebGLFramebuffer | null = null;
   private width = 0;
   private height = 0;
   private ratio = 1;
+  private scene = "";
   private meshes = new Map<string, { buffer: WebGLBuffer; vao: WebGLVertexArrayObject }>();
   private locations = new Map<string, WebGLUniformLocation | null>();
   private uniform(index: number, name: string) {
@@ -17,12 +20,16 @@ export class DaylightRenderer {
     return this.locations.get(key)!;
   }
   constructor(private gl: WebGL2RenderingContext) {
-    this.texture = gl.createTexture(); this.target = gl.createFramebuffer();
     try {
+      this.texture = gl.createTexture(); this.target = gl.createFramebuffer();
+      if (!this.texture || !this.target) throw new Error("Daylight render target unavailable");
       for (const sources of [[daylightTraceVertex, daylightCausticFragment], [daylightCausticVertex, daylightCausticFragment], [daylightCompositeVertex, daylightCompositeFragment]]) {
-        const program = gl.createProgram()!; this.programs.push(program);
+        const program = gl.createProgram();
+        if (!program) throw new Error("Daylight program unavailable");
+        this.programs.push(program);
         sources.forEach((source, i) => {
-          const shader = gl.createShader(i ? gl.FRAGMENT_SHADER : gl.VERTEX_SHADER)!;
+          const shader = gl.createShader(i ? gl.FRAGMENT_SHADER : gl.VERTEX_SHADER);
+          if (!shader) throw new Error("Daylight shader unavailable");
           this.shaders.push(shader); gl.shaderSource(shader, source); gl.compileShader(shader);
           if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(shader) || "Daylight shader");
           gl.attachShader(program, shader);
@@ -37,6 +44,17 @@ export class DaylightRenderer {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     } catch (error) { this.dispose(); throw error; }
+  }
+  update(width: number, height: number, dpr: number, surfaces: DaylightSurface[]) {
+    // Pointer motion changes reflections, but not the incident sunlight.
+    // Retain the irradiance texture until a receiver, its height or DPR changes.
+    const scene = JSON.stringify([width,height,dpr,surfaces.map(s =>
+      [s.left,s.top,s.width,s.height,s.radius,s.lift])]);
+    if (scene === this.scene) return;
+    this.begin(width,height,dpr);
+    for (const surface of surfaces) this.card(surface.left,surface.top,surface,surface.lift);
+    this.end(width,height);
+    this.scene = scene;
   }
   begin(width: number, height: number, dpr: number) {
     const gl = this.gl;
@@ -60,7 +78,11 @@ export class DaylightRenderer {
     const count=40*24*6*6;
     let mesh=this.meshes.get(key);
     if(!mesh) {
-      const buffer=gl.createBuffer()!,vao=gl.createVertexArray()!,feedback=gl.createTransformFeedback()!;
+      const buffer=gl.createBuffer(),vao=gl.createVertexArray(),feedback=gl.createTransformFeedback();
+      if (!buffer || !vao || !feedback) {
+        gl.deleteBuffer(buffer);gl.deleteVertexArray(vao);gl.deleteTransformFeedback(feedback);
+        throw new Error("Daylight geometry unavailable");
+      }
       gl.bindVertexArray(vao);gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
       gl.bufferData(gl.ARRAY_BUFFER,count*9*4,gl.STATIC_COPY);
       gl.bindBuffer(gl.ARRAY_BUFFER,null);
@@ -109,6 +131,7 @@ export class DaylightRenderer {
     for(const {buffer,vao} of this.meshes.values()) { gl.deleteBuffer(buffer);gl.deleteVertexArray(vao); }
     this.meshes.clear();this.locations.clear();
     gl.deleteFramebuffer(this.target); gl.deleteTexture(this.texture);
+    this.programs=[];this.shaders=[];this.texture=null;this.target=null;this.scene="";
   }
 }
 
@@ -116,10 +139,12 @@ const SVG = "http://www.w3.org/2000/svg";
 let nextFilter = 0;
 export class LensFilters {
   private filters = new Map<HTMLElement, { key: string; filter: SVGFilterElement; mix: SVGFECompositeElement; lift: number }>();
+  private unavailable = false;
   constructor(private defs: SVGDefsElement) {}
   update(element: HTMLElement, shape: LensShape, lift: number) {
-    if(lift === 0) {
-      if(element.style.getPropertyValue("--glass-lens")!=="none")element.style.setProperty("--glass-lens","none");
+    if(lift === 0 || this.unavailable) {
+      const lens=element.style.getPropertyValue("--glass-lens");
+      if(lens && lens!=="none")element.style.setProperty("--glass-lens","none");
       return;
     }
     const key = `${shape.width.toFixed(1)},${shape.height.toFixed(1)},${shape.radius}`;
@@ -127,6 +152,7 @@ export class LensFilters {
     if (!state || state.key !== key) {
       state?.filter.remove();
       const maps = createLensMaps(shape), id = `ice-glass-lens-${++nextFilter}`;
+      if (!maps) { this.unavailable=true;this.update(element,shape,0);return; }
       const filter = document.createElementNS(SVG, "filter");
       filter.id = id;
       filter.setAttribute("filterUnits", "userSpaceOnUse"); filter.setAttribute("color-interpolation-filters", "sRGB");
@@ -151,7 +177,7 @@ export class LensFilters {
     if (Math.abs(lift - state.lift) > .001) {
       state.mix.setAttribute("k2", lift.toFixed(4));
       state.mix.setAttribute("k3", lift.toFixed(4));
-      state.mix.setAttribute("k4", (.5-lift).toFixed(4));
+      state.mix.setAttribute("k4", (.5-2*LENS_MAP_NEUTRAL*lift).toFixed(6));
       state.lift = lift;
     }
   }

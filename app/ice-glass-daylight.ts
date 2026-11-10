@@ -2,6 +2,8 @@ import { soapSample, unit, dot, type Vec3 } from "./ice-glass-volume.ts";
 
 // CSS pixels throughout. Both the viewer and the sun traverse this same solid.
 export const DAYLIGHT = { ior: 1.5, dispersion: .003, lift: 28, gap: 1.2, thickness: 14 } as const;
+// RGBA8 cannot represent 0.5 exactly. Use an exact byte value in both maps.
+export const LENS_MAP_NEUTRAL = 128 / 255;
 export type LensShape = { width: number; height: number; radius: number };
 export function lensDimensions({ width, height, radius }: LensShape) {
   const bx = width / 2, by = height / 2;
@@ -43,6 +45,28 @@ export function lensRay(x: number, y: number, shape: LensShape, dimensions = len
   return { base: [qx - x + slope[0] * air, qy - y + slope[1] * air], slope };
 }
 
+// Near critical angles the optical mapping can fold over itself. Preserve the
+// central lens field but bound neighbouring offsets for readable DOM sampling.
+function regularizeOffsets(field: Float32Array, width: number, height: number, dx: number, dy: number) {
+  const constrain = (a: number, b: number, limit: number) => {
+    const x=field[b]-field[a],y=field[b+1]-field[a+1],length=Math.hypot(x,y);
+    if(length<=limit)return;
+    const correction=(length-limit)/(2*length);
+    field[a]+=x*correction;field[a+1]+=y*correction;
+    field[b]-=x*correction;field[b+1]-=y*correction;
+  };
+  for(let pass=0;pass<16;pass++)for(let row=0;row<height;row++)for(let col=0;col<width;col++) {
+    const x=pass%2 ? width-1-col : col,y=pass%2 ? height-1-row : row,i=(y*width+x)*2;
+    if(x+1<width)constrain(i,i+2,dx*.10);
+    if(y+1<height)constrain(i,i+width*2,dy*.10);
+  }
+  const xs=[Math.floor((width-1)/2),Math.ceil((width-1)/2)];
+  const ys=[Math.floor((height-1)/2),Math.ceil((height-1)/2)];
+  const center=[0,0];
+  for(const x of xs)for(const y of ys)for(let c=0;c<2;c++)center[c]+=field[(y*width+x)*2+c]/4;
+  for(let i=0;i<field.length;i++)field[i]-=center[i%2];
+}
+
 // Two cached maps encode the in-glass path and the extra air path. SVG combines
 // them arithmetically each frame; there is no DOM capture or image regeneration.
 export function createLensMaps(shape: LensShape) {
@@ -52,9 +76,12 @@ export function createLensMaps(shape: LensShape) {
   const density = Math.min(1, 64 / Math.max(w, h));
   canvas.width = Math.max(32, Math.ceil(w * density));
   canvas.height = Math.max(32, Math.ceil(h * density));
-  const ctx = canvas.getContext("2d")!;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
   const base = ctx.createImageData(canvas.width, canvas.height);
   const gap = ctx.createImageData(canvas.width, canvas.height);
+  const baseOffsets = new Float32Array(canvas.width*canvas.height*2);
+  const gapOffsets = new Float32Array(baseOffsets.length);
   const scale = 64;
   const dimensions = lensDimensions(shape);
   for (let iy = 0; iy < canvas.height; iy++) for (let ix = 0; ix < canvas.width; ix++) {
@@ -68,10 +95,16 @@ export function createLensMaps(shape: LensShape) {
       const limit = Math.min(12, shape.height * .055);
       const a = ray ? limit * Math.tanh(ray.base[channel] / limit) : 0;
       const b = ray ? limit * Math.tanh(ray.slope[channel] * DAYLIGHT.lift / limit) : 0;
-      base.data[offset + channel] = Math.round((.5 + a / scale) * 255);
-      gap.data[offset + channel] = Math.round((.5 + b / scale) * 255);
+      baseOffsets[(iy*canvas.width+ix)*2+channel]=a;
+      gapOffsets[(iy*canvas.width+ix)*2+channel]=b;
     }
     base.data[offset + 3] = gap.data[offset + 3] = 255;
+  }
+  for(const field of [baseOffsets,gapOffsets])regularizeOffsets(field,canvas.width,canvas.height,w/canvas.width,h/canvas.height);
+  for(let i=0;i<baseOffsets.length;i++) {
+    const offset=Math.floor(i/2)*4+i%2;
+    base.data[offset]=Math.round((LENS_MAP_NEUTRAL+baseOffsets[i]/scale)*255);
+    gap.data[offset]=Math.round((LENS_MAP_NEUTRAL+gapOffsets[i]/scale)*255);
   }
   ctx.putImageData(base, 0, 0); const baseURL = canvas.toDataURL();
   ctx.putImageData(gap, 0, 0); const gapURL = canvas.toDataURL();

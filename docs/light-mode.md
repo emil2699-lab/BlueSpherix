@@ -120,3 +120,40 @@ e aumento dell'ingrandimento al crescere della distanza, su due geometrie divers
   renderer software è lento: la fluidità richiesta su GPU fisiche resta da
   verificare e questi risultati non attestano 60 fps. Safari/macOS non è stato
   disponibile per la prova.
+
+## Correzioni del debug del ciclo di rendering
+
+Il controllo successivo ha riprodotto un filtro rimasto attivo dopo il passaggio
+in tempo reale a `prefers-reduced-motion` e dieci disegni aggiuntivi delle caustiche
+per un movimento del cursore a scena immobile. Ora il filtro viene azzerato anche
+uscendo dalla card e perdendo il focus della finestra. L'animazione parte dal
+momento dell'interazione e segue il tempo trascorso, senza salti dopo l'inattività
+né rallentamenti artificiali sui frame lunghi.
+
+La texture delle caustiche viene riutilizzata finché geometria, altezza, posizione,
+dimensioni del buffer e DPR rimangono invariati. Il puntatore continua ad aggiornare
+i riflessi. I cambiamenti di `--glass-lens` non innescano più un ciclo di misurazioni
+layout. Le mappe RGBA8 usano un neutro rappresentabile esattamente per evitare uno
+spostamento uniforme del contenuto. Le allocazioni WebGL mancanti e l'assenza di
+Canvas 2D attivano il fallback; il cleanup delle risorse è idempotente.
+
+`node scripts/check-daylight-runtime.mjs` verifica cache, invalidazione, sette
+fallimenti di allocazione, asse neutro e fallback Canvas 2D. Impostando
+`DAYLIGHT_URL` alla preview locale verifica anche cambio della preferenza di
+movimento, perdita del focus, contenuto immobile e assenza di errori runtime.
+Il test sulla dashboard ora conta zero disegni delle caustiche aggiuntivi nel
+caso immobile riprodotto. Il benchmark SwiftShader riportato sopra precede queste
+correzioni e non costituisce una misura della nuova cache o di una GPU fisica.
+
+Il controllo visivo mobile ha inoltre individuato ripetizioni di lettere vicino
+ai bordi: il campionamento poteva ripiegarsi, con un determinante locale minimo
+negativo (-2,37 nella geometria di controllo). Le variazioni delle mappe DOM
+sono ora regolarizzate tra campioni adiacenti; il minimo verificato è positivo
+(0,59), anche controllando forme alte e strette o molto basse e larghe. Questo
+limite serve alla leggibilità del contenuto raster, preserva l'asse ottico e non
+modifica il calcolo dei raggi delle caustiche. È un'approssimazione dichiarata
+rispetto alla rifrazione completa ai bordi critici.
+
+Nella verifica finale dell'ingrandimento, l'immagine di controllo 20×20 viene
+osservata come 20×24 durante il sollevamento; il suo elemento DOM e la card
+conservano le coordinate e le dimensioni originali.
