@@ -259,30 +259,46 @@ void main() {
   float coverage = 1.0-smoothstep(-aa,0.0,d);
   float depth = -d;
   float thickness = min(uGlass.y*2.1, min(halfSize.x,halfSize.y)*.50);
-  if (coverage <= 0.0) discard;
-  if(uTheme>.5 && uLightGlass>.5) {
-    // The same biconvex solid used by the forward sunlight and reverse camera
-    // rays. Reflected window light reveals curvature without a luminous outline.
-    float dayThickness=min(14.0,min(halfSize.x,halfSize.y)*.5);
-    vec3 soap=soapSurface(p,halfSize,radius,dayThickness);
-    vec3 normal=normalize(vec3(-soap.xy,1));
-    vec3 view=normalize(vec3((uPointer.xy-.5)*uLift*.025,1));
-    vec3 reflected=reflect(-view,normal);
-    float f0=pow((uGlass.x-1.0)/(uGlass.x+1.0),2.0);
-    float F=f0+(1.0-f0)*pow(1.0-max(dot(normal,view),0.0),5.0);
-    // Broad daylight window on one side; a quieter room on the opposite side.
-    float windowLight=exp(-pow((reflected.x+.48)/.55,2.0)-pow((reflected.y+.60)/.85,2.0));
-    float frame=exp(-pow((reflected.x+.12)/.065,2.0))*windowLight;
-    vec3 room=mix(vec3(.22,.29,.30),vec3(.99,1.0,.98),windowLight);
-    room-=frame*.12;
-    float rolled=exp(-depth/3.0);
-    float lowerRim=max(dot(normal.xy,normalize(vec2(.55,.72))),0.0);
-    float alpha=(F*.62+.025+rolled*lowerRim*.12)*coverage;
-    vec3 radiance=room*alpha;
-    // Finite thickness causes a narrow, cool transmission edge. It remains
-    // inside the solid and has no external blur, halo or diffuse shadow.
-    radiance+=vec3(.96,.99,1.0)*windowLight*F*.10*coverage;
-    outColor=vec4(radiance,alpha);
+  if (coverage <= 0.0) {
+    if(uTheme<.5 || uLightGlass<.5) discard;
+    // The same directional daylight that enters the glass projects its shadow
+    // and dispersed caustic onto the dashboard plane. The projection is sampled
+    // outside the DOM bounds on this shared canvas, so neighbouring surfaces can
+    // receive it instead of clipping every pattern to its source card.
+    vec2 sunDirection=normalize(vec2(-.42,-.72));
+    vec2 tangent=vec2(-sunDirection.y,sunDirection.x);
+    float elevation=2.5+uLift*13.5;
+    vec2 projection=sunDirection*(3.5+elevation*1.18);
+    vec2 q=p-projection;
+    float projectedD=boxSDF(q,halfSize,radius);
+    float blur=3.2+elevation*.38;
+    float shadow=(1.0-smoothstep(-blur,blur*1.7,projectedD))
+      *exp(-max(projectedD,0.0)*max(projectedD,0.0)/(blur*blur*3.5));
+    shadow*=.075*(1.0-.38*uLift);
+    float projectedDepth=max(-projectedD,0.0);
+    // Outside the material we need only the projected envelope. Reusing the
+    // analytic shoulder depth avoids evaluating the full soap volume in every
+    // overscan pixel while preserving its contour and directional normal.
+    float slope=exp(-projectedDepth/max(thickness*.72,1.0));
+    float focusDepth=2.3+elevation*.42+min(8.0,slope*thickness*.55);
+    float width=2.2+elevation*.20;
+    float materialPhase=(1.0-slope)*5.4+dot(q,tangent)*.011;
+    vec2 projectedNormal=roundedSurfaceNormal(clamp(q,-halfSize,halfSize),halfSize,radius);
+    float directionalFocus=.03+.97*pow(max(dot(projectedNormal,sunDirection),0.0),1.35);
+    float concentration=(.78+.22*cos(materialPhase))*directionalFocus;
+    float split=.72+uLift*.72;
+    vec3 spectralDepth=vec3(
+      max(-boxSDF(q+tangent*split,halfSize,radius),0.0),
+      projectedDepth,
+      max(-boxSDF(q-tangent*split,halfSize,radius),0.0));
+    vec3 caustic=exp(-pow((spectralDepth-vec3(focusDepth))/width,vec3(2.0)))
+      *concentration*smoothstep(-1.0,2.0,projectedDepth);
+    float reach=1.0-smoothstep(24.0+elevation*.45,34.0+elevation*.55,length(max(abs(p)-halfSize,vec2(0))));
+    caustic*=reach*(.062+.035*uLift);
+    float causticAlpha=clamp(max(max(caustic.r,caustic.g),caustic.b)*.58,0.0,.14);
+    float alpha=1.0-(1.0-shadow)*(1.0-causticAlpha);
+    vec3 causticColor=caustic*vec3(.38,.56,.60)+caustic.bgr*vec3(.055,.018,.028);
+    outColor=vec4(causticColor,alpha);
     return;
   }
   // Keep the exact rounded silhouette, but move all optical shading onto a
@@ -431,7 +447,7 @@ void main() {
     float solarFocus=pow(max(dot(N,sunL),0.0),7.0)*shoulder;
     vec3 daylightBody=mix(vec3(.045,.12,.14),vec3(.18,.34,.34),daylightFresnel);
     vec3 daylightRadiance=daylightBody*daylightAlpha;
-    daylightRadiance+=caustic*vec3(.060,.080,.086)*spectralReach*rimDirection*(.78+solarFocus);
+    daylightRadiance+=caustic*vec3(.028,.038,.043)*spectralReach*rimDirection*(.72+solarFocus);
     daylightRadiance+=vec3(.66,.80,.78)*solarFocus*.034;
     outColor=vec4(daylightRadiance,daylightAlpha);
   }

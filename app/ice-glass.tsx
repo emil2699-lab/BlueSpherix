@@ -6,7 +6,6 @@ import { glassFragment, glassVertex } from "./ice-glass-shader";
 import { coatingProgress, useGlassSelection } from "./glass-selection";
 import { soapSample } from "./ice-glass-volume";
 import { switchRect } from "./glass-switch-motion";
-import { DaylightRenderer, LensFilters } from "./ice-glass-daylight-renderer";
 
 type ViewportRect = { left: number; top: number; width: number; height: number };
 type GlassRect = ViewportRect & { right: number; bottom: number };
@@ -20,7 +19,6 @@ const BUFFER_PIXEL_BUDGET = 8_388_608;
 export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const coatings = useGlassSelection(rootRef);
-  const lensDefsRef = useRef<SVGDefsElement>(null);
   useEffect(() => {
     const canvas = canvasRef.current;
     const root = rootRef.current;
@@ -47,18 +45,16 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     let resize: ResizeObserver | null = null;
     const observedSurfaces = new Set<Element>();
     const pointer = { x: -10000, y: -10000, presence: 0 };
-    const lifts = new Map<HTMLElement,{ value: number; updated: number; target: number }>();
+    const lifts = new Map<HTMLElement,{ value: number; updated: number }>();
     const reduced = matchMedia("(prefers-reduced-motion: reduce)");
-    let daylight: DaylightRenderer | null = null;
-    let daylightUnavailable=false;
-    const lensFilters = lensDefsRef.current ? new LensFilters(lensDefsRef.current) : null;
+    const refraction = document.getElementById("ice-glass-refraction-map") as SVGFEDisplacementMapElement | null;
+    const refractionOffset = document.getElementById("ice-glass-refraction-offset") as SVGFEOffsetElement | null;
     const locations = new Map<string, WebGLUniformLocation | null>();
     const uniform = (name: string) => {
       if (!locations.has(name)) locations.set(name, gl.getUniformLocation(program!, name));
       return locations.get(name)!;
     };
     const dispose = () => {
-      daylight?.dispose(); daylight = null; daylightUnavailable=false;
       shaders.forEach((shader) => gl.deleteShader(shader));
       shaders = [];
       if (program) gl.deleteProgram(program);
@@ -145,7 +141,6 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       cards = cards.filter(card=>card.rect.width>0 && card.rect.height>0);
       const currentElements=new Set(cards.map(card=>card.element));
       for(const element of lifts.keys()) if(!currentElements.has(element)) lifts.delete(element);
-      lensFilters?.prune(currentElements);
       dirty = false;
     };
     const fitDrawingBuffer = (quality = 1) => {
@@ -189,37 +184,6 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       if (root.hidden) return;
       gl.useProgram(program);
       gl.bindVertexArray(vao);
-      let liftMoving = false;
-      const pointerX=pointer.x-viewport.left, pointerY=pointer.y-viewport.top;
-      const dayCards=lightMode ? cards.filter(({element,rect})=>element.matches(LIFTABLE_SURFACE_SELECTOR)
-        && rect.bottom> -100 && rect.top<viewHeight+100 && rect.right> -100 && rect.left<viewWidth+100) : [];
-      for(const {element,rect,radius} of dayCards) {
-        const hovered=pointer.presence>0 && pointerX>=rect.left && pointerX<=rect.right && pointerY>=rect.top && pointerY<=rect.bottom;
-        let state=lifts.get(element);
-        if(!state) { state={value:0,updated:time,target:0}; lifts.set(element,state); }
-        const target=hovered && !reduced.matches ? 1 : 0;
-        // Start at the interaction, not at the last frame rendered while idle.
-        if(target!==state.target) { state.target=target;state.updated=time; }
-        const elapsed=Math.max(0,time-state.updated);
-        state.value+=(target-state.value)*(1-Math.exp(-elapsed/(target>.5 ? 145 : 220)));
-        state.updated=time;
-        if(reduced.matches)state.value=0;
-        if(Math.abs(target-state.value)<.002)state.value=target;else liftMoving=true;
-        lensFilters?.update(element,{width:rect.width,height:rect.height,radius},state.value);
-      }
-      if(lightMode && !daylightUnavailable) {
-        try {
-          daylight ??= new DaylightRenderer(gl);
-          daylight.update(width,height,dpr,dayCards.map(({element,rect,radius}) =>
-            ({...rect,radius,lift:lifts.get(element)?.value ?? 0})));
-        } catch(error) {
-          console.warn("Ice Glass daylight uses the material fallback:",error);
-          daylight?.dispose();daylight=null;daylightUnavailable=true;
-          gl.disable(gl.RASTERIZER_DISCARD);gl.bindFramebuffer(gl.FRAMEBUFFER,null);
-          gl.viewport(0,0,width,height);
-        }
-        gl.useProgram(program);gl.bindVertexArray(vao);
-      }
       gl.uniform2f(uniform("uResolution"), width, height);
       gl.uniform1f(uniform("uDPR"),dpr);
       gl.uniform3f(uniform("uLight"),pointer.x-viewport.left,pointer.y-viewport.top,reduced.matches ? 0 : pointer.presence);
@@ -229,10 +193,11 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       gl.uniform4f(uniform("uEnergy"),config.ambientReflection,config.lightIntensity,config.lightHeight,config.lightFalloff);
       gl.uniform3f(uniform("uFinish"),config.specularSharpness,config.bloomIntensity,config.bloomRadius);
       gl.uniform1f(uniform("uTheme"),lightMode ? 1 : 0);
-      gl.blendFunc(gl.ONE,gl.ONE_MINUS_SRC_ALPHA);
       gl.enable(gl.SCISSOR_TEST);
       let coatingMoving = false;
       let underlightMoving = false;
+      let liftMoving = false;
+      let refracting: { lift: number; x: number; y: number } | null = null;
       // Multiple checked controls retain their own glass and underlight. Keep
       // the existing neighbouring-rim pass anchored to the latest active choice.
       // Reuse measurements; this adds no DOM reads to pointer frames.
@@ -264,10 +229,22 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         const liftable = element.matches(LIFTABLE_SURFACE_SELECTOR);
         const pointerX=pointer.x-viewport.left, pointerY=pointer.y-viewport.top;
         const hovered=lightMode && liftable && pointer.presence>0 && pointerX>=rect.left && pointerX<=rect.right && pointerY>=rect.top && pointerY<=rect.bottom;
-        const lift=lightMode ? lifts.get(element)?.value ?? 0 : 0;
+        let liftState=lifts.get(element);
+        if(!liftState) { liftState={ value: 0, updated: time }; lifts.set(element,liftState); }
+        const liftTarget=hovered && !reduced.matches ? 1 : 0;
+        const elapsed=Math.min(64,Math.max(0,time-liftState.updated));
+        const response=1-Math.exp(-elapsed/(liftTarget>.5 ? 118 : 185));
+        liftState.value+= (liftTarget-liftState.value)*response;
+        liftState.updated=time;
+        if(Math.abs(liftTarget-liftState.value)<.002) liftState.value=liftTarget;
+        else liftMoving=true;
+        const lift=liftState.value;
         const localX=Math.max(0,Math.min(1,(pointerX-rect.left)/Math.max(rect.width,1)));
         const localY=Math.max(0,Math.min(1,(pointerY-rect.top)/Math.max(rect.height,1)));
-        const drawRect=rect;
+        if(hovered) refracting={ lift, x: localX, y: localY };
+        const projectionPad=lightMode && liftable ? 38+lift*10 : 0;
+        const drawRect={ left:rect.left-projectionPad, top:rect.top-projectionPad, width:rect.width+projectionPad*2,
+          height:rect.height+projectionPad*2, right:rect.right+projectionPad, bottom:rect.bottom+projectionPad };
         if (drawRect.bottom <= 0 || drawRect.top >= viewHeight || drawRect.right <= 0 || drawRect.left >= viewWidth || !rect.width) continue;
         // A scissored full-card quad keeps the slab continuous while avoiding work outside it.
         gl.viewport(0,0,width,height);
@@ -300,7 +277,13 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         gl.uniform3f(uniform("uTint"),tint[0],tint[1],tint[2]);
         gl.drawArrays(gl.TRIANGLES,0,6);
       }
-      if(lightMode)daylight?.composite(width,height,viewWidth,viewHeight,dpr);
+      if(refracting && !reduced.matches) {
+        const edge=Math.min(1,Math.hypot((refracting.x-.5)*1.35,(refracting.y-.5)*1.35));
+        const scale=1.2+refracting.lift*(2.45+edge*1.25);
+        refraction?.setAttribute("scale",scale.toFixed(3));
+        refractionOffset?.setAttribute("dx",((refracting.x-.5)*refracting.lift*.8).toFixed(3));
+        refractionOffset?.setAttribute("dy",((refracting.y-.5)*refracting.lift*.8).toFixed(3));
+      }
       if (root.dataset.iceGlass !== "ready") root.dataset.iceGlass = "ready";
       canvas.dataset.pointer = `${pointer.x},${pointer.y}`;
       // Adapt resolution only under sustained activity, never interpolate position.
@@ -345,9 +328,8 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       pointer.x = event.clientX; pointer.y = event.clientY; pointer.presence = 1;
       schedule();
     };
-    const blur = () => { pointer.presence = 0; schedule(); };
-    const leave = (event: PointerEvent) => { if (!event.relatedTarget) blur(); };
-    const visibility = () => { if (document.hidden) { pointer.presence=0; clearTimeout(underlightTimer); underlightTimer = undefined; cancelAnimationFrame(frame); frame = 0; } else invalidate(); };
+    const leave = (event: PointerEvent) => { if (!event.relatedTarget) { pointer.presence = 0; schedule(); } };
+    const visibility = () => { if (document.hidden) { clearTimeout(underlightTimer); underlightTimer = undefined; cancelAnimationFrame(frame); frame = 0; } else invalidate(); };
     const contextLost = (event: Event) => {
       event.preventDefault();lost=true;clearTimeout(underlightTimer);underlightTimer=undefined;cancelAnimationFrame(frame);frame=0;
       // Release references while the context is lost. After restoration these
@@ -362,22 +344,16 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     resize.observe(root);
     syncObservedSurfaces();
     const mutation = new MutationObserver(records => {
-      const withoutLens = (style: string | null) => (style ?? "").split(";").map(s=>s.trim())
-        .filter(s=>s && !/^--glass-lens\s*:/.test(s)).join(";");
-      const layoutRecords=records.filter(record=>record.target!==canvas && !lensDefsRef.current?.contains(record.target)
-        && !(record.attributeName==="style" && record.target instanceof HTMLElement
-          && withoutLens(record.oldValue)===withoutLens(record.target.getAttribute("style"))));
-      if(!layoutRecords.length)return;
+      if(records.every(record=>record.target===canvas))return;
       syncObservedSurfaces();
       // A coating changes material coverage, not layout. Reuse cached rectangles.
-      if (layoutRecords.every(record => record.attributeName === "data-glass-selection")) invalidate();
+      if (records.every(record => record.attributeName === "data-glass-selection")) invalidate();
       else settleLayout();
     });
-    mutation.observe(root,{ childList: true, subtree: true, attributes: true, attributeOldValue: true, attributeFilter: ["hidden", "class", "style", "data-glass-selection", "data-glass-underlight"] });
+    mutation.observe(root,{ childList: true, subtree: true, attributes: true, attributeFilter: ["hidden", "class", "style", "data-glass-selection", "data-glass-underlight"] });
     window.addEventListener("pointermove",move,{passive:true});
     window.addEventListener("pointerrawupdate",move,{passive:true});
     window.addEventListener("pointerout",leave,{passive:true});
-    window.addEventListener("blur",blur);
     window.addEventListener("resize",settleLayout,{passive:true});
     window.addEventListener("scroll",invalidate,{passive:true,capture:true});
     window.visualViewport?.addEventListener("resize",settleLayout,{passive:true});
@@ -395,20 +371,26 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       clearTimeout(underlightTimer); cancelAnimationFrame(frame); resize?.disconnect(); mutation.disconnect();
       resolutionQuery?.removeEventListener("change",resolutionChanged);
       window.removeEventListener("pointermove",move); window.removeEventListener("pointerrawupdate",move);
-      window.removeEventListener("pointerout",leave); window.removeEventListener("blur",blur); window.removeEventListener("resize",settleLayout);
+      window.removeEventListener("pointerout",leave); window.removeEventListener("resize",settleLayout);
       window.removeEventListener("scroll",invalidate,true); root.removeEventListener("transitionrun",settleLayout); root.removeEventListener("transitionend",invalidate);
       root.removeEventListener("glassswitchmotion",settleLayout);
       window.visualViewport?.removeEventListener("resize",settleLayout); window.visualViewport?.removeEventListener("scroll",invalidate);
       document.removeEventListener("visibilitychange",visibility); reduced.removeEventListener("change",schedule);
       window.removeEventListener("bluespherix:theme",themeChanged);
       canvas.removeEventListener("webglcontextlost",contextLost); canvas.removeEventListener("webglcontextrestored",contextRestored);
-      lensFilters?.dispose(); delete root.dataset.iceGlass;dispose();
+      delete root.dataset.iceGlass;dispose();
     };
   },[rootRef, coatings]);
   return <>
     <canvas ref={canvasRef} className="ice-glass-canvas" aria-hidden="true" />
     <svg className="ice-glass-refraction-defs" aria-hidden="true">
-      <defs ref={lensDefsRef} />
+      <defs>
+        <filter id="ice-glass-refraction" x="-4%" y="-6%" width="108%" height="112%" colorInterpolationFilters="sRGB">
+          <feImage href="ice-glass-normal-map.png" x="0%" y="0%" width="100%" height="100%" preserveAspectRatio="none" result="soapNormals" />
+          <feDisplacementMap id="ice-glass-refraction-map" in="SourceGraphic" in2="soapNormals" scale="1.1" xChannelSelector="R" yChannelSelector="G" result="refractedColor" />
+          <feOffset id="ice-glass-refraction-offset" in="refractedColor" dx="0" dy="0" />
+        </filter>
+      </defs>
     </svg>
   </>;
 }
