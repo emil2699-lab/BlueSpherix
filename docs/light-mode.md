@@ -37,16 +37,19 @@ Lo shader mantiene la stessa SDF arrotondata e lo stesso campo di altezza
 convesso `soapSurface`. In Light Mode il quad di ogni card principale include
 un piccolo overscan. I frammenti interni disegnano volume, rifrazione Snell,
 Fresnel e dispersione; i frammenti esterni proiettano sul piano della dashboard
-ombra e caustica usando la stessa silhouette, la stessa direzione solare e la
+solo la caustica usando la stessa silhouette, la stessa direzione solare e la
 stessa separazione RGB. Il contributo esterno non viene ritagliato dal DOM della
 card e può quindi raggiungere lo spazio o una superficie vicina.
+Le ombre proiettate sono rimosse sia dallo shader sia dal fallback CSS delle
+card. Il compositing della caustica aggiunge luce in ogni canale, evitando
+frange scure dovute alla copertura alfa dei canali meno intensi.
 
 Il sollevamento è un valore continuo per card lungo l'asse Z, verso lo
 spettatore: corsa di 16 px e distanza prospettica di 900 px. La proiezione
 `900 / (900 - altezza)` espande solo il volume e il suo labbro attorno al centro
 fisso della card, senza traslazioni X/Y, inclinazioni o trasformazioni del DOM.
 Testi, immagini, controlli e hit area rimangono sulla base. La stessa progressione
-guida proiezione della luce e rifrazione; caustiche e ombra restano sul piano
+guida proiezione della luce e rifrazione; le caustiche restano sul piano
 della dashboard. Con `prefers-reduced-motion` il valore resta a zero e il filtro
 dinamico viene disattivato. Il ritorno usa la stessa proiezione inversa.
 

@@ -272,8 +272,9 @@ void main() {
     min(halfSize.x,halfSize.y)*.50);
   if (coverage <= 0.0) {
     if(uTheme<.5 || uLightGlass<.5) discard;
-    // The same directional daylight that enters the glass projects its shadow
-    // and dispersed caustic onto the dashboard plane. The projection is sampled
+    // The same directional daylight that enters the glass projects its
+    // dispersed caustic onto the dashboard plane, without a cast shadow.
+    // The projection is sampled
     // outside the DOM bounds on this shared canvas, so neighbouring surfaces can
     // receive it instead of clipping every pattern to its source card.
     vec2 sunDirection=normalize(vec2(-.42,-.72));
@@ -283,10 +284,6 @@ void main() {
     // Receiver patterns stay on the base, not on the advancing glass plane.
     vec2 q=basePoint-projection;
     float projectedD=boxSDF(q,halfSize,radius);
-    float blur=3.2+elevation*.38;
-    float shadow=(1.0-smoothstep(-blur,blur*1.7,projectedD))
-      *exp(-max(projectedD,0.0)*max(projectedD,0.0)/(blur*blur*3.5));
-    shadow*=.075*(1.0-.38*uLift);
     float projectedDepth=max(-projectedD,0.0);
     // Outside the material we need only the projected envelope. Reusing the
     // analytic shoulder depth avoids evaluating the full soap volume in every
@@ -308,9 +305,10 @@ void main() {
     float reach=1.0-smoothstep(24.0+elevation*.45,34.0+elevation*.55,length(max(abs(basePoint)-halfSize,vec2(0))));
     caustic*=reach*(.062+.035*uLift);
     float causticAlpha=clamp(max(max(caustic.r,caustic.g),caustic.b)*.58,0.0,.14);
-    float alpha=1.0-(1.0-shadow)*(1.0-causticAlpha);
     vec3 causticColor=caustic*vec3(.38,.56,.60)+caustic.bgr*vec3(.055,.018,.028);
-    outColor=vec4(causticColor,alpha);
+    // Premultiplied coverage must add light in every channel. Otherwise the
+    // dimmer spectral channels darken the base and leave a shadow-like fringe.
+    outColor=vec4(vec3(causticAlpha)+causticColor,causticAlpha);
     return;
   }
   // Keep the exact rounded silhouette, but move all optical shading onto a
