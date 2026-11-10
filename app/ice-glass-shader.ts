@@ -108,9 +108,10 @@ uniform vec4 uEnergy; // ambient, intensity, light height, falloff
 uniform vec3 uFinish; // sharpness, bloom intensity, bloom radius
 uniform float uTheme; // 0: preserved dark room, 1: daylight room
 uniform float uLift;
+uniform float uLiftDistance;
+uniform float uProjection; // viewer-facing perspective, centred on the base
 uniform float uLightGlass;
 uniform float uDaylightThickness;
-uniform vec3 uPointer; // local 0..1 position and presence over this surface
 
 ${glassGeometry}
 vec3 environment(vec3 ray) {
@@ -251,14 +252,18 @@ vec3 underlightSpill(vec2 pixel, float depth) {
 void main() {
   vec2 pixel = vec2(gl_FragCoord.x/uDPR, (uResolution.y-gl_FragCoord.y)/uDPR);
   vec2 halfSize = uRect.zw*.5;
-  vec2 p = pixel-uRect.xy-halfSize;
+  vec2 basePoint = pixel-uRect.xy-halfSize;
+  // Inverse perspective maps the projected glass back to its material plane.
+  // The centre never drifts, and the DOM/base rectangle is not transformed.
+  float projectionScale=max(uProjection,1.0);
+  vec2 p = basePoint/projectionScale;
   // A soap volume needs a broad shoulder and rolled corners, rather than the
   // narrow fillet of the original flat slab. Keep its bounding rectangle fixed.
   float daylightCard = uTheme*uLightGlass;
   float radius = min(min(halfSize.x,halfSize.y)*.95,
     mix(max(uRadius*1.75,24.0),uRadius,daylightCard));
   float d = boxSDF(p,halfSize,radius);
-  float aa = 1.25/uDPR;
+  float aa = 1.25/(uDPR*projectionScale);
   float coverage = 1.0-smoothstep(-aa,0.0,d);
   float depth = -d;
   // All daylight cards share the reference notice's optical section, even
@@ -273,9 +278,10 @@ void main() {
     // receive it instead of clipping every pattern to its source card.
     vec2 sunDirection=normalize(vec2(-.42,-.72));
     vec2 tangent=vec2(-sunDirection.y,sunDirection.x);
-    float elevation=2.5+uLift*13.5;
+    float elevation=2.5+uLift*uLiftDistance;
     vec2 projection=sunDirection*(3.5+elevation*1.18);
-    vec2 q=p-projection;
+    // Receiver patterns stay on the base, not on the advancing glass plane.
+    vec2 q=basePoint-projection;
     float projectedD=boxSDF(q,halfSize,radius);
     float blur=3.2+elevation*.38;
     float shadow=(1.0-smoothstep(-blur,blur*1.7,projectedD))
@@ -299,7 +305,7 @@ void main() {
       max(-boxSDF(q-tangent*split,halfSize,radius),0.0));
     vec3 caustic=exp(-pow((spectralDepth-vec3(focusDepth))/width,vec3(2.0)))
       *concentration*smoothstep(-1.0,2.0,projectedDepth);
-    float reach=1.0-smoothstep(24.0+elevation*.45,34.0+elevation*.55,length(max(abs(p)-halfSize,vec2(0))));
+    float reach=1.0-smoothstep(24.0+elevation*.45,34.0+elevation*.55,length(max(abs(basePoint)-halfSize,vec2(0))));
     caustic*=reach*(.062+.035*uLift);
     float causticAlpha=clamp(max(max(caustic.r,caustic.g),caustic.b)*.58,0.0,.14);
     float alpha=1.0-(1.0-shadow)*(1.0-causticAlpha);
@@ -335,8 +341,6 @@ void main() {
   // into the vertical sides so it cannot cut a crease into the outer silhouette.
   vec2 normalXY = -surface.xy + waveGradient*3.2*bevel*smoothstep(0.0,thickness*.4,depth);
   vec3 N = normalize(vec3(normalXY*volume,1.0));
-  vec2 pointerTilt=(uPointer.xy-.5)*uPointer.z*uLift;
-  N=normalize(vec3(N.xy+pointerTilt*.055,N.z));
   vec3 V = vec3(0,0,1);
   vec3 delta = vec3(uLight.xy-pixel,max(uEnergy.z-surfaceHeight,1.0));
   float distanceXY = length(delta.xy);
@@ -456,6 +460,15 @@ void main() {
     daylightRadiance+=caustic*vec3(.028,.038,.043)*spectralReach*rimDirection*(.72+solarFocus);
     daylightRadiance+=vec3(.66,.80,.78)*solarFocus*.034;
     outColor=vec4(daylightRadiance,daylightAlpha);
+    if(uLightGlass>.5) {
+      // The polished lip belongs to this same projected volume. Keeping it in
+      // the material avoids a second, stationary CSS outline on the base.
+      float upperLip=pow(max(-surfaceNormal.y,0.0),1.5)*.52;
+      float sideLip=max(-surfaceNormal.x,0.0)*.12;
+      float polish=exp(-pow((depth-1.8)/3.0,2.0))*(upperLip+sideLip)*coverage;
+      outColor=vec4(vec3(polish)+outColor.rgb*(1.0-polish),
+        polish+outColor.a*(1.0-polish));
+    }
   }
   if(uSpill.w>.5 && depth<26.0) outColor.rgb+=underlightSpill(pixel,depth)*coverage;
   if(uUnderlight.x>0.0 && uCoating.y>.5) {

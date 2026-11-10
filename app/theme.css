@@ -83,19 +83,21 @@ html[data-theme="light"] .content:not([data-ice-glass="ready"]) :is(.glass-card,
 }
 html[data-theme="light"] .content[data-ice-glass="ready"] :is(.glass-card,.calendar-strip,.demo-notice) {
   background: transparent;
-  /* The polished upper lip stays visible at rest, including on tall panels.
-     All shading is inset: no extra drop shadow around the cards. The shared
-     WebGL material continues to supply the moving optical response. */
-  box-shadow:
-    inset 0 7px 9px -7px rgb(255 255 255 / .96),
-    inset 1px 0 3px rgb(255 255 255 / .34),
-    inset -1px -2px 4px rgb(42 76 78 / .025);
+  /* Geometry and the polished lip advance together on the shared canvas.
+     The DOM stays on the base, including while its pixels are refracted. */
+  box-shadow: none;
+  transform: none !important;
 }
 html[data-theme="light"] .content[data-ice-glass="ready"] .glass-card:not(.timeline-card):not(.trade-inspector):hover,
 html[data-theme="light"] .content[data-ice-glass="ready"] :is(.calendar-strip,.demo-notice):hover {
-  transform: translateY(-5px) scale(1.001) !important;
   filter: url("#ice-glass-refraction");
   z-index: 3;
+}
+/* Card hover must not carry decorative content off the base with the glass. */
+html[data-theme="light"] .content[data-ice-glass="ready"] .analytics-kpis article:hover .analytics-icon,
+html[data-theme="light"] .content[data-ice-glass="ready"] .account-card:hover .account-identity > span {
+  transform: none;
+  box-shadow: none;
 }
 .ice-glass-refraction-defs { position: absolute !important; width: 0; height: 0; overflow: hidden; pointer-events: none; }
 

@@ -15,10 +15,10 @@ non cresce con l'altezza di grafici e tabelle: bordi e riflessi mantengono la
 stessa scala sui pannelli grandi e sulle card compatte. Il raggio CSS viene
 usato anche dalla SDF, mentre la CPU calcola l'altezza centrale con lo stesso
 spessore del materiale. Layout, padding e dimensioni restano invariati.
-Il labbro superiore lucidato usa una luce CSS interna e asimmetrica, visibile
-anche a riposo; lo shader continua a disegnare il materiale ottico e la sua
-risposta dinamica. Questo accento non aggiunge ombre esterne e non viene
-presentato come rifrazione o caustica.
+Il labbro superiore lucidato viene disegnato nello stesso shader del volume,
+con un riflesso asimmetrico sempre visibile. Avanza insieme al vetro, senza
+lasciare un secondo contorno CSS sulla base. Questo accento non aggiunge ombre
+esterne e non viene presentato come rifrazione o caustica.
 
 La calibrazione riguarda solo le card in modalità chiara. Profilo scuro,
 controlli selezionati e switch mantengono i parametri precedenti. Non vengono
@@ -41,10 +41,21 @@ ombra e caustica usando la stessa silhouette, la stessa direzione solare e la
 stessa separazione RGB. Il contributo esterno non viene ritagliato dal DOM della
 card e può quindi raggiungere lo spazio o una superficie vicina.
 
-Il sollevamento è un valore continuo per card. Modifica insieme distanza della
-proiezione, morbidezza dell'ombra, fuoco della caustica, normale ottica e
-trasformazione visiva del contenitore. Con `prefers-reduced-motion` il valore
-resta a zero e il filtro dinamico viene disattivato.
+Il sollevamento è un valore continuo per card lungo l'asse Z, verso lo
+spettatore: corsa di 16 px e distanza prospettica di 900 px. La proiezione
+`900 / (900 - altezza)` espande solo il volume e il suo labbro attorno al centro
+fisso della card, senza traslazioni X/Y, inclinazioni o trasformazioni del DOM.
+Testi, immagini, controlli e hit area rimangono sulla base. La stessa progressione
+guida proiezione della luce e rifrazione; caustiche e ombra restano sul piano
+della dashboard. Con `prefers-reduced-motion` il valore resta a zero e il filtro
+dinamico viene disattivato. Il ritorno usa la stessa proiezione inversa.
+
+Verifica del movimento: otto viste in Chromium, rettangoli DOM di card, testi
+e SVG invariati durante l'hover, avanzamento monotono e ritorno alla proiezione
+iniziale. Le vecchie animazioni di sollevamento delle icone in Analisi e degli
+avatar del Portafoglio sono disattivate solo nel tema chiaro. Confronto pixel
+scuro identico a riposo e in hover; controllati anche movimento ridotto, fallback
+senza WebGL, comandi del calendario e assenza di overflow a 1024 e 390 px.
 
 ## Rifrazione del contenuto DOM
 

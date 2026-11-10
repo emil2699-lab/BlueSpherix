@@ -4,6 +4,9 @@ export const ICE_GLASS = {
   glassThickness: 14,
   // Match the shallow convex section of the calendar's reference notice.
   daylightThickness: 12,
+  // Travel along the viewer-facing Z axis; perspective affects glass only.
+  daylightLift: 16,
+  daylightPerspective: 900,
   glassRoughness: .21,
   glassOpacity: .58,
   glassBodyOpacity: .14,

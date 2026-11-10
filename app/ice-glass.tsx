@@ -195,6 +195,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       gl.uniform3f(uniform("uFinish"),config.specularSharpness,config.bloomIntensity,config.bloomRadius);
       gl.uniform1f(uniform("uTheme"),lightMode ? 1 : 0);
       gl.uniform1f(uniform("uDaylightThickness"),config.daylightThickness);
+      gl.uniform1f(uniform("uLiftDistance"),config.daylightLift);
       gl.enable(gl.SCISSOR_TEST);
       let coatingMoving = false;
       let underlightMoving = false;
@@ -244,9 +245,15 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         const localX=Math.max(0,Math.min(1,(pointerX-rect.left)/Math.max(rect.width,1)));
         const localY=Math.max(0,Math.min(1,(pointerY-rect.top)/Math.max(rect.height,1)));
         if(hovered) refracting={ lift, x: localX, y: localY };
+        // Project only the optical layer towards the viewer. Hit testing and
+        // DOM content keep the original rectangle, with no X/Y translation.
+        const projection=lightMode && liftable
+          ? config.daylightPerspective/(config.daylightPerspective-lift*config.daylightLift) : 1;
         const projectionPad=lightMode && liftable ? 38+lift*10 : 0;
-        const drawRect={ left:rect.left-projectionPad, top:rect.top-projectionPad, width:rect.width+projectionPad*2,
-          height:rect.height+projectionPad*2, right:rect.right+projectionPad, bottom:rect.bottom+projectionPad };
+        const padX=projectionPad+rect.width*(projection-1)*.5;
+        const padY=projectionPad+rect.height*(projection-1)*.5;
+        const drawRect={ left:rect.left-padX, top:rect.top-padY, width:rect.width+padX*2,
+          height:rect.height+padY*2, right:rect.right+padX, bottom:rect.bottom+padY };
         if (drawRect.bottom <= 0 || drawRect.top >= viewHeight || drawRect.right <= 0 || drawRect.left >= viewWidth || !rect.width) continue;
         // A scissored full-card quad keeps the slab continuous while avoiding work outside it.
         gl.viewport(0,0,width,height);
@@ -270,8 +277,8 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         gl.uniform4f(uniform("uDrawRect"),drawRect.left,drawRect.top,drawRect.width,drawRect.height);
         gl.uniform1f(uniform("uRadius"),radius);
         gl.uniform1f(uniform("uLift"),lift);
+        gl.uniform1f(uniform("uProjection"),projection);
         gl.uniform1f(uniform("uLightGlass"),liftable ? 1 : 0);
-        gl.uniform3f(uniform("uPointer"),localX,localY,hovered ? 1 : 0);
         const movingCrown = coating?.travel ? soapSample(0,0,rect.width*.5,rect.height*.5,
           Math.min(Math.min(rect.width,rect.height)*.475,Math.max(radius*1.75,24)),
           Math.min(config.glassThickness*2.1,Math.min(rect.width,rect.height)*.25))[2] : crownHeight;
