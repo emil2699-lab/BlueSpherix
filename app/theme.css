@@ -91,11 +91,6 @@ html[data-theme="light"] .content[data-ice-glass="ready"] :is(.glass-card,.calen
 html[data-theme="light"] .content[data-ice-glass="ready"] [data-ice-lens-active] {
   z-index: 3;
 }
-/* Safari keeps the live card in place for semantics and hit testing. Its
-   physically displaced image is painted by the shared optical canvas. */
-html[data-theme="light"] .content[data-ice-glass="ready"] [data-ice-lens-raster] {
-  opacity: 0 !important;
-}
 /* Card hover must not carry decorative content off the base with the glass. */
 html[data-theme="light"] .content[data-ice-glass="ready"] .analytics-kpis article:hover .analytics-icon,
 html[data-theme="light"] .content[data-ice-glass="ready"] .account-card:hover .account-identity > span {
@@ -107,7 +102,7 @@ html[data-theme="light"] .content[data-ice-glass="ready"] .account-card:hover .a
 /* The dark theme uses translucent white controls. In daylight these controls
    receive a neutral ink/frost treatment while semantic colours stay intact. */
 html[data-theme="light"] .content :is(
-  .range-switch,.comparison-choices label,.session-tabs button,
+  .equity-layout-picker button > i,.range-switch,.comparison-choices label,.session-tabs button,
   .session-score,.instrument-track,.dna-row > div,.risk-budget-track,.stress-tabs,
   .simulator-controls,.simulator-projection,.simulator-result,.risk-presets,.projection-track,
   .correlation-insight dl > div,.drawdown-readout dl > div,.monte-carlo-switch,
