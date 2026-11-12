@@ -2,15 +2,17 @@
 
 import { useEffect, useRef, type RefObject } from "react";
 import { ICE_GLASS as config } from "./ice-glass-config";
-import { glassFragment, glassVertex } from "./ice-glass-shader";
+import { glassFragment, glassGeometry, glassVertex } from "./ice-glass-shader";
 import { coatingProgress, useGlassSelection } from "./glass-selection";
 import { soapSample } from "./ice-glass-volume";
 import { createGlassLenses } from "./ice-glass-lens";
 import { switchRect } from "./glass-switch-motion";
+import { createDaylightCaustics, DAYLIGHT_GLASS, daylightPlanes } from "./daylight-glass";
+import { createDaylightParallax } from "./daylight-parallax";
 
 type ViewportRect = { left: number; top: number; width: number; height: number };
 type GlassRect = ViewportRect & { right: number; bottom: number };
-type Measurement = { element: HTMLElement; rect: GlassRect; radius: number; tint: number[]; crownHeight: number };
+type Measurement = { element: HTMLElement; rect: GlassRect; radius: number; tint: number[]; crownHeight: number; reference: boolean };
 const GLASS_SURFACE_SELECTOR = ".glass-card, .calendar-strip, .demo-notice, .heatmap button, [data-glass-selection], .glass-switch-thumb";
 const LIFTABLE_SURFACE_SELECTOR = ".glass-card, .calendar-strip, .demo-notice";
 // Keep the overscanned backing store below a conservative Safari allocation
@@ -29,6 +31,8 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     const gl = canvas.getContext("webgl2", { alpha: true, antialias: false, depth: false, premultipliedAlpha: true, powerPreference: "low-power" });
     if (!gl) return; // The original dark cards are the no-WebGL fallback.
     const lenses = createGlassLenses(definitions);
+    const parallax = createDaylightParallax();
+    let caustics: ReturnType<typeof createDaylightCaustics> | undefined;
     let program: WebGLProgram | null = null;
     let vao: WebGLVertexArrayObject | null = null;
     let shaders: WebGLShader[] = [];
@@ -49,7 +53,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     let resize: ResizeObserver | null = null;
     const observedSurfaces = new Set<Element>();
     const pointer = { x: -10000, y: -10000, presence: 0 };
-    const lifts = new Map<HTMLElement,{ value: number; updated: number }>();
+    const lifts = new Map<HTMLElement,{ value: number; updated: number; target?: number }>();
     const reduced = matchMedia("(prefers-reduced-motion: reduce)");
     const locations = new Map<string, WebGLUniformLocation | null>();
     const uniform = (name: string) => {
@@ -58,6 +62,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     };
     const dispose = () => {
       lenses.clear();
+      parallax.clear(); caustics?.dispose(); caustics=undefined;
       shaders.forEach((shader) => gl.deleteShader(shader));
       shaders = [];
       if (program) gl.deleteProgram(program);
@@ -91,6 +96,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         maxBufferWidth = Math.min(sideLimit,viewportLimits[0]);
         maxBufferHeight = Math.min(sideLimit,viewportLimits[1]);
         dprCap = config.maxDPR;
+        caustics = createDaylightCaustics(gl, glassGeometry);
       } catch (error) {
         console.warn("Ice Glass uses the dark-card fallback:", error);
         dispose();
@@ -140,12 +146,18 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         const opticalRadius=Math.min(Math.min(halfWidth,halfHeight)*.95,daylightCard ? radius : Math.max(radius*1.75,24));
         const thickness=Math.min(daylightCard ? config.daylightThickness : config.glassThickness*2.1,Math.min(halfWidth,halfHeight)*.5);
         const crownHeight=rect.width && rect.height ? soapSample(0,0,halfWidth,halfHeight,opticalRadius,thickness)[2] : 0;
-        return { element, rect, radius, tint, crownHeight };
+        const reference=!!element.closest('.today-dashboard') && element.matches(LIFTABLE_SURFACE_SELECTOR);
+        return { element, rect, radius, tint, crownHeight, reference };
       });
       cards = cards.filter(card=>card.rect.width>0 && card.rect.height>0);
       const currentElements=new Set(cards.map(card=>card.element));
       for(const element of lifts.keys()) if(!currentElements.has(element)) lifts.delete(element);
       lenses.retain(currentElements);
+      const daylight=document.documentElement.dataset.theme === "light";
+      const referenceElements=new Set(cards.filter(card=>daylight && card.reference).map(card=>card.element));
+      parallax.retain(referenceElements);
+      caustics?.retain(referenceElements);
+      for(const element of referenceElements) parallax.measure(element);
       dirty = false;
     };
     const fitDrawingBuffer = (quality = 1) => {
@@ -180,7 +192,8 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       // Daylight caustics extend beyond every silhouette. A modest shared raster
       // scale offsets that extra fill cost without creating a second render loop
       // or changing CSS-pixel geometry, pointer coordinates or optical lengths.
-      const buffer = fitDrawingBuffer(lightMode ? .82 : 1);
+      const referenceToday=lightMode && !!root.querySelector('.today-dashboard:not([hidden])');
+      const buffer = fitDrawingBuffer(referenceToday ? Math.min(1,1.25/(devicePixelRatio || 1)) : lightMode ? .82 : 1);
       if (!buffer) return;
       const { width, height } = buffer;
       gl.disable(gl.SCISSOR_TEST);
@@ -200,6 +213,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       gl.uniform1f(uniform("uTheme"),lightMode ? 1 : 0);
       gl.uniform1f(uniform("uDaylightThickness"),config.daylightThickness);
       gl.uniform1f(uniform("uLiftDistance"),config.daylightLift);
+      gl.uniform3f(uniform("uSun"),...DAYLIGHT_GLASS.sun);
       gl.enable(gl.SCISSOR_TEST);
       let coatingMoving = false;
       let underlightMoving = false;
@@ -225,7 +239,9 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       gl.uniform4f(uniform("uSpillRect"), emitterRect?.left ?? 0,emitterRect?.top ?? 0,emitterRect?.width ?? 1,emitterRect?.height ?? 1);
       gl.uniform2f(uniform("uSpillOrigin"),...(emission?.origin ?? [.5,.5] as [number,number]));
       gl.uniform3f(uniform("uSpillTint"),emissionTint[0],emissionTint[1],emissionTint[2]);
-      for (const { element, rect: measuredRect, radius, tint, crownHeight } of cards) {
+      for (const { element, rect: measuredRect, radius, tint, crownHeight, reference } of cards) {
+        const today=lightMode && !!element.closest('.today-dashboard');
+        const referenceGlass=lightMode && reference;
         const coating = coatings.current.get(element);
         const thumb = element.matches('.glass-switch-thumb');
         const thumbOn = thumb && (element.closest('.protection-switch')?.classList.contains('on')
@@ -238,7 +254,10 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         let liftState=lifts.get(element);
         if(!liftState) { liftState={ value: 0, updated: time }; lifts.set(element,liftState); }
         const liftTarget=hovered && !reduced.matches ? 1 : 0;
-        const elapsed=Math.min(64,Math.max(0,time-liftState.updated));
+        if(referenceGlass && reduced.matches) liftState.value=0;
+        if(referenceGlass && liftState.target!==liftTarget) liftState.updated=time-16;
+        liftState.target=liftTarget;
+        const elapsed=referenceGlass ? Math.max(0,time-liftState.updated) : Math.min(64,Math.max(0,time-liftState.updated));
         const response=1-Math.exp(-elapsed/(liftTarget>.5 ? 118 : 185));
         liftState.value+= (liftTarget-liftState.value)*response;
         liftState.updated=time;
@@ -247,15 +266,16 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         const lift=liftState.value;
         // Project only the optical layer towards the viewer. Hit testing and
         // DOM content keep the original rectangle, with no X/Y translation.
-        const projection=lightMode && liftable
+        const projection=referenceGlass ? daylightPlanes(lift).glassScale : lightMode && liftable
           ? config.daylightPerspective/(config.daylightPerspective-lift*config.daylightLift) : 1;
+        if(referenceGlass) parallax.update(element,lift);
         lenses.update(element,{
           width:rect.width,height:rect.height,
           radius:Math.min(rect.width*.475,rect.height*.475,radius),
           thickness:Math.min(config.daylightThickness,rect.width*.25,rect.height*.25),
           ior:config.glassIOR,distance:config.daylightLift,
-        },lightMode && liftable && !reduced.matches ? lift : 0,projection);
-        const projectionPad=lightMode && liftable ? 38+lift*10 : 0;
+        },lightMode && liftable && !referenceGlass && !reduced.matches ? lift : 0,projection);
+        const projectionPad=referenceGlass ? 72+lift*18 : lightMode && liftable ? 38+lift*10 : 0;
         const padX=projectionPad+rect.width*(projection-1)*.5;
         const padY=projectionPad+rect.height*(projection-1)*.5;
         const drawRect={ left:rect.left-padX, top:rect.top-padY, width:rect.width+padX*2,
@@ -267,12 +287,12 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         const [reveal, isControl, opacity, moving, volume] = coating ? coatingProgress(coating, time, reduced.matches) : [1, thumb ? 1 : 0, 1, 0, 1];
         gl.uniform1f(uniform("uControlBrightness"), coating?.luminous || thumb ? 1.5 : 1);
         coatingMoving ||= moving > 0;
-        const receivesSpill = !!(emitter && power > .35 && element.matches('.glass-card')
+        const receivesSpill = !!(!today && emitter && power > .35 && element.matches('.glass-card')
           && !element.contains(emitter.element) && !emitter.element.contains(element));
         gl.uniform4f(uniform("uSpill"),power,reduced.matches ? 0 : emission ? (time-emission.started)/1000 : 0,
           emissionPhase[0]*emissionPhase[2]*emissionPhase[4],receivesSpill ? 1 : 0);
         underlightMoving ||= receivesSpill && power > .35 && !reduced.matches && emission?.exiting === undefined;
-        const underlight = coating
+        const underlight = today ? 0 : coating
           ? Math.max(0, Math.min(1, Number(element.dataset.glassUnderlight ?? 1) || 0)) : thumbOn ? .45 : 0;
         underlightMoving ||= underlight > 0 && !reduced.matches && coating?.exiting === undefined;
         gl.uniform2f(uniform("uUnderlight"), underlight,
@@ -284,6 +304,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         gl.uniform1f(uniform("uRadius"),radius);
         gl.uniform1f(uniform("uLift"),lift);
         gl.uniform1f(uniform("uProjection"),projection);
+        gl.uniform1f(uniform("uReferenceGlass"),referenceGlass ? 1 : 0);
         gl.uniform1f(uniform("uLightGlass"),liftable ? 1 : 0);
         const movingCrown = coating?.travel ? soapSample(0,0,rect.width*.5,rect.height*.5,
           Math.min(Math.min(rect.width,rect.height)*.475,Math.max(radius*1.75,24)),
@@ -291,6 +312,10 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         gl.uniform1f(uniform("uCrownHeight"),movingCrown);
         gl.uniform3f(uniform("uTint"),tint[0],tint[1],tint[2]);
         gl.drawArrays(gl.TRIANGLES,0,6);
+        if(referenceGlass) {
+          caustics?.draw(element,width,height,dpr,rect,drawRect,radius,lift,config.glassIOR);
+          gl.useProgram(program);
+        }
       }
       if (root.dataset.iceGlass !== "ready") root.dataset.iceGlass = "ready";
       canvas.dataset.pointer = `${pointer.x},${pointer.y}`;
@@ -330,13 +355,23 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         if (!observedSurfaces.has(surface)) { resize.observe(surface); observedSurfaces.add(surface); }
       }
     };
+    let hoveredReference: HTMLElement | undefined;
     const move: EventListener = (nativeEvent) => {
       const event = nativeEvent as PointerEvent;
       if (event.pointerType === "touch" || root.hidden || reduced.matches) return;
       pointer.x = event.clientX; pointer.y = event.clientY; pointer.presence = 1;
+      const today=lightDaylight();
+      if(today) {
+        const x=event.clientX-viewport.left,y=event.clientY-viewport.top;
+        const next=cards.find(card=>card.reference && x>=card.rect.left && x<=card.rect.right && y>=card.rect.top && y<=card.rect.bottom)?.element;
+        if(next===hoveredReference) return;
+        hoveredReference=next;
+      }
       schedule();
     };
-    const leave = (event: PointerEvent) => { if (!event.relatedTarget) { pointer.presence = 0; schedule(); } };
+    const lightDaylight=()=>document.documentElement.dataset.theme === "light"
+      && !!root.querySelector('.today-dashboard:not([hidden])');
+    const leave = (event: PointerEvent) => { if (!event.relatedTarget) { pointer.presence = 0; hoveredReference=undefined; schedule(); } };
     const visibility = () => { if (document.hidden) { clearTimeout(underlightTimer); underlightTimer = undefined; cancelAnimationFrame(frame); frame = 0; } else invalidate(); };
     const contextLost = (event: Event) => {
       event.preventDefault();lost=true;clearTimeout(underlightTimer);underlightTimer=undefined;cancelAnimationFrame(frame);frame=0;
@@ -352,7 +387,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     resize.observe(root);
     syncObservedSurfaces();
     const mutation = new MutationObserver(records => {
-      if(records.every(record=>record.target===canvas || definitions.contains(record.target)))return;
+      if(records.every(record=>record.target===canvas || definitions.contains(record.target) || parallax.ownsMutation(record)))return;
       syncObservedSurfaces();
       // A coating changes material coverage, not layout. Reuse cached rectangles.
       if (records.every(record => record.attributeName === "data-glass-selection")) invalidate();

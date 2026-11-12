@@ -138,7 +138,7 @@ function EquityChart({ range }: { range: Range }) {
           <circle cx={equityEnd.x} cy={equityEnd.y} r="4.5" className="end-dot" />
         </g>
       </svg>
-      <div className="chart-axis"><span>Inizio</span><span>Metà periodo</span><span>Oggi</span></div>
+      <div className="chart-axis" data-glass-label><span>Inizio</span><span>Metà periodo</span><span>Oggi</span></div>
     </div>
   );
 }
@@ -147,8 +147,8 @@ function MetricCard({ label, value, detail, values, tone = "aqua", signValue, ic
   const color = tone === "violet" ? "#9f8cff" : tone === "amber" ? "#ffb85c" : "#56d9ca";
   return (
     <article className={`metric-card today-kpi glass-card ${tone}`}>
-      <span className="today-kpi-icon">{icon}</span>
-      <div><p>{label}</p><strong data-sign={signValue === undefined ? undefined : valueSign(signValue)}>{value}</strong><small>{detail}</small></div>
+      <span className="today-kpi-icon" data-glass-label>{icon}</span>
+      <div data-glass-label><p>{label}</p><strong data-sign={signValue === undefined ? undefined : valueSign(signValue)}>{value}</strong><small>{detail}</small></div>
       <MiniChart values={values} color={color} />
     </article>
   );
@@ -243,40 +243,40 @@ export default function Home() {
             <span className={`risk-live-status ${riskUsed < 80 ? "calm" : riskUsed < 100 ? "warning" : "critical"}`}><i /> Dati aggiornati · 28 ott, 18:42</span>
           </section>
 
-          <div className="demo-notice today-notice"><ShieldCheck size={16} /><span><strong>Riepilogo dimostrativo.</strong> Metriche, posizioni e segnali usano il ledger simulato; il collegamento MT5 aggiornerà questa vista in tempo reale.</span></div>
+          <div className="demo-notice today-notice"><ShieldCheck size={16} data-glass-label /><span data-glass-label><strong>Riepilogo dimostrativo.</strong> Metriche, posizioni e segnali usano il ledger simulato; il collegamento MT5 aggiornerà questa vista in tempo reale.</span></div>
 
           <section className="hero-grid today-hero">
             <article className={`equity-card glass-card equity-layout-${equityLayout}`}>
-              <div className="equity-layout-picker" role="group" aria-label="Proposte di layout per Equity totale">
+              <div className="equity-layout-picker" role="group" aria-label="Proposte di layout per Equity totale" data-glass-label>
                 <span>Composizione</span>
                 {equityLayouts.map((layout) => <button key={layout.id} type="button" aria-pressed={equityLayout === layout.id} className={equityLayout === layout.id ? "active" : ""} onClick={() => setEquityLayout(layout.id)}><i aria-hidden="true" /><span><strong>{layout.label}</strong><small>{layout.caption}</small></span></button>)}
               </div>
               <div className="equity-composition" key={equityLayout}>
-              <div className="card-head today-chart-head equity-story">
+              <div className="card-head today-chart-head equity-story" data-glass-label>
                 <div><p className="eyebrow">Equity totale</p><div className="equity-value"><strong>{money(ALPHA_ACCOUNT.equity)}</strong><span data-sign={valueSign(OPEN_PNL)}>{OPEN_PNL >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />} {signedMoney(OPEN_PNL)} oggi</span></div></div>
               </div>
-              <div className="today-chart-controls"><div className="range-switch" aria-label="Periodo grafico">{(["1W", "1M", "3M", "1Y"] as Range[]).map((item) => <button key={item} aria-pressed={range === item} className={range === item ? "active" : ""} onClick={() => setRange(item)}>{item}</button>)}</div><div className="legend"><span><i className="equity" /> Equity</span><span><i className="balance" /> Balance</span></div></div>
+              <div className="today-chart-controls" data-glass-label><div className="range-switch" aria-label="Periodo grafico">{(["1W", "1M", "3M", "1Y"] as Range[]).map((item) => <button key={item} aria-pressed={range === item} className={range === item ? "active" : ""} onClick={() => setRange(item)}>{item}</button>)}</div><div className="legend"><span><i className="equity" /> Equity</span><span><i className="balance" /> Balance</span></div></div>
               <EquityChart range={range} />
-              <div className="chart-summary"><div><span>Rendimento</span><strong data-sign={valueSign(DASHBOARD_RANGE_STATS[range].returnPct)}>{performance}</strong></div><div><span>Profitto netto</span><strong data-sign={valueSign(rangeProfit)}>{money(rangeProfit)}</strong></div><div><span>Data confidence</span><strong className="confidence"><ShieldCheck size={15} /> {DASHBOARD_RANGE_STATS[range].confidence}%</strong></div></div>
+              <div className="chart-summary" data-glass-label><div><span>Rendimento</span><strong data-sign={valueSign(DASHBOARD_RANGE_STATS[range].returnPct)}>{performance}</strong></div><div><span>Profitto netto</span><strong data-sign={valueSign(rangeProfit)}>{money(rangeProfit)}</strong></div><div><span>Data confidence</span><strong className="confidence"><ShieldCheck size={15} /> {DASHBOARD_RANGE_STATS[range].confidence}%</strong></div></div>
               </div>
             </article>
 
             <article className="today-risk-card glass-card">
-              <div className="section-head"><div><p className="eyebrow">Stato del rischio</p><h2>{riskState}</h2></div><span className={`status-badge ${riskUsed >= 80 ? "warning" : ""}`}><i /> {riskUsed >= 80 ? "Budget quasi pieno" : "Sotto controllo"}</span></div>
+              <div className="section-head" data-glass-label><div><p className="eyebrow">Stato del rischio</p><h2>{riskState}</h2></div><span className={`status-badge ${riskUsed >= 80 ? "warning" : ""}`}><i /> {riskUsed >= 80 ? "Budget quasi pieno" : "Sotto controllo"}</span></div>
               <div className="today-risk-sphere" aria-label={`Indice di rischio ${ALPHA_ACCOUNT.riskScore} su 100`}>
                 <div className="today-risk-orbit orbit-outer" /><div className="today-risk-orbit orbit-middle" /><div className="today-risk-orbit orbit-inner" />
-                <div className="today-risk-core"><div><strong>{ALPHA_ACCOUNT.riskScore}</strong><span>su 100</span></div></div>
+                <div className="today-risk-core"><div data-glass-label><strong>{ALPHA_ACCOUNT.riskScore}</strong><span>su 100</span></div></div>
                 <i className="today-risk-node node-margin" style={orbitalNodeStyle(marginPressure, 205, 42, 88)} aria-hidden="true" />
                 <i className="today-risk-node node-open-risk" style={orbitalNodeStyle(riskUsed / 100, 305, 42, 69)} aria-hidden="true" />
                 <i className="today-risk-node node-drawdown" style={orbitalNodeStyle(drawdownPressure, 108, 42, 50)} aria-hidden="true" />
               </div>
-              <dl className="today-risk-legend" aria-label="Pressioni che compongono lo stato del rischio">
+              <dl className="today-risk-legend" aria-label="Pressioni che compongono lo stato del rischio" data-glass-label>
                 <div className="margin"><dt><i /> Margine</dt><dd>{ALPHA_ACCOUNT.marginUsage.toLocaleString("it-IT")}% <span>su 20%</span></dd></div>
                 <div className="open-risk"><dt><i /> Rischio aperto</dt><dd>{ALPHA_ACCOUNT.activeRisk.toLocaleString("it-IT")}% <span>su {ALPHA_ACCOUNT.riskLimit.toLocaleString("it-IT")}%</span></dd></div>
                 <div className="drawdown"><dt><i /> Drawdown</dt><dd>{ALPHA_ACCOUNT.currentDrawdown.toLocaleString("it-IT")}% <span>su 8%</span></dd></div>
               </dl>
-              <p className="today-risk-copy">I punti avanzano lungo la propria orbita mentre il dato si avvicina alla soglia.</p>
-              <button className="text-action" onClick={() => goTo("risk")}>Apri Risk Center <ArrowRight size={15} /></button>
+              <p className="today-risk-copy" data-glass-label>I punti avanzano lungo la propria orbita mentre il dato si avvicina alla soglia.</p>
+              <button className="text-action" data-glass-label onClick={() => goTo("risk")}>Apri Risk Center <ArrowRight size={15} /></button>
             </article>
           </section>
 
@@ -288,24 +288,24 @@ export default function Home() {
 
           <section className="lower-grid">
             <article className="positions-card glass-card" id="positions">
-              <div className="section-head"><div><p className="eyebrow">Posizioni aperte</p><h2>{positions.length} posizioni · <span data-sign={valueSign(OPEN_PNL)}>{signedMoney(OPEN_PNL)}</span></h2></div><button className="quiet-button">Vedi tutte <ArrowRight size={14} /></button></div>
+              <div className="section-head" data-glass-label><div><p className="eyebrow">Posizioni aperte</p><h2>{positions.length} posizioni · <span data-sign={valueSign(OPEN_PNL)}>{signedMoney(OPEN_PNL)}</span></h2></div><button className="quiet-button">Vedi tutte <ArrowRight size={14} /></button></div>
               <div className="position-table">
-                <div className="table-row table-header"><span>Strumento</span><span>Direzione</span><span>Volume</span><span>Apertura</span><span>Corrente</span><span>P&amp;L</span></div>
-                {positions.map((position) => <button type="button" className={`table-row ${position.trend === "down" ? "negative-row" : ""}`} key={position.symbol} data-glass-underlight={positionUnderlight(position.result, ALPHA_ACCOUNT.balance)}><span className="symbol"><i>{position.symbol.slice(0, 2)}</i><strong>{position.symbol}</strong></span><span className={position.side === "Long" ? "long" : "short"}>{position.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{position.side}</span><span>{position.volumeLabel}</span><span>{position.open}</span><span>{position.currentPrice}</span><strong className={position.trend}>{position.pnl}</strong></button>)}
+                <div className="table-row table-header" data-glass-label><span>Strumento</span><span>Direzione</span><span>Volume</span><span>Apertura</span><span>Corrente</span><span>P&amp;L</span></div>
+                {positions.map((position) => <button type="button" className={`table-row ${position.trend === "down" ? "negative-row" : ""}`} key={position.symbol} data-glass-underlight={positionUnderlight(position.result, ALPHA_ACCOUNT.balance)}><span className="symbol" data-glass-label><i>{position.symbol.slice(0, 2)}</i><strong>{position.symbol}</strong></span><span data-glass-label className={position.side === "Long" ? "long" : "short"}>{position.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{position.side}</span><span data-glass-label>{position.volumeLabel}</span><span data-glass-label>{position.open}</span><span data-glass-label>{position.currentPrice}</span><strong data-glass-label className={position.trend}>{position.pnl}</strong></button>)}
               </div>
             </article>
 
             <article className="insight-card glass-card">
-              <div className="insight-icon"><BrainCircuit size={20} /></div><p className="eyebrow">Spherix insight</p><h2>La sessione {BEST_SESSION_30D.name} genera il {BEST_SESSION_30D.share.toLocaleString("it-IT")}% del risultato.</h2><p>Negli ultimi 30 giorni questa sessione ha un profit factor di {BEST_SESSION_30D.factor.toLocaleString("it-IT")} e un win rate del {BEST_SESSION_30D.win.toLocaleString("it-IT")}%.</p><button>Esplora il pattern <Sparkles size={15} /></button><small><ShieldCheck size={12} /> Calcolato su {BEST_SESSION_30D.trades} operazioni</small>
+              <div className="insight-icon" data-glass-label><BrainCircuit size={20} /></div><p className="eyebrow" data-glass-label>Spherix insight</p><h2 data-glass-label>La sessione {BEST_SESSION_30D.name} genera il {BEST_SESSION_30D.share.toLocaleString("it-IT")}% del risultato.</h2><p data-glass-label>Negli ultimi 30 giorni questa sessione ha un profit factor di {BEST_SESSION_30D.factor.toLocaleString("it-IT")} e un win rate del {BEST_SESSION_30D.win.toLocaleString("it-IT")}%.</p><button data-glass-label>Esplora il pattern <Sparkles size={15} /></button><small data-glass-label><ShieldCheck size={12} /> Calcolato su {BEST_SESSION_30D.trades} operazioni</small>
             </article>
           </section>
 
           <section className="story-card glass-card" id="story">
-            <div className="section-head"><div><p className="eyebrow">Equity story</p><h2>Gli ultimi 30 giorni, in tre numeri.</h2></div><button className="quiet-button"><Sparkles size={14} /> Genera report</button></div>
-            <div className="story-line"><div className="story-item positive"><span>1</span><div><small>{BEST_RECENT_TRADE.date}</small><strong>{BEST_RECENT_TRADE.setup} · {BEST_RECENT_TRADE.symbol}</strong><p>La migliore operazione del periodo ha aggiunto <span data-sign={valueSign(BEST_RECENT_TRADE.netPnl)}>{money(BEST_RECENT_TRADE.netPnl)}</span> con un risultato di <span data-sign={valueSign(BEST_RECENT_TRADE.rMultiple)}>{BEST_RECENT_TRADE.rMultiple.toLocaleString("it-IT")}R</span>.</p></div></div><div className="story-item caution"><span>2</span><div><small>Rischio corrente</small><strong>{positions.length} posizioni aperte</strong><p>Il rischio complessivo è {ALPHA_ACCOUNT.activeRisk.toLocaleString("it-IT")}% dell’equity, contro un limite di {ALPHA_ACCOUNT.riskLimit.toLocaleString("it-IT")}%.</p></div></div><div className="story-item positive"><span>3</span><div><small>Equity riconciliata</small><strong>{money(ALPHA_ACCOUNT.equity)}</strong><p>Balance {money(ALPHA_ACCOUNT.balance)} più P&amp;L aperto <span data-sign={valueSign(OPEN_PNL)}>{signedMoney(OPEN_PNL)}</span>.</p></div></div></div>
+            <div className="section-head" data-glass-label><div><p className="eyebrow">Equity story</p><h2>Gli ultimi 30 giorni, in tre numeri.</h2></div><button className="quiet-button"><Sparkles size={14} /> Genera report</button></div>
+            <div className="story-line" data-glass-label><div className="story-item positive"><span>1</span><div><small>{BEST_RECENT_TRADE.date}</small><strong>{BEST_RECENT_TRADE.setup} · {BEST_RECENT_TRADE.symbol}</strong><p>La migliore operazione del periodo ha aggiunto <span data-sign={valueSign(BEST_RECENT_TRADE.netPnl)}>{money(BEST_RECENT_TRADE.netPnl)}</span> con un risultato di <span data-sign={valueSign(BEST_RECENT_TRADE.rMultiple)}>{BEST_RECENT_TRADE.rMultiple.toLocaleString("it-IT")}R</span>.</p></div></div><div className="story-item caution"><span>2</span><div><small>Rischio corrente</small><strong>{positions.length} posizioni aperte</strong><p>Il rischio complessivo è {ALPHA_ACCOUNT.activeRisk.toLocaleString("it-IT")}% dell’equity, contro un limite di {ALPHA_ACCOUNT.riskLimit.toLocaleString("it-IT")}%.</p></div></div><div className="story-item positive"><span>3</span><div><small>Equity riconciliata</small><strong>{money(ALPHA_ACCOUNT.equity)}</strong><p>Balance {money(ALPHA_ACCOUNT.balance)} più P&amp;L aperto <span data-sign={valueSign(OPEN_PNL)}>{signedMoney(OPEN_PNL)}</span>.</p></div></div></div>
           </section>
 
-          <section className="calendar-strip"><div><CalendarDays size={19} /><span><strong>3 eventi ad alto impatto</strong> nelle prossime 24 ore</span></div><div className="event-pills"><span>13:30 · USD GDP</span><span>15:00 · USD Consumer Confidence</span><button onClick={() => goTo("calendar")}>Apri calendario <ArrowRight size={14} /></button></div></section>
+          <section className="calendar-strip"><div data-glass-label><CalendarDays size={19} /><span><strong>3 eventi ad alto impatto</strong> nelle prossime 24 ore</span></div><div className="event-pills" data-glass-label><span>13:30 · USD GDP</span><span>15:00 · USD Consumer Confidence</span><button onClick={() => goTo("calendar")}>Apri calendario <ArrowRight size={14} /></button></div></section>
           </div>
         </div>
       </section>

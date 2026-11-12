@@ -99,6 +99,32 @@ html[data-theme="light"] .content[data-ice-glass="ready"] .account-card:hover .a
 }
 .ice-glass-refraction-defs { position: absolute !important; width: 0; height: 0; overflow: hidden; pointer-events: none; }
 
+/* Today: clear polished reference material, with labels on a separate Z plane.
+   The shared renderer owns the glass/caustics; DOM labels keep their semantics. */
+html[data-theme="light"] .today-dashboard :is(.glass-card,.demo-notice,.calendar-strip) {
+  border-radius: 38px;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+html[data-theme="light"] .content:not([data-ice-glass="ready"]) .today-dashboard :is(.glass-card,.demo-notice,.calendar-strip) {
+  background: rgb(238 249 248 / .18);
+  border-color: rgb(37 107 108 / .42);
+  box-shadow: inset 0 0 0 2px rgb(255 255 255 / .8),inset 0 0 0 4px rgb(103 165 163 / .16),4px 7px 13px rgb(38 79 80 / .11);
+}
+html[data-theme="light"] .today-dashboard [data-glass-label] {
+  transition: none;
+  backface-visibility: hidden;
+}
+html[data-theme="light"] .today-dashboard :is(.today-notice > span,.insight-card > small)[data-glass-label] {
+  display: inline-block;
+}
+html[data-theme="light"] .content[data-ice-glass="ready"] .today-dashboard .equity-chart svg {
+  filter: none;
+}
+html[data-theme="light"] .content[data-ice-glass="ready"] .today-dashboard .equity-path {
+  filter: none;
+}
+
 /* The dark theme uses translucent white controls. In daylight these controls
    receive a neutral ink/frost treatment while semantic colours stay intact. */
 html[data-theme="light"] .content :is(

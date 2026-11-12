@@ -1,3 +1,5 @@
+import { daylightMaterial } from "./daylight-glass";
+
 export const glassVertex = `#version 300 es
 precision highp float;
 uniform vec2 uResolution;
@@ -114,6 +116,7 @@ uniform float uLightGlass;
 uniform float uDaylightThickness;
 
 ${glassGeometry}
+${daylightMaterial}
 vec3 environment(vec3 ray) {
   float sky = smoothstep(-.55,.72,ray.y);
   float cool = pow(max(0.0, .5 + .5 * ray.x), 2.4);
@@ -251,6 +254,7 @@ vec3 underlightSpill(vec2 pixel, float depth) {
 }
 void main() {
   vec2 pixel = vec2(gl_FragCoord.x/uDPR, (uResolution.y-gl_FragCoord.y)/uDPR);
+  if(uReferenceGlass>.5) { outColor=referenceGlass(pixel); return; }
   vec2 halfSize = uRect.zw*.5;
   vec2 basePoint = pixel-uRect.xy-halfSize;
   // Inverse perspective maps the projected glass back to its material plane.
