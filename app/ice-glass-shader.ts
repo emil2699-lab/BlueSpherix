@@ -261,6 +261,12 @@ void main() {
   // A soap volume needs a broad shoulder and rolled corners, rather than the
   // narrow fillet of the original flat slab. Keep its bounding rectangle fixed.
   float daylightCard = uTheme*uLightGlass;
+  // Keep every height-dependent response tied to the real glass/base gap.
+  // 82 px is the approved reference travel; reducing uLiftDistance therefore
+  // reduces shadow separation and reflection change by the same proportion.
+  float physicalLift = uReferenceGlass>.5
+    ? clamp(uLift*uLiftDistance/82.0,0.0,1.0)
+    : uLift;
   float radius = min(min(halfSize.x,halfSize.y)*.95,
     mix(max(uRadius*1.75,24.0),uRadius,daylightCard));
   float d = boxSDF(p,halfSize,radius);
@@ -277,15 +283,15 @@ void main() {
       // A single upper-left daylight source casts the prototype's soft base
       // shadow. Its separation and penumbra grow from the same Z lift that
       // drives projection and refraction; no DOM element is translated.
-      vec2 shadowOffset=mix(vec2(12.0,20.0),vec2(24.0,38.0),uLift);
-      float shadowBlur=mix(32.0,52.0,uLift);
-      float shadowSpread=mix(-8.0,-2.0,uLift);
+      vec2 shadowOffset=mix(vec2(12.0,20.0),vec2(24.0,38.0),physicalLift);
+      float shadowBlur=mix(32.0,52.0,physicalLift);
+      float shadowSpread=mix(-8.0,-2.0,physicalLift);
       vec2 shadowHalf=max(halfSize+vec2(shadowSpread),vec2(1.0));
       float shadowD=boxSDF(basePoint-shadowOffset,shadowHalf,max(1.0,radius+shadowSpread));
       float broad=exp(-pow(max(shadowD,0.0)/max(1.0,shadowBlur*.46),2.0));
       float contactD=boxSDF(basePoint-vec2(0.0,5.0),max(halfSize-vec2(8.0),vec2(1.0)),max(1.0,radius-8.0));
-      float contact=exp(-pow(max(contactD,0.0)/6.0,2.0))*(1.0-uLift*.72);
-      float shadowAlpha=(mix(.26,.18,uLift)*broad+.18*contact)*(1.0-coverage);
+      float contact=exp(-pow(max(contactD,0.0)/6.0,2.0))*(1.0-physicalLift*.72);
+      float shadowAlpha=(mix(.26,.18,physicalLift)*broad+.18*contact)*(1.0-coverage);
       outColor=vec4(vec3(0.0),clamp(shadowAlpha,0.0,.32));
       return;
     }
@@ -356,7 +362,7 @@ void main() {
     referenceRadiance+=vec3(.82,1.0,1.0)*outerRim*sunRim*.22;
     referenceRadiance+=vec3(.54,.90,.92)*innerShoulder*(.018+.040*counterRim);
     referenceRadiance+=vec3(.88,1.0,1.0)*(broadTop*.055+lowerReflection*.040)
-      *(1.0-.18*uLift);
+      *(1.0-.18*physicalLift);
     float upperLip=pow(max(-referenceNormal.y,0.0),1.5)*.52;
     float sideLip=max(-referenceNormal.x,0.0)*.12;
     float polish=exp(-pow((depth-1.8)/3.0,2.0))*(upperLip+sideLip)*coverage;
