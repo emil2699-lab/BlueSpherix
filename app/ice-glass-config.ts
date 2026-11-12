@@ -9,7 +9,7 @@ export const ICE_GLASS = {
   daylightPerspective: 900,
   // The approved convex-lens prototype, scoped to the Today dashboard.
   todayRadius: 56,
-  todayThickness: 18,
+  todayThickness: 16.5,
   todayLift: 82,
   todayPerspective: 1100,
   todayParaxial: .075,
