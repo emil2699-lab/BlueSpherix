@@ -140,8 +140,8 @@ type ScaleLensEntry = { key: string; id: string; style: SVGStyleElement; origins
 type RasterLensEntry = {
   key: string; id: string; element: HTMLElement; field: LensField;
   content: WebGLTexture; rays: WebGLTexture; ready: boolean; failed: boolean;
-  capturing: boolean; active: boolean; generation: number; lastUsed: number;
-  refresh: EventListener; refreshTimer?: ReturnType<typeof setTimeout>;
+  capturing: boolean; active: boolean; desired: boolean; generation: number; lastUsed: number;
+  refresh: EventListener; captureTimer?: ReturnType<typeof setTimeout>;
 };
 const SVG_NS="http://www.w3.org/2000/svg";
 let nextLens=0;
@@ -204,8 +204,8 @@ function createScaleGlassLenses(definitions: SVGDefsElement) {
   };
   return {
     beginFrame(_width: number, _height: number, _dpr: number) { void _width; void _height; void _dpr; },
-    update(element: HTMLElement, profile: LensProfile, _lift: number, projection=1) {
-      void _lift;
+    update(element: HTMLElement, profile: LensProfile, _lift: number, projection=1, _hovered=false) {
+      void _lift;void _hovered;
       const existing=entries.get(element);
       if(projection<=1.00001) {
         if(existing?.active) { delete element.dataset.iceLensFallback; existing.active=false; }
@@ -238,6 +238,10 @@ function createRasterGlassLenses(definitions: SVGDefsElement, canvas: HTMLCanvas
   const gl=canvas.getContext("webgl2",{alpha:true,antialias:false,depth:false,premultipliedAlpha:true,powerPreference:"low-power"});
   if(!gl) return fallback;
   let lost=false;
+  let captureBusy=false;
+  let pendingCapture: RasterLensEntry | undefined;
+  let frameEnabled=false;
+  let paintedLastFrame=false;
   const entries=new Map<HTMLElement,RasterLensEntry>();
   const locations=new Map<string,WebGLUniformLocation|null>();
   const vertex=`#version 300 es
@@ -273,7 +277,12 @@ function createRasterGlassLenses(definitions: SVGDefsElement, canvas: HTMLCanvas
         offset=(encoded*255.-128.)/127.*uRange;
       }
       vec2 sourceUv=(local+offset*uStrength)/uCardRect.zw;
-      if(any(lessThan(sourceUv,vec2(0.)))||any(greaterThan(sourceUv,vec2(1.)))) discard;
+      vec2 baseUv=local/uCardRect.zw;
+      if(any(lessThan(baseUv,vec2(0.)))||any(greaterThan(baseUv,vec2(1.)))) discard;
+      // The content is attached to the base, not to the moving glass. Rays
+      // that leave the captured image therefore reveal the undistorted base
+      // sample instead of punching transparent holes through labels/graphs.
+      if(any(lessThan(sourceUv,vec2(0.)))||any(greaterThan(sourceUv,vec2(1.)))) sourceUv=baseUv;
       outColor=texture(uContent,sourceUv);
     }`;
   const shader=(type: number,source: string) => {
@@ -322,12 +331,18 @@ function createRasterGlassLenses(definitions: SVGDefsElement, canvas: HTMLCanvas
     const entry=entries.get(element);
     if(!entry) return;
     entry.generation++;reveal(entry);
-    clearTimeout(entry.refreshTimer);
+    clearTimeout(entry.captureTimer);
+    if(pendingCapture===entry) pendingCapture=undefined;
     for(const event of ["pointerdown","input","change","click"]) element.removeEventListener(event,entry.refresh,true);
     gl.deleteTexture(entry.content);gl.deleteTexture(entry.rays);
     entries.delete(element);
   };
   const capture=async(entry: RasterLensEntry) => {
+    if(captureBusy || entry.capturing || entry.ready || entry.failed || !entry.desired) {
+      if(captureBusy && entry.desired) pendingCapture=entry;
+      return;
+    }
+    captureBusy=true;
     entry.capturing=true;
     const generation=++entry.generation;
     try {
@@ -346,33 +361,44 @@ function createRasterGlassLenses(definitions: SVGDefsElement, canvas: HTMLCanvas
       entry.failed=true;
       console.warn("Ice Glass could not capture Safari card content:",error);
     } finally {
-      if(generation===entry.generation) entry.capturing=false;
+      if(entries.get(entry.element)===entry) entry.capturing=false;
+      captureBusy=false;
       invalidate();
+      const next=pendingCapture;
+      pendingCapture=undefined;
+      if(next?.desired && entries.get(next.element)===next) queueCapture(next,0);
     }
+  };
+  const queueCapture=(entry: RasterLensEntry, delay=140) => {
+    if(entry.ready || entry.failed || entry.capturing || entry.captureTimer || !entry.desired) return;
+    entry.captureTimer=setTimeout(()=>{
+      entry.captureTimer=undefined;
+      if(entry.desired && entries.get(entry.element)===entry) void capture(entry);
+    },delay);
   };
   const prepare=(element: HTMLElement,profile: LensProfile) => {
     const key=[profile.width,profile.height,profile.radius,profile.thickness,profile.ior,profile.distance,profile.paraxial ?? 0].map(n=>n.toFixed(3)).join(":");
     let entry=entries.get(element);
     if(entry?.key!==key) { remove(element); entry=undefined; }
     if(!entry) {
-      if(entries.size>=6) {
-        const oldest=Array.from(entries.values()).filter(value=>!value.active).sort((a,b)=>a.lastUsed-b.lastUsed)[0];
+      if(entries.size>=2) {
+        const oldest=Array.from(entries.values()).filter(value=>!value.active && !value.desired && !value.capturing).sort((a,b)=>a.lastUsed-b.lastUsed)[0];
         if(oldest) remove(oldest.element);
       }
       const field=buildLensField(profile);
       const refresh: EventListener=() => {
         if(!entry?.ready && !entry?.active) return;
         entry.ready=false;entry.failed=false;entry.generation++;reveal(entry);
-        clearTimeout(entry.refreshTimer);
-        entry.refreshTimer=setTimeout(()=>{ if(entry && entries.get(element)===entry) void capture(entry); },90);
+        clearTimeout(entry.captureTimer);
+        entry.captureTimer=undefined;
+        if(entry.desired) queueCapture(entry,90);
         invalidate();
       };
       entry={key,id:`ice-glass-raster-${++nextLens}`,element,field,
         content:texture(),rays:texture(field.data,field.width,field.height),
-        ready:false,failed:false,capturing:false,active:false,generation:0,lastUsed:performance.now(),refresh};
+        ready:false,failed:false,capturing:false,active:false,desired:false,generation:0,lastUsed:performance.now(),refresh};
       entries.set(element,entry);
       for(const event of ["pointerdown","input","change","click"]) element.addEventListener(event,refresh,true);
-      void capture(entry);
     }
     entry.lastUsed=performance.now();
     return entry;
@@ -388,33 +414,71 @@ function createRasterGlassLenses(definitions: SVGDefsElement, canvas: HTMLCanvas
     beginFrame(width: number,height: number,dpr: number) {
       fallback.beginFrame(width,height,dpr);
       if(lost) return;
+      // The optical plane is expensive on Retina displays. Keep it completely
+      // idle until a stable Safari hover has an image to paint; previously a
+      // second full-viewport buffer was cleared on every material frame.
+      frameEnabled=Array.from(entries.values()).some(entry=>entry.active || (entry.ready && entry.desired));
+      if(!frameEnabled) {
+        if(paintedLastFrame && canvas.width && canvas.height) {
+          gl.viewport(0,0,canvas.width,canvas.height);
+          gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);
+        }
+        paintedLastFrame=false;
+        return;
+      }
       const cssWidth=width/dpr,cssHeight=height/dpr;
       // The material canvas may lower its idle fill rate. Text needs a denser
       // optical plane, otherwise Safari's raster copy looks softer than the
       // compositor-filtered Chromium DOM. Keep the shared plane bounded.
-      const pixelBudget=8_388_608;
-      const lensDpr=Math.min(1.5,Math.max(devicePixelRatio||1,1.35),Math.sqrt(pixelBudget/(cssWidth*cssHeight)));
+      const pixelBudget=4_194_304;
+      const lensDpr=Math.min(1.25,Math.max(devicePixelRatio||1,1.1),Math.sqrt(pixelBudget/(cssWidth*cssHeight)));
       const lensWidth=Math.max(1,Math.floor(cssWidth*lensDpr)),lensHeight=Math.max(1,Math.floor(cssHeight*lensDpr));
       if(canvas.width!==lensWidth || canvas.height!==lensHeight) { canvas.width=lensWidth;canvas.height=lensHeight; }
       gl.viewport(0,0,lensWidth,lensHeight);gl.disable(gl.DEPTH_TEST);gl.enable(gl.BLEND);
       gl.blendFunc(gl.ONE,gl.ONE_MINUS_SRC_ALPHA);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);
       gl.useProgram(program);gl.bindVertexArray(vao);
       gl.uniform2f(uniform("uResolution"),cssWidth,cssHeight);
+      paintedLastFrame=true;
     },
-    update(element: HTMLElement,profile: LensProfile,lift: number,projection=1) {
+    update(element: HTMLElement,profile: LensProfile,lift: number,projection=1,hovered=false) {
       const existing=entries.get(element);
       if(lost || projection<=1.00001 || lift<=.0001) {
-        if(existing) reveal(existing);
+        if(existing) {
+          existing.desired=false;clearTimeout(existing.captureTimer);existing.captureTimer=undefined;
+          reveal(existing);
+        }
+        fallback.update(element,profile,lift,projection);
+        return;
+      }
+      // Do not rasterise cards merely crossed while the pointer is travelling.
+      // A new capture starts only after the pointer has remained over this card
+      // briefly; the cheap DOM fallback handles entry and exit transitions.
+      if(!existing && !hovered) {
         fallback.update(element,profile,lift,projection);
         return;
       }
       const entry=prepare(element,profile);
+      entry.desired=hovered;
+      if(hovered) queueCapture(entry);
+      else {
+        clearTimeout(entry.captureTimer);entry.captureTimer=undefined;
+        reveal(entry);
+        fallback.update(element,profile,lift,projection);
+        return;
+      }
       if(!entry.ready) {
-        if(entry.failed) fallback.update(element,profile,lift,projection);
+        fallback.update(element,profile,lift,projection);
         return;
       }
       fallback.update(element,profile,lift,1);
-      if(!entry.active) { element.dataset.iceLensRaster=entry.id;entry.active=true; }
+      if(!entry.active) {
+        // Only the card under the pointer may own the costly optical plane.
+        // Revealing older cards also prevents hidden DOM accumulating while
+        // the user crosses the dashboard quickly.
+        for(const other of entries.values()) if(other!==entry && other.active) reveal(other);
+        element.dataset.iceLensRaster=entry.id;entry.active=true;
+      }
+      if(!frameEnabled) return;
       const padding=entry.field.padding+Math.max(profile.width,profile.height)*(projection-1)*.5;
       const left=profile.left ?? 0,top=profile.top ?? 0;
       gl.useProgram(program);gl.bindVertexArray(vao);
@@ -459,7 +523,8 @@ export function createGlassLenses(definitions: SVGDefsElement, svgFilters = true
     delete element.dataset.iceLensActive;
     entries.delete(element);
   };
-  const update=(element: HTMLElement, profile: LensProfile, lift: number, projection=1) => {
+  const update=(element: HTMLElement, profile: LensProfile, lift: number, projection=1, _hovered=false) => {
+    void _hovered;
     let entry=entries.get(element);
     if(lift<=0 || !context) {
       if(entry?.active) { delete element.dataset.iceLensActive; entry.active=false; }
