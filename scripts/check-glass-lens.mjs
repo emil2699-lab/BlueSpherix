@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { buildLensField, soapLensSlope } from "../app/ice-glass-lens.ts";
 import { soapSample } from "../app/ice-glass-volume.ts";
+import { ICE_GLASS } from "../app/ice-glass-config.ts";
 
 const profile=(width,height,ior=1.5) => ({width,height,ior,radius:Math.min(28,width*.475,height*.475),thickness:Math.min(12,width*.25,height*.25),distance:48});
 const close=(a,b,tolerance=1e-6) => assert(Math.abs(a-b)<=tolerance,`${a} differs from ${b}`);
@@ -54,11 +55,16 @@ for(const [width,height] of [[369,134],[764,478],[1136,48],[280,540],[328,720],[
 }
 
 // The Today prototype adds a centred paraxial term to make the convex lens's
-// magnification legible. It must remain upright, symmetric and stronger than
-// the traced shallow surface alone.
-const reference=buildLensField({width:760,height:420,radius:56,thickness:18,ior:1.5,distance:82,paraxial:.075});
-const referenceStepX=(760+2*reference.padding)/reference.width;
-const referenceStepY=(420+2*reference.padding)/reference.height;
+// magnification legible. It must remain upright, symmetric and reduce the
+// previously approved zoom excess by 20% without weakening the traced surface.
+const referenceWidth=784.6875,referenceHeight=479;
+const referenceProfile={width:referenceWidth,height:referenceHeight,
+  radius:ICE_GLASS.todayRadius,thickness:ICE_GLASS.todayThickness,
+  ior:ICE_GLASS.glassIOR,distance:ICE_GLASS.todayLift};
+const reference=buildLensField({...referenceProfile,paraxial:ICE_GLASS.todayParaxial});
+const previousReference=buildLensField({...referenceProfile,paraxial:.075});
+const referenceStepX=(referenceWidth+2*reference.padding)/reference.width;
+const referenceStepY=(referenceHeight+2*reference.padding)/reference.height;
 let referenceMinimum=1;
 for(let y=1;y<reference.height-1;y++) for(let x=1;x<reference.width-1;x++) {
   const i=(y*reference.width+x)*2;
@@ -71,6 +77,12 @@ for(let y=1;y<reference.height-1;y++) for(let x=1;x<reference.width-1;x++) {
 }
 const referenceMid=((reference.height-1)/2*reference.width+(reference.width-1)/2)*2;
 const referenceSlope=(reference.offsets[referenceMid+reference.width*2+1]-reference.offsets[referenceMid-reference.width*2+1])/(referenceStepY*2);
-assert(1/(1+referenceSlope)>1.08,"The Today lens must visibly magnify the base at full lift");
+const previousStepY=(referenceHeight+2*previousReference.padding)/previousReference.height;
+const previousMid=((previousReference.height-1)/2*previousReference.width+(previousReference.width-1)/2)*2;
+const previousSlope=(previousReference.offsets[previousMid+previousReference.width*2+1]
+  -previousReference.offsets[previousMid-previousReference.width*2+1])/(previousStepY*2);
+const referenceMagnification=1/(1+referenceSlope),previousMagnification=1/(1+previousSlope);
+close((referenceMagnification-1)/(previousMagnification-1),.8,.002);
+assert(referenceMagnification>1.05,"The Today lens must visibly magnify the base at full lift");
 assert(referenceMinimum>.5,"The Today lens must preserve readable content");
 console.log("Glass lens: index matching, focal power, symmetry, magnification and non-folding maps passed.");
