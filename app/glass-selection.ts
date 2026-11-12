@@ -9,6 +9,8 @@ export const SETTLE_MS = 240;
 const ENTER_MS = SPREAD_MS + RISE_MS;
 const EXIT_MS = 200;
 const SWITCH_GROUPS = '.range-switch, .stress-tabs, .monte-carlo-switch, .focus-tabs, .session-tabs, .risk-presets, .lab-parameter, .lab-friction-profiles, .lab-sensitivity, .proposal-picker, [role="tablist"]';
+const DEFAULT_SWITCH_TINT = [86 / 255, 217 / 255, 202 / 255];
+const NEUTRAL_CONTROL_TINT = [.56, .64, .71];
 const SELECTABLE = [
   'button[aria-pressed]', 'button[aria-selected]', 'button[role="tab"]', 'button[aria-expanded]',
   '.range-switch button', '.trade-filters button', '.proposal-picker button',
@@ -84,7 +86,12 @@ function materialTint(element: HTMLElement, context: CanvasRenderingContext2D | 
     }
     if (best) return best;
   }
-  return [.56, .64, .71];
+  // Switches without a semantic hue use the dashboard accent instead of
+  // becoming neutral grey. Controls that already expose a chromatic surface or
+  // text colour return above, so red, amber, violet and custom states survive.
+  const switchControl = element.matches('.protection-switch, .lab-cost-toggle > i')
+    || !!element.closest(SWITCH_GROUPS);
+  return switchControl ? DEFAULT_SWITCH_TINT : NEUTRAL_CONTROL_TINT;
 }
 
 // Exclusive controls have one temporary selection. Multi-select controls keep
