@@ -7,9 +7,12 @@ soft transmitted shadow plus caustics. Based on restored `0e6bf17`.
 The latest material-only revision restores the visible soap from `3f3fcd6`:
 56 px rounded corners and its original soft rim, shoulder, crown and polished
 lip equations. The 48 px glass / 24 px label animation, dashboard palette,
-transmitted shadow and cached caustic field remain those of `f30afa0`.
-The visible contour is calibrated independently from the retained transmission
-footprint so the approved shadow and caustic pattern do not change.
+shadow softness and caustic intensity remain those of `f30afa0`.
+The subsequent corner correction uses the same measured 56 px CSS radius for
+the visible contour, shadow SDF and caustic source mesh/mask. Every pass clamps
+it to 47.5% of the smaller card dimension, including the narrow notice/strip.
+The caustic field follows the corrected corners; lighting, motion and colour
+parameters remain unchanged.
 
 ## Rendering
 
@@ -40,11 +43,15 @@ refraction.
 
 ## Verification
 
-- Material-only revision: isolated GPU comparison with `3f3fcd6` produces
+- Corner correction: instrumented WebGL draws confirm matching glass/caustic
+  radii at 1440×1000 and 390×844, including the smaller radius clamped for short
+  cards. The shadow uses the glass's exact SDF radius. No browser runtime errors.
+- Previous material-only revision (`f696746`): isolated GPU comparison with `3f3fcd6` produces
   identical RGBA pixels at three card sizes and three lift states. The same
   comparison confirms the shadow is identical to `f30afa0` (18 comparisons,
   zero changed channels). Caustic shaders/cache and motion parameters are
-  unchanged at source level.
+  unchanged at source level. The later corner correction intentionally updates
+  shadow/caustic geometry to match the restored glass.
 - Production build including TypeScript: passed.
 - Existing optical model checks and shader skill compilation: passed.
 - Skill manifest/reference validation: passed.
@@ -53,7 +60,7 @@ refraction.
   no Today content displacement filters; working range buttons and navigation;
   dark theme, scrolling, mobile, reduced motion, no-WebGL fallback and context
   loss/restoration.
-- Caustic ablation at 1440×1000: disabling only the equity card's caustic
+- Previous `f696746` caustic ablation at 1440×1000: disabling only the equity card's caustic
   composite changed 9,613 brightened pixels inside and 2,533 outside its original
   bounds (RGB-sum difference greater than 12).
 - Dark baseline/new screenshot comparison at 1440×1000: all 4,320,000 RGB

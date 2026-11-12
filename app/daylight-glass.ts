@@ -27,9 +27,8 @@ vec4 referenceGlass(vec2 pixel) {
   vec2 halfSize=uRect.zw*.5;
   vec2 base=pixel-uRect.xy-halfSize;
   vec2 p=base/uProjection;
-  // Restore only the visible soap profile from 3f3fcd6. Keep the approved
-  // transmission footprint for the shadow and the separate caustic pass.
-  float radius=min(56.0,min(halfSize.x,halfSize.y)*.95);
+  // The measured CSS radius is shared by the restored soap, shadow and rays.
+  float radius=min(uRadius,min(halfSize.x,halfSize.y)*.95);
   float d=boxSDF(p,halfSize,radius);
   float aa=1.25/(uDPR*uProjection);
   float coverage=1.0-smoothstep(-aa,0.0,d);
@@ -40,8 +39,7 @@ vec4 referenceGlass(vec2 pixel) {
   // Clear dielectric blocks only a small fraction of light: broad transmission
   // loss, not an opaque rectangle. Penumbra expands with the same elevation.
   vec2 shadowShift=-L.xy/L.z*(elevation+thickness*.55);
-  float shadowRadius=min(uRadius,min(halfSize.x,halfSize.y)*.95);
-  float shadowD=boxSDF(base-shadowShift,halfSize,shadowRadius);
+  float shadowD=boxSDF(base-shadowShift,halfSize,radius);
   float penumbra=3.5+elevation*.16;
   float shadowCoverage=1.0-smoothstep(-penumbra,penumbra*2.0,shadowD);
   float shadowRim=exp(-pow(shadowD/(penumbra*1.35),2.0));

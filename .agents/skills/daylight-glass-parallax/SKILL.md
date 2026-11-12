@@ -10,9 +10,10 @@ project-specific material applies only to Today in light mode. Keep the existing
 dark material and other views. The user's current choices supersede older
 instructions about a cursor light or keeping every label on the base.
 The latest user choice restores only the visible soap material from `3f3fcd6`;
-preserve the animation, shadow, caustics and dashboard colours from `f30afa0`.
-Its visible contour is calibrated separately from the approved transmission
-footprint. Do not restore the old DOM lens, shadow or 82 px lift.
+preserve the animation, shadow softness, caustic intensity and dashboard colours
+from `f30afa0`. The subsequent corner correction shares the 56 px CSS radius
+between the visible contour, shadow SDF and caustic source mesh/mask, with the
+same size clamp. Do not restore the old DOM lens, shadow or 82 px lift.
 
 ## Optical and interaction contract
 
@@ -29,8 +30,8 @@ footprint. Do not restore the old DOM lens, shadow or 82 px lift.
   then intersecting the receiving plane. Estimate flux concentration from the
   projected/source area ratio; bound highlights and account for Fresnel losses.
   This is a planar-receiver approximation, not full scene path tracing.
-- Use the same height and fixed source for the shadow and caustics, retaining
-  their approved transmission profile independently of the restored visible rim.
+- Use the same rounded contour, height and fixed source for the shadow and
+  caustics. Read the radius from CSS for all passes, including small cards.
   Do not add animated noise, random decorative lines, or a separate light source.
 - Weak transmitted shadow and bright caustics coexist. Keep the shadow light;
   clear glass does not cast an opaque grey copy of the entire card.
