@@ -41,16 +41,8 @@ import { positionUnderlight } from "./glass-underlight";
 import { ThemeToggle } from "./theme-toggle";
 
 type Range = DashboardRange;
-type EquityLayout = "breath" | "shore" | "threshold" | "wake";
 const equitySeries = DEMO_EQUITY_SERIES;
 const balanceSeries = DEMO_BALANCE_SERIES;
-
-const equityLayouts: { id: EquityLayout; label: string; caption: string }[] = [
-  { id: "breath", label: "Respiro", caption: "ampio e quieto" },
-  { id: "shore", label: "Riva", caption: "racconto laterale" },
-  { id: "threshold", label: "Soglia", caption: "valore nel paesaggio" },
-  { id: "wake", label: "Scia", caption: "numeri in sequenza" },
-];
 
 const navItems = [
   { label: "Oggi", icon: LayoutDashboard, target: "overview" },
@@ -176,7 +168,6 @@ export default function Home() {
     };
   }, []);
   const [range, setRange] = useState<Range>("1M");
-  const [equityLayout, setEquityLayout] = useState<EquityLayout>("breath");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [privateMode, setPrivateMode] = useState(true);
   const performance = useMemo(() => `${DASHBOARD_RANGE_STATS[range].returnPct >= 0 ? "+" : ""}${DASHBOARD_RANGE_STATS[range].returnPct.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`, [range]);
@@ -246,12 +237,8 @@ export default function Home() {
           <div className="demo-notice today-notice"><ShieldCheck size={16} /><span><strong>Riepilogo dimostrativo.</strong> Metriche, posizioni e segnali usano il ledger simulato; il collegamento MT5 aggiornerà questa vista in tempo reale.</span></div>
 
           <section className="hero-grid today-hero">
-            <article className={`equity-card glass-card equity-layout-${equityLayout}`}>
-              <div className="equity-layout-picker" role="group" aria-label="Proposte di layout per Equity totale">
-                <span>Composizione</span>
-                {equityLayouts.map((layout) => <button key={layout.id} type="button" aria-pressed={equityLayout === layout.id} className={equityLayout === layout.id ? "active" : ""} onClick={() => setEquityLayout(layout.id)}><i aria-hidden="true" /><span><strong>{layout.label}</strong><small>{layout.caption}</small></span></button>)}
-              </div>
-              <div className="equity-composition" key={equityLayout}>
+            <article className="equity-card glass-card">
+              <div className="equity-composition">
               <div className="card-head today-chart-head equity-story">
                 <div><p className="eyebrow">Equity totale</p><div className="equity-value"><strong>{money(ALPHA_ACCOUNT.equity)}</strong><span data-sign={valueSign(OPEN_PNL)}>{OPEN_PNL >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />} {signedMoney(OPEN_PNL)} oggi</span></div></div>
               </div>
