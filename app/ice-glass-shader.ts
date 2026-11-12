@@ -471,11 +471,22 @@ void main() {
       // has crossed enough of the body, even on compact convex switches, while
       // the low-pigment shoulder preserves the white polished reflection.
       float tintBody=smoothstep(1.5,max(4.0,thickness*.22),opticalDepth);
-      float tintAbsorption=coverage*(.12+.50*tintBody);
-      daylightAlpha=clamp(daylightAlpha+tintAbsorption,0.0,.70);
-      daylightRadiance+=uTint*tintAbsorption*(.94+.04*daylightFresnel);
+      float tintAbsorption=coverage*(.055+.22*tintBody);
+      daylightAlpha=clamp(daylightAlpha+tintAbsorption,0.0,.32);
+      daylightRadiance+=uTint*tintAbsorption*(.72+.04*daylightFresnel);
     }
     outColor=vec4(daylightRadiance,daylightAlpha);
+    if(uSwitchTint>.5) {
+      // Compact switches are not liftable card surfaces, so give their own SDF
+      // shoulder a directional white polish. The chromatic body remains below
+      // it and visible through the clear, untinted rim.
+      float switchUpper=pow(max(-surfaceNormal.y,0.0),1.35)*.48;
+      float switchSide=pow(abs(surfaceNormal.x),1.8)*.11;
+      float switchPolish=exp(-pow((depth-1.35)/1.75,2.0))
+        *(switchUpper+switchSide)*coverage;
+      outColor=vec4(vec3(switchPolish)+outColor.rgb*(1.0-switchPolish),
+        switchPolish+outColor.a*(1.0-switchPolish));
+    }
     if(uLightGlass>.5) {
       // The polished lip belongs to this same projected volume. Keeping it in
       // the material avoids a second, stationary CSS outline on the base.
@@ -498,8 +509,9 @@ void main() {
     // the material geometry and the crisp interface above the optical layer.
     outColor.rgb+=illumination*coverage;
   }
-  // Lift switch radiance by 50% without changing coverage, hue or card optics.
-  outColor.rgb *= max(1.0,uControlBrightness);
+  // The tinted daylight body already carries its own transmitted radiance.
+  // Brightening it again clips the colour toward white and reads as plastic.
+  outColor.rgb *= uSwitchTint>.5 ? 1.0 : max(1.0,uControlBrightness);
   if(uCoating.y>.5) {
     vec2 origin=uCoatingOrigin*uRect.zw;
     // CSS-pixel distance keeps the spreading front circular on wide controls.
