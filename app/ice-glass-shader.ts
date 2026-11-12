@@ -467,9 +467,13 @@ void main() {
     // hue. Absorption stays inside the transparent body instead of becoming a
     // flat fill; card glass and non-switch controls remain unchanged.
     if(uSwitchTint>.5) {
-      float tintAbsorption=coverage*(.048+.027*(1.0-bevel));
-      daylightAlpha=clamp(daylightAlpha+tintAbsorption,0.0,.13);
-      daylightRadiance+=uTint*tintAbsorption*.58;
+      // Daylight washes a weak tint out. Concentrate pigment only after the ray
+      // has crossed enough of the body, even on compact convex switches, while
+      // the low-pigment shoulder preserves the white polished reflection.
+      float tintBody=smoothstep(1.5,max(4.0,thickness*.22),opticalDepth);
+      float tintAbsorption=coverage*(.12+.50*tintBody);
+      daylightAlpha=clamp(daylightAlpha+tintAbsorption,0.0,.70);
+      daylightRadiance+=uTint*tintAbsorption*(.94+.04*daylightFresnel);
     }
     outColor=vec4(daylightRadiance,daylightAlpha);
     if(uLightGlass>.5) {
