@@ -1335,8 +1335,6 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
   .account-card:hover .account-identity > span, .analytics-kpis article:hover .analytics-icon { transform: translateY(-2px) scale(1.03); }
   .account-identity > span, .analytics-icon { transition: transform .2s ease, box-shadow .2s ease; }
   .analytics-kpis article:hover .analytics-icon { box-shadow: 0 8px 22px rgba(86,217,202,.09); }
-  .equity-card:hover .equity-path { filter: drop-shadow(0 0 5px rgba(86,217,202,.4)); }
-  .equity-path { transition: filter .2s ease; }
   .risk-card:hover .ring-one { transform: translate(-50%,-50%) rotate(-6deg) scale(1.02); }
   .risk-card:hover .ring-two { transform: translate(-50%,-50%) rotate(-18deg) scale(.98); }
   .orbit-ring { transition: transform .32s ease; }
