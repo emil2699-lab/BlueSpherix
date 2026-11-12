@@ -1,6 +1,6 @@
 import { snell, soapSample, unit } from "./ice-glass-volume.ts";
 
-export type LensProfile = { width: number; height: number; radius: number; thickness: number; ior: number; distance: number; paraxial?: number };
+export type LensProfile = { width: number; height: number; radius: number; thickness: number; ior: number; distance: number };
 export type LensField = { width: number; height: number; padding: number; range: number; data: Uint8ClampedArray; offsets: Float32Array; gain: number };
 const clamp = (x: number, low: number, high: number) => Math.max(low,Math.min(high,x));
 
@@ -33,10 +33,7 @@ export function soapLensSlope(x: number, y: number, profile: LensProfile): [numb
 
 /** A cached inverse ray map. Only its SVG displacement scale changes per frame. */
 export function buildLensField(profile: LensProfile): LensField {
-  // The paraxial component can move pixels farther than the traced shoulder.
-  // Include that travel in the SVG filter region so wide Today cards do not
-  // crop their magnified text at the polished rim.
-  const padding=Math.ceil(Math.max(24,Math.max(profile.width,profile.height)*(profile.paraxial ?? 0)*.5+12));
+  const padding=24;
   const extentX=profile.width+padding*2, extentY=profile.height+padding*2;
   const odd=(size: number) => Math.max(65,Math.min(193,Math.round(size)|1));
   const width=odd(193*extentX/Math.max(extentX,extentY));
@@ -91,48 +88,14 @@ export function buildLensField(profile: LensProfile): LensField {
   }
   const gain=minimum<-.32 ? -.32/minimum : 1;
   let range=1;
-  for(let y=0;y<height;y++) for(let x=0;x<width;x++) {
-    const i=(y*width+x)*2;
-    // A shallow paraxial inverse map exposes the magnification of a convex
-    // lens without replacing the traced curved-surface distortion. Fade that
-    // term through the rolled shoulder, where transmitted content must merge
-    // back into the fixed DOM instead of being cut off by the silhouette.
-    const px=(x-midX)*stepX,py=(y-midY)*stepY;
-    const qx=Math.abs(px)-profile.width*.5+profile.radius;
-    const qy=Math.abs(py)-profile.height*.5+profile.radius;
-    const depth=profile.radius-Math.min(Math.max(qx,qy),0)-Math.hypot(Math.max(qx,0),Math.max(qy,0));
-    // Finish the merge inside the optical lip. Letting this transition cross
-    // the content area would locally compress glyphs even though the map never
-    // mathematically folds.
-    const shoulder=clamp((depth-3)/15,0,1);
-    const transmission=shoulder*shoulder*(3-2*shoulder);
-    offsets[i]=offsets[i]*gain-px*(profile.paraxial ?? 0)*transmission;
-    offsets[i+1]=offsets[i+1]*gain-py*(profile.paraxial ?? 0)*transmission;
-  }
-  // The shoulder taper contributes its own derivative. Re-evaluate the whole
-  // inverse map after combining traced and paraxial terms, then uniformly
-  // reduce it if needed so glyphs can enlarge without folding or pinching.
-  let combinedMinimum=0;
-  for(let y=1;y<height-1;y++) for(let x=1;x<width-1;x++) {
-    const i=(y*width+x)*2;
-    const a=(offsets[i+2]-offsets[i-2])/(stepX*2);
-    const d=(offsets[i+width*2+1]-offsets[i-width*2+1])/(stepY*2);
-    const cross=((offsets[i+width*2]-offsets[i-width*2])/(stepY*2)
-      +(offsets[i+3]-offsets[i-1])/(stepX*2))*.5;
-    combinedMinimum=Math.min(combinedMinimum,(a+d)*.5-Math.hypot((a-d)*.5,cross));
-  }
-  const readabilityGain=combinedMinimum<-.42 ? -.42/combinedMinimum : 1;
-  for(let i=0;i<offsets.length;i++) {
-    offsets[i]*=readabilityGain;
-    range=Math.max(range,Math.abs(offsets[i]));
-  }
+  for(let i=0;i<offsets.length;i++) { offsets[i]*=gain; range=Math.max(range,Math.abs(offsets[i])); }
   const data=new Uint8ClampedArray(width*height*4);
   for(let i=0;i<width*height;i++) {
     data[i*4]=Math.round(128+127*offsets[i*2]/range);
     data[i*4+1]=Math.round(128+127*offsets[i*2+1]/range);
     data[i*4+2]=128; data[i*4+3]=255;
   }
-  return {width,height,padding,range,data,offsets,gain:gain*readabilityGain};
+  return {width,height,padding,range,data,offsets,gain};
 }
 
 type LensEntry = { key: string; id: string; filter: SVGFilterElement; style: SVGStyleElement; image: SVGFEImageElement; displacement: SVGFEDisplacementMapElement; range: number; padding: number; active: boolean; scale: string; projection: number };
@@ -162,7 +125,7 @@ export function createGlassLenses(definitions: SVGDefsElement) {
       if(entry?.active) { delete element.dataset.iceLensActive; entry.active=false; }
       return;
     }
-    const key=[profile.width,profile.height,profile.radius,profile.thickness,profile.ior,profile.distance,profile.paraxial ?? 0].map(n=>n.toFixed(3)).join(":");
+    const key=[profile.width,profile.height,profile.radius,profile.thickness,profile.ior,profile.distance].map(n=>n.toFixed(2)).join(":");
     if(entry?.key!==key) {
       remove(element);
       // Bound retained filters/textures across long dashboard sessions.

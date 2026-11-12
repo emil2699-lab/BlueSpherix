@@ -52,25 +52,4 @@ for(const [width,height] of [[369,134],[764,478],[1136,48],[280,540],[328,720],[
   assert(magnifications.every((m,i)=>!i||m>=magnifications[i-1]),"Magnification grows with separation");
   console.log(JSON.stringify({width,height,minJacobian:+minJacobian.toFixed(3),magnificationY:+magnifications.at(-1).toFixed(3)}));
 }
-
-// The Today prototype adds a centred paraxial term to make the convex lens's
-// magnification legible. It must remain upright, symmetric and stronger than
-// the traced shallow surface alone.
-const reference=buildLensField({width:760,height:420,radius:56,thickness:18,ior:1.5,distance:82,paraxial:.075});
-const referenceStepX=(760+2*reference.padding)/reference.width;
-const referenceStepY=(420+2*reference.padding)/reference.height;
-let referenceMinimum=1;
-for(let y=1;y<reference.height-1;y++) for(let x=1;x<reference.width-1;x++) {
-  const i=(y*reference.width+x)*2;
-  const a=1+(reference.offsets[i+2]-reference.offsets[i-2])/(referenceStepX*2);
-  const d=1+(reference.offsets[i+reference.width*2+1]-reference.offsets[i-reference.width*2+1])/(referenceStepY*2);
-  const b=(reference.offsets[i+reference.width*2]-reference.offsets[i-reference.width*2])/(referenceStepY*2);
-  const c=(reference.offsets[i+3]-reference.offsets[i-1])/(referenceStepX*2);
-  assert(a*d-b*c>0,"The Today lens must never fold or mirror the image");
-  referenceMinimum=Math.min(referenceMinimum,(a+d)/2-Math.hypot((a-d)/2,(b+c)/2));
-}
-const referenceMid=((reference.height-1)/2*reference.width+(reference.width-1)/2)*2;
-const referenceSlope=(reference.offsets[referenceMid+reference.width*2+1]-reference.offsets[referenceMid-reference.width*2+1])/(referenceStepY*2);
-assert(1/(1+referenceSlope)>1.08,"The Today lens must visibly magnify the base at full lift");
-assert(referenceMinimum>.5,"The Today lens must preserve readable content");
 console.log("Glass lens: index matching, focal power, symmetry, magnification and non-folding maps passed.");

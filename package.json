@@ -6,7 +6,6 @@
     "data:csv": "node --no-warnings --experimental-strip-types scripts/export-demo-csv.mjs",
     "data:check": "node --no-warnings --experimental-strip-types scripts/check-demo-data.mjs",
     "glass:check": "node --no-warnings --experimental-strip-types scripts/check-glass-lens.mjs",
-    "glass:prototype:check": "node .agents/skills/convex-glass-lens/scripts/verify-model.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

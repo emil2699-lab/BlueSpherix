@@ -10,7 +10,7 @@ import { switchRect } from "./glass-switch-motion";
 
 type ViewportRect = { left: number; top: number; width: number; height: number };
 type GlassRect = ViewportRect & { right: number; bottom: number };
-type Measurement = { element: HTMLElement; rect: GlassRect; radius: number; tint: number[]; crownHeight: number; todayGlass: boolean };
+type Measurement = { element: HTMLElement; rect: GlassRect; radius: number; tint: number[]; crownHeight: number };
 const GLASS_SURFACE_SELECTOR = ".glass-card, .calendar-strip, .demo-notice, .heatmap button, [data-glass-selection], .glass-switch-thumb";
 const LIFTABLE_SURFACE_SELECTOR = ".glass-card, .calendar-strip, .demo-notice";
 // Keep the overscanned backing store below a conservative Safari allocation
@@ -137,13 +137,10 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         const radius=parseFloat(style.borderTopLeftRadius) || 14;
         const halfWidth=rect.width*.5,halfHeight=rect.height*.5;
         const daylightCard=document.documentElement.dataset.theme === "light" && element.matches(LIFTABLE_SURFACE_SELECTOR);
-        const todayGlass=element.closest(".today-dashboard") !== null && element.matches(LIFTABLE_SURFACE_SELECTOR);
-        const materialRadius=todayGlass ? config.todayRadius : radius;
-        const opticalRadius=Math.min(Math.min(halfWidth,halfHeight)*.95,daylightCard ? materialRadius : Math.max(radius*1.75,24));
-        const daylightThickness=todayGlass ? config.todayThickness : config.daylightThickness;
-        const thickness=Math.min(daylightCard ? daylightThickness : config.glassThickness*2.1,Math.min(halfWidth,halfHeight)*.5);
+        const opticalRadius=Math.min(Math.min(halfWidth,halfHeight)*.95,daylightCard ? radius : Math.max(radius*1.75,24));
+        const thickness=Math.min(daylightCard ? config.daylightThickness : config.glassThickness*2.1,Math.min(halfWidth,halfHeight)*.5);
         const crownHeight=rect.width && rect.height ? soapSample(0,0,halfWidth,halfHeight,opticalRadius,thickness)[2] : 0;
-        return { element, rect, radius, tint, crownHeight, todayGlass };
+        return { element, rect, radius, tint, crownHeight };
       });
       cards = cards.filter(card=>card.rect.width>0 && card.rect.height>0);
       const currentElements=new Set(cards.map(card=>card.element));
@@ -228,7 +225,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       gl.uniform4f(uniform("uSpillRect"), emitterRect?.left ?? 0,emitterRect?.top ?? 0,emitterRect?.width ?? 1,emitterRect?.height ?? 1);
       gl.uniform2f(uniform("uSpillOrigin"),...(emission?.origin ?? [.5,.5] as [number,number]));
       gl.uniform3f(uniform("uSpillTint"),emissionTint[0],emissionTint[1],emissionTint[2]);
-      for (const { element, rect: measuredRect, radius, tint, crownHeight, todayGlass } of cards) {
+      for (const { element, rect: measuredRect, radius, tint, crownHeight } of cards) {
         const coating = coatings.current.get(element);
         const thumb = element.matches('.glass-switch-thumb');
         const thumbOn = thumb && (element.closest('.protection-switch')?.classList.contains('on')
@@ -248,27 +245,17 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         if(Math.abs(liftTarget-liftState.value)<.002) liftState.value=liftTarget;
         else liftMoving=true;
         const lift=liftState.value;
-        // The reference material is a daylight-only treatment. Keeping this
-        // gate here (rather than only in CSS) preserves the original dark-room
-        // radius, thickness, projection and lens map byte-for-byte.
-        const referenceGlass=lightMode && todayGlass;
-        const liftDistance=referenceGlass ? config.todayLift : config.daylightLift;
-        const perspective=referenceGlass ? config.todayPerspective : config.daylightPerspective;
-        const daylightThickness=referenceGlass ? config.todayThickness : config.daylightThickness;
-        const materialRadius=referenceGlass ? Math.min(config.todayRadius,rect.width*.475,rect.height*.475) : radius;
         // Project only the optical layer towards the viewer. Hit testing and
         // DOM content keep the original rectangle, with no X/Y translation.
         const projection=lightMode && liftable
-          ? perspective/(perspective-lift*liftDistance) : 1;
-        const lensStrength=referenceGlass ? .11+.89*lift : lift;
+          ? config.daylightPerspective/(config.daylightPerspective-lift*config.daylightLift) : 1;
         lenses.update(element,{
           width:rect.width,height:rect.height,
-          radius:materialRadius,
-          thickness:Math.min(daylightThickness,rect.width*.25,rect.height*.25),
-          ior:config.glassIOR,distance:liftDistance,
-          paraxial:referenceGlass ? config.todayParaxial : 0,
-        },lightMode && liftable && (referenceGlass || !reduced.matches) ? lensStrength : 0,projection);
-        const projectionPad=lightMode && liftable ? (referenceGlass ? 72+lift*20 : 38+lift*10) : 0;
+          radius:Math.min(rect.width*.475,rect.height*.475,radius),
+          thickness:Math.min(config.daylightThickness,rect.width*.25,rect.height*.25),
+          ior:config.glassIOR,distance:config.daylightLift,
+        },lightMode && liftable && !reduced.matches ? lift : 0,projection);
+        const projectionPad=lightMode && liftable ? 38+lift*10 : 0;
         const padX=projectionPad+rect.width*(projection-1)*.5;
         const padY=projectionPad+rect.height*(projection-1)*.5;
         const drawRect={ left:rect.left-padX, top:rect.top-padY, width:rect.width+padX*2,
@@ -294,13 +281,10 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         gl.uniform2f(uniform("uCoatingOrigin"), ...(coating?.origin ?? [.5, .5] as [number, number]));
         gl.uniform4f(uniform("uRect"),rect.left,rect.top,rect.width,rect.height);
         gl.uniform4f(uniform("uDrawRect"),drawRect.left,drawRect.top,drawRect.width,drawRect.height);
-        gl.uniform1f(uniform("uRadius"),materialRadius);
+        gl.uniform1f(uniform("uRadius"),radius);
         gl.uniform1f(uniform("uLift"),lift);
-        gl.uniform1f(uniform("uLiftDistance"),liftDistance);
-        gl.uniform1f(uniform("uDaylightThickness"),daylightThickness);
         gl.uniform1f(uniform("uProjection"),projection);
         gl.uniform1f(uniform("uLightGlass"),liftable ? 1 : 0);
-        gl.uniform1f(uniform("uReferenceGlass"),referenceGlass ? 1 : 0);
         const movingCrown = coating?.travel ? soapSample(0,0,rect.width*.5,rect.height*.5,
           Math.min(Math.min(rect.width,rect.height)*.475,Math.max(radius*1.75,24)),
           Math.min(config.glassThickness*2.1,Math.min(rect.width,rect.height)*.25))[2] : crownHeight;

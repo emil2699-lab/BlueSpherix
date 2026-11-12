@@ -7,12 +7,6 @@ export const ICE_GLASS = {
   // Travel along the viewer-facing Z axis; perspective affects glass only.
   daylightLift: 48,
   daylightPerspective: 900,
-  // The approved convex-lens prototype, scoped to the Today dashboard.
-  todayRadius: 56,
-  todayThickness: 18,
-  todayLift: 82,
-  todayPerspective: 1100,
-  todayParaxial: .075,
   glassRoughness: .21,
   glassOpacity: .58,
   glassBodyOpacity: .14,

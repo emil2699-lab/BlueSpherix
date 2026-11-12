@@ -111,7 +111,6 @@ uniform float uLift;
 uniform float uLiftDistance;
 uniform float uProjection; // viewer-facing perspective, centred on the base
 uniform float uLightGlass;
-uniform float uReferenceGlass; // approved convex material on the Today view
 uniform float uDaylightThickness;
 
 ${glassGeometry}
@@ -273,22 +272,6 @@ void main() {
     min(halfSize.x,halfSize.y)*.50);
   if (coverage <= 0.0) {
     if(uTheme<.5 || uLightGlass<.5) discard;
-    if(uReferenceGlass>.5) {
-      // A single upper-left daylight source casts the prototype's soft base
-      // shadow. Its separation and penumbra grow from the same Z lift that
-      // drives projection and refraction; no DOM element is translated.
-      vec2 shadowOffset=mix(vec2(12.0,20.0),vec2(24.0,38.0),uLift);
-      float shadowBlur=mix(32.0,52.0,uLift);
-      float shadowSpread=mix(-8.0,-2.0,uLift);
-      vec2 shadowHalf=max(halfSize+vec2(shadowSpread),vec2(1.0));
-      float shadowD=boxSDF(basePoint-shadowOffset,shadowHalf,max(1.0,radius+shadowSpread));
-      float broad=exp(-pow(max(shadowD,0.0)/max(1.0,shadowBlur*.46),2.0));
-      float contactD=boxSDF(basePoint-vec2(0.0,5.0),max(halfSize-vec2(8.0),vec2(1.0)),max(1.0,radius-8.0));
-      float contact=exp(-pow(max(contactD,0.0)/6.0,2.0))*(1.0-uLift*.72);
-      float shadowAlpha=(mix(.26,.18,uLift)*broad+.18*contact)*(1.0-coverage);
-      outColor=vec4(vec3(0.0),clamp(shadowAlpha,0.0,.32));
-      return;
-    }
     // The same directional daylight that enters the glass projects its
     // dispersed caustic onto the dashboard plane, without a cast shadow.
     // The projection is sampled
@@ -326,42 +309,6 @@ void main() {
     // Premultiplied coverage must add light in every channel. Otherwise the
     // dimmer spectral channels darken the base and leave a shadow-like fringe.
     outColor=vec4(vec3(causticAlpha)+causticColor,causticAlpha);
-    return;
-  }
-  if(uTheme>.5 && uReferenceGlass>.5) {
-    // Today's accepted daylight material has its own compact analytic path.
-    // It needs the rounded SDF and directional rim only; returning here avoids
-    // evaluating the dark room's waves, three-channel Snell rays and internal
-    // transport once for every pixel of every large dashboard card.
-    vec2 referenceNormal=roundedSurfaceNormal(p,halfSize,radius);
-    float outerRim=exp(-depth/2.2);
-    float innerShoulder=exp(-pow((depth-7.0)/5.5,2.0));
-    vec2 crownSlope=-p/max(halfSize,vec2(1.0))*.10;
-    vec3 referenceN=normalize(vec3(-referenceNormal*outerRim*1.25+crownSlope,1.0));
-    vec2 referenceDirection=normalize(vec2(-.42,-.72));
-    float referenceF0=pow((uGlass.x-1.0)/(uGlass.x+1.0),2.0);
-    float referenceFresnel=referenceF0+(1.0-referenceF0)*pow(1.0-max(referenceN.z,0.0),5.0);
-    float sunRim=pow(max(dot(referenceNormal,referenceDirection),0.0),1.22);
-    float counterRim=pow(max(dot(referenceNormal,-referenceDirection),0.0),1.45);
-    float broadTop=exp(-pow((p.y+halfSize.y*.82)/max(13.0,halfSize.y*.22),2.0))
-      *exp(-pow((p.x+halfSize.x*.34)/max(54.0,halfSize.x*.70),2.0));
-    float lowerReflection=exp(-pow((p.y-halfSize.y*.78)/max(13.0,halfSize.y*.24),2.0))
-      *exp(-pow((p.x-halfSize.x*.42)/max(48.0,halfSize.x*.58),2.0));
-    float referenceAlpha=clamp((.010+referenceFresnel*.020
-      +outerRim*(.055+.075*sunRim+.045*counterRim)
-      +innerShoulder*(.018+.025*counterRim))*coverage,0.0,.19);
-    vec3 referenceRadiance=vec3(.86,.97,.98)*(.010+referenceFresnel*.012)*coverage;
-    referenceRadiance+=mix(vec3(.018,.105,.115),vec3(.10,.31,.32),counterRim)
-      *outerRim*(.055+.075*counterRim);
-    referenceRadiance+=vec3(.82,1.0,1.0)*outerRim*sunRim*.22;
-    referenceRadiance+=vec3(.54,.90,.92)*innerShoulder*(.018+.040*counterRim);
-    referenceRadiance+=vec3(.88,1.0,1.0)*(broadTop*.055+lowerReflection*.040)
-      *(1.0-.18*uLift);
-    float upperLip=pow(max(-referenceNormal.y,0.0),1.5)*.52;
-    float sideLip=max(-referenceNormal.x,0.0)*.12;
-    float polish=exp(-pow((depth-1.8)/3.0,2.0))*(upperLip+sideLip)*coverage;
-    outColor=vec4(vec3(polish)+referenceRadiance*(1.0-polish),
-      polish+referenceAlpha*(1.0-polish));
     return;
   }
   // Keep the exact rounded silhouette, but move all optical shading onto a
