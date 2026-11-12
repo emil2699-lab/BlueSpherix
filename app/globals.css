@@ -196,6 +196,25 @@ nav button b { margin-left: auto; font-size: 8px; color: #091110; background: va
 .content:not([data-ice-glass="ready"]) :is(.glass-card, .calendar-strip, .demo-notice) { background: rgba(17,27,40,.26); }
 .content[data-ice-glass="ready"] .glass-card:hover { transform: none; }
 .content .glass-card:not(.timeline-card):not(.trade-inspector):hover { transform: none !important; }
+/* The approved convex prototype is applied only to Today. The larger radius
+   defines the same optical silhouette for WebGL, SVG refraction and fallback;
+   it changes no card dimensions or content placement. */
+html[data-theme="light"] .content .today-dashboard :is(.glass-card, .calendar-strip, .demo-notice) {
+  border-radius: 56px;
+}
+html[data-theme="light"] .content:not([data-ice-glass="ready"]) .today-dashboard :is(.glass-card, .calendar-strip, .demo-notice) {
+  border-color: rgba(20,118,126,.42);
+  background:
+    radial-gradient(120% 100% at 4% -9%,rgba(255,255,255,.25),transparent 27%),
+    radial-gradient(95% 80% at 93% 106%,rgba(207,255,255,.13),transparent 34%),
+    linear-gradient(135deg,rgba(233,255,255,.085),rgba(226,247,249,.025) 44%,rgba(181,237,243,.055));
+  box-shadow:
+    12px 20px 32px -8px rgba(9,54,62,.26),
+    inset 0 1px 1px rgba(255,255,255,.88),
+    inset 0 0 0 6px rgba(255,255,255,.21),
+    inset 0 0 0 9px rgba(32,130,140,.075),
+    inset 0 -3px 6px rgba(10,102,111,.13);
+}
 .today-notice svg { color: var(--aqua); }
 .today-hero { grid-template-columns: minmax(0,1.75fr) minmax(310px,.75fr); margin-top: 15px; }
 .today-chart-controls { display: flex; flex-direction: column; align-items: flex-end; gap: 13px; }

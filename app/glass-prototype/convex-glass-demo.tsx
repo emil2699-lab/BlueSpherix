@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState, type CSSProperties } from "react";
-import { buildLensField, type LensField } from "../ice-glass-lens";
+import { buildLensField } from "../ice-glass-lens";
 import styles from "./prototype.module.css";
 
 type GlassVariables = CSSProperties & Record<`--${string}`, string>;
@@ -13,36 +13,6 @@ const GLASS = {
   lift: 82,
   perspective: 1100,
 } as const;
-
-function encodeParaxialLens(field: LensField, width: number, height: number) {
-  const offsets = field.offsets.slice();
-  const extentX = width + field.padding * 2;
-  const extentY = height + field.padding * 2;
-  const middleX = (field.width - 1) / 2;
-  const middleY = (field.height - 1) / 2;
-  // Bounded paraxial term: the analytic surface still supplies the curved
-  // distortion, while this inverse map makes its magnification readable.
-  const inverseMagnification = -0.075;
-  let range = 1;
-  for (let y = 0; y < field.height; y += 1) {
-    for (let x = 0; x < field.width; x += 1) {
-      const index = (y * field.width + x) * 2;
-      const px = (x - middleX) * extentX / field.width;
-      const py = (y - middleY) * extentY / field.height;
-      offsets[index] += px * inverseMagnification;
-      offsets[index + 1] += py * inverseMagnification;
-      range = Math.max(range, Math.abs(offsets[index]), Math.abs(offsets[index + 1]));
-    }
-  }
-  const data = new Uint8ClampedArray(field.width * field.height * 4);
-  for (let index = 0; index < field.width * field.height; index += 1) {
-    data[index * 4] = Math.round(128 + 127 * offsets[index * 2] / range);
-    data[index * 4 + 1] = Math.round(128 + 127 * offsets[index * 2 + 1] / range);
-    data[index * 4 + 2] = 128;
-    data[index * 4 + 3] = 255;
-  }
-  return { data, range };
-}
 
 export function ConvexGlassDemo() {
   const reactId = useId();
@@ -145,17 +115,17 @@ export function ConvexGlassDemo() {
         thickness: Math.min(GLASS.thickness, width * 0.2, height * 0.2),
         ior: GLASS.ior,
         distance: GLASS.lift,
+        paraxial: 0.075,
       });
-      const encoded = encodeParaxialLens(field, width, height);
       const bitmap = document.createElement("canvas");
       bitmap.width = field.width;
       bitmap.height = field.height;
       const context = bitmap.getContext("2d");
       if (!context) return;
       const pixels = context.createImageData(field.width, field.height);
-      pixels.data.set(encoded.data);
+      pixels.data.set(field.data);
       context.putImageData(pixels, 0, 0);
-      rangeRef.current = encoded.range;
+      rangeRef.current = field.range;
       map.setAttribute("href", bitmap.toDataURL("image/png"));
       map.setAttribute("width", String(width));
       map.setAttribute("height", String(height));
