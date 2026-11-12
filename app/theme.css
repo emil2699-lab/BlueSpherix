@@ -91,6 +91,11 @@ html[data-theme="light"] .content[data-ice-glass="ready"] :is(.glass-card,.calen
 html[data-theme="light"] .content[data-ice-glass="ready"] [data-ice-lens-active] {
   z-index: 3;
 }
+/* Safari keeps the live card in place for semantics and hit testing. Its
+   physically displaced image is painted by the shared optical canvas. */
+html[data-theme="light"] .content[data-ice-glass="ready"] [data-ice-lens-raster] {
+  opacity: 0 !important;
+}
 /* Card hover must not carry decorative content off the base with the glass. */
 html[data-theme="light"] .content[data-ice-glass="ready"] .analytics-kpis article:hover .analytics-icon,
 html[data-theme="light"] .content[data-ice-glass="ready"] .account-card:hover .account-identity > span {

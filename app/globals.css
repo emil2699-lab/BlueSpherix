@@ -152,7 +152,8 @@ nav button b { margin-left: auto; font-size: 8px; color: #091110; background: va
 /* Explicit material/content planes avoid a negative WebGL compositing layer
    being dropped while Safari rebuilds its layers during page zoom. */
 .ice-glass-canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; pointer-events: none; z-index: 0; }
-.content > :not(.ice-glass-canvas) { position: relative; z-index: 1; }
+.ice-glass-lens-canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; pointer-events: none; z-index: 2; }
+.content > :not(.ice-glass-canvas):not(.ice-glass-lens-canvas) { position: relative; z-index: 1; }
 .content:not([data-ice-glass="ready"]) > .ice-glass-canvas { visibility: hidden; }
 .content[data-ice-glass="ready"] :is(.glass-card, .calendar-strip, .demo-notice) { background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
 .content:not([data-ice-glass="ready"]) :is(.glass-card, .calendar-strip, .demo-notice) { background: rgba(17,27,40,.26); }

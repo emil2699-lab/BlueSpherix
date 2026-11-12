@@ -19,20 +19,23 @@ const BUFFER_PIXEL_BUDGET = 8_388_608;
 
 export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const lensCanvasRef = useRef<HTMLCanvasElement>(null);
   const definitionsRef = useRef<SVGDefsElement>(null);
   const coatings = useGlassSelection(rootRef);
   useEffect(() => {
     const canvas = canvasRef.current;
+    const lensCanvas = lensCanvasRef.current;
     const root = rootRef.current;
     const definitions = definitionsRef.current;
-    if (!canvas || !root || !definitions) return;
+    if (!canvas || !lensCanvas || !root || !definitions) return;
     const gl = canvas.getContext("webgl2", { alpha: true, antialias: false, depth: false, premultipliedAlpha: true, powerPreference: "low-power" });
     if (!gl) return; // The original dark cards are the no-WebGL fallback.
     // Safari/WebKit advertises CSS/SVG filter support but can drop the whole
     // filtered card (text included) and lock its compositor. Retain the shared
     // WebGL material/caustics while using an unfiltered, readable DOM plane.
     const domLensFilters = supportsDomSvgLensFilters(navigator.userAgent);
-    const lenses = createGlassLenses(definitions, domLensFilters);
+    let scheduleLensFrame=()=>{};
+    const lenses = createGlassLenses(definitions, domLensFilters, lensCanvas,()=>scheduleLensFrame());
     let program: WebGLProgram | null = null;
     let vao: WebGLVertexArrayObject | null = null;
     let shaders: WebGLShader[] = [];
@@ -113,6 +116,8 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       const cssHeight=`${height}px`,cssTop=`${top}px`;
       if(canvas.style.height!==cssHeight)canvas.style.height=cssHeight;
       if(canvas.style.top!==cssTop)canvas.style.top=cssTop;
+      if(lensCanvas.style.height!==cssHeight)lensCanvas.style.height=cssHeight;
+      if(lensCanvas.style.top!==cssTop)lensCanvas.style.top=cssTop;
       const rect = canvas.getBoundingClientRect();
       return {
         left: rect.left,
@@ -190,6 +195,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       const buffer = fitDrawingBuffer(lightMode ? .82 : 1);
       if (!buffer) return;
       const { width, height } = buffer;
+      lenses.beginFrame(width,height,dpr);
       gl.disable(gl.SCISSOR_TEST);
       gl.clearColor(0,0,0,0);
       gl.clear(gl.COLOR_BUFFER_BIT);
@@ -266,6 +272,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
           ? perspective/(perspective-lift*liftDistance) : 1;
         const lensStrength=referenceGlass ? .11+.89*lift : lift;
         lenses.update(element,{
+          left:rect.left,top:rect.top,
           width:rect.width,height:rect.height,
           radius:materialRadius,
           thickness:Math.min(daylightThickness,rect.width*.25,rect.height*.25),
@@ -332,6 +339,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       if (underlightTimer !== undefined) { clearTimeout(underlightTimer); underlightTimer = undefined; }
       if (!frame && !lost && !document.hidden) frame = requestAnimationFrame(draw);
     };
+    scheduleLensFrame=schedule;
     const invalidate = () => { dirty = true; schedule(); };
     const settleLayout = () => { settleUntil = performance.now()+700; invalidate(); };
     const watchResolution = () => {
@@ -411,6 +419,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
   },[rootRef, coatings]);
   return <>
     <canvas ref={canvasRef} className="ice-glass-canvas" aria-hidden="true" />
+    <canvas ref={lensCanvasRef} className="ice-glass-lens-canvas" aria-hidden="true" />
     <svg className="ice-glass-refraction-defs" aria-hidden="true">
       <defs ref={definitionsRef} />
     </svg>

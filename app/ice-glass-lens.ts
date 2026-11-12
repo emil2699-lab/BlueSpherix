@@ -1,6 +1,6 @@
 import { snell, soapSample, unit } from "./ice-glass-volume.ts";
 
-export type LensProfile = { width: number; height: number; radius: number; thickness: number; ior: number; distance: number; paraxial?: number };
+export type LensProfile = { width: number; height: number; radius: number; thickness: number; ior: number; distance: number; paraxial?: number; left?: number; top?: number };
 export type LensField = { width: number; height: number; padding: number; range: number; data: Uint8ClampedArray; offsets: Float32Array; gain: number };
 const clamp = (x: number, low: number, high: number) => Math.max(low,Math.min(high,x));
 
@@ -137,6 +137,12 @@ export function buildLensField(profile: LensProfile): LensField {
 
 type LensEntry = { key: string; id: string; filter: SVGFilterElement; style: SVGStyleElement; image: SVGFEImageElement; displacement: SVGFEDisplacementMapElement; range: number; padding: number; active: boolean; scale: string; projection: number };
 type ScaleLensEntry = { key: string; id: string; style: SVGStyleElement; origins: string; scale: string; active: boolean };
+type RasterLensEntry = {
+  key: string; id: string; element: HTMLElement; field: LensField;
+  content: WebGLTexture; rays: WebGLTexture; ready: boolean; failed: boolean;
+  capturing: boolean; active: boolean; generation: number; lastUsed: number;
+  refresh: EventListener; refreshTimer?: ReturnType<typeof setTimeout>;
+};
 const SVG_NS="http://www.w3.org/2000/svg";
 let nextLens=0;
 
@@ -197,6 +203,7 @@ function createScaleGlassLenses(definitions: SVGDefsElement) {
     return entry;
   };
   return {
+    beginFrame(_width: number, _height: number, _dpr: number) { void _width; void _height; void _dpr; },
     update(element: HTMLElement, profile: LensProfile, _lift: number, projection=1) {
       void _lift;
       const existing=entries.get(element);
@@ -220,9 +227,223 @@ function createScaleGlassLenses(definitions: SVGDefsElement) {
   };
 }
 
+/**
+ * WebKit path: rasterise only the hovered DOM card, then pass that image through
+ * the same inverse ray map used by the Chromium SVG displacement filter. The
+ * live DOM keeps its layout, hit target and accessibility tree on the base
+ * plane; only this optical image is hidden/revealed while the glass is lifted.
+ */
+function createRasterGlassLenses(definitions: SVGDefsElement, canvas: HTMLCanvasElement, invalidate: () => void) {
+  const fallback=createScaleGlassLenses(definitions);
+  const gl=canvas.getContext("webgl2",{alpha:true,antialias:false,depth:false,premultipliedAlpha:true,powerPreference:"low-power"});
+  if(!gl) return fallback;
+  let lost=false;
+  const entries=new Map<HTMLElement,RasterLensEntry>();
+  const locations=new Map<string,WebGLUniformLocation|null>();
+  const vertex=`#version 300 es
+    precision highp float;
+    uniform vec4 uDrawRect;
+    uniform vec2 uResolution;
+    out vec2 vCss;
+    const vec2 corners[6]=vec2[6](vec2(0.,0.),vec2(1.,0.),vec2(0.,1.),vec2(0.,1.),vec2(1.,0.),vec2(1.,1.));
+    void main(){
+      vec2 corner=corners[gl_VertexID];
+      vCss=uDrawRect.xy+corner*uDrawRect.zw;
+      vec2 clip=vec2(vCss.x/uResolution.x*2.-1.,1.-vCss.y/uResolution.y*2.);
+      gl_Position=vec4(clip,0.,1.);
+    }`;
+  const fragment=`#version 300 es
+    precision highp float;
+    uniform sampler2D uContent;
+    uniform sampler2D uRays;
+    uniform vec4 uCardRect;
+    uniform vec2 uRayExtent;
+    uniform float uRange;
+    uniform float uStrength;
+    uniform float uProjection;
+    in vec2 vCss;
+    out vec4 outColor;
+    void main(){
+      vec2 local=vCss-uCardRect.xy;
+      vec2 centred=local-uCardRect.zw*.5;
+      vec2 rayUv=centred/(uRayExtent*uProjection)+.5;
+      vec2 offset=vec2(0.);
+      if(all(greaterThanEqual(rayUv,vec2(0.)))&&all(lessThanEqual(rayUv,vec2(1.)))) {
+        vec2 encoded=texture(uRays,rayUv).rg;
+        offset=(encoded*255.-128.)/127.*uRange;
+      }
+      vec2 sourceUv=(local+offset*uStrength)/uCardRect.zw;
+      if(any(lessThan(sourceUv,vec2(0.)))||any(greaterThan(sourceUv,vec2(1.)))) discard;
+      outColor=texture(uContent,sourceUv);
+    }`;
+  const shader=(type: number,source: string) => {
+    const value=gl.createShader(type);
+    if(!value) throw new Error("Safari lens shader unavailable");
+    gl.shaderSource(value,source);gl.compileShader(value);
+    if(!gl.getShaderParameter(value,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(value)||"Safari lens shader compilation");
+    return value;
+  };
+  let program: WebGLProgram;
+  let vao: WebGLVertexArrayObject;
+  try {
+    const vertexShader=shader(gl.VERTEX_SHADER,vertex),fragmentShader=shader(gl.FRAGMENT_SHADER,fragment);
+    const linked=gl.createProgram();
+    if(!linked) throw new Error("Safari lens program unavailable");
+    gl.attachShader(linked,vertexShader);gl.attachShader(linked,fragmentShader);gl.linkProgram(linked);
+    gl.deleteShader(vertexShader);gl.deleteShader(fragmentShader);
+    if(!gl.getProgramParameter(linked,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(linked)||"Safari lens link");
+    const array=gl.createVertexArray();
+    if(!array) throw new Error("Safari lens geometry unavailable");
+    program=linked;vao=array;
+  } catch(error) {
+    console.warn("Ice Glass uses the readable Safari lens fallback:",error);
+    return fallback;
+  }
+  const uniform=(name: string) => {
+    if(!locations.has(name)) locations.set(name,gl.getUniformLocation(program,name));
+    return locations.get(name)!;
+  };
+  const texture=(pixels?: Uint8ClampedArray,width=1,height=1) => {
+    const value=gl.createTexture();
+    if(!value) throw new Error("Safari lens texture unavailable");
+    gl.bindTexture(gl.TEXTURE_2D,value);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,width,height,0,gl.RGBA,gl.UNSIGNED_BYTE,pixels ?? new Uint8Array([0,0,0,0]));
+    return value;
+  };
+  const reveal=(entry: RasterLensEntry) => {
+    if(entry.active) delete entry.element.dataset.iceLensRaster;
+    entry.active=false;
+  };
+  const remove=(element: HTMLElement) => {
+    const entry=entries.get(element);
+    if(!entry) return;
+    entry.generation++;reveal(entry);
+    clearTimeout(entry.refreshTimer);
+    for(const event of ["pointerdown","input","change","click"]) element.removeEventListener(event,entry.refresh,true);
+    gl.deleteTexture(entry.content);gl.deleteTexture(entry.rays);
+    entries.delete(element);
+  };
+  const capture=async(entry: RasterLensEntry) => {
+    entry.capturing=true;
+    const generation=++entry.generation;
+    try {
+      const {default: html2canvas}=await import("html2canvas");
+      if(generation!==entry.generation || lost) return;
+      const bitmap=await html2canvas(entry.element,{
+        backgroundColor:null,logging:false,useCORS:true,removeContainer:true,
+        imageTimeout:2500,scale:2,
+      });
+      if(generation!==entry.generation || lost) return;
+      gl.bindTexture(gl.TEXTURE_2D,entry.content);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,true);
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,bitmap);
+      entry.ready=true;
+    } catch(error) {
+      entry.failed=true;
+      console.warn("Ice Glass could not capture Safari card content:",error);
+    } finally {
+      if(generation===entry.generation) entry.capturing=false;
+      invalidate();
+    }
+  };
+  const prepare=(element: HTMLElement,profile: LensProfile) => {
+    const key=[profile.width,profile.height,profile.radius,profile.thickness,profile.ior,profile.distance,profile.paraxial ?? 0].map(n=>n.toFixed(3)).join(":");
+    let entry=entries.get(element);
+    if(entry?.key!==key) { remove(element); entry=undefined; }
+    if(!entry) {
+      if(entries.size>=6) {
+        const oldest=Array.from(entries.values()).filter(value=>!value.active).sort((a,b)=>a.lastUsed-b.lastUsed)[0];
+        if(oldest) remove(oldest.element);
+      }
+      const field=buildLensField(profile);
+      const refresh: EventListener=() => {
+        if(!entry?.ready && !entry?.active) return;
+        entry.ready=false;entry.failed=false;entry.generation++;reveal(entry);
+        clearTimeout(entry.refreshTimer);
+        entry.refreshTimer=setTimeout(()=>{ if(entry && entries.get(element)===entry) void capture(entry); },90);
+        invalidate();
+      };
+      entry={key,id:`ice-glass-raster-${++nextLens}`,element,field,
+        content:texture(),rays:texture(field.data,field.width,field.height),
+        ready:false,failed:false,capturing:false,active:false,generation:0,lastUsed:performance.now(),refresh};
+      entries.set(element,entry);
+      for(const event of ["pointerdown","input","change","click"]) element.addEventListener(event,refresh,true);
+      void capture(entry);
+    }
+    entry.lastUsed=performance.now();
+    return entry;
+  };
+  const contextLost=(event: Event) => {
+    event.preventDefault();lost=true;
+    for(const entry of entries.values()) { entry.generation++;reveal(entry); }
+    invalidate();
+  };
+  canvas.addEventListener("webglcontextlost",contextLost);
+  gl.useProgram(program);gl.uniform1i(uniform("uContent"),0);gl.uniform1i(uniform("uRays"),1);
+  return {
+    beginFrame(width: number,height: number,dpr: number) {
+      fallback.beginFrame(width,height,dpr);
+      if(lost) return;
+      const cssWidth=width/dpr,cssHeight=height/dpr;
+      // The material canvas may lower its idle fill rate. Text needs a denser
+      // optical plane, otherwise Safari's raster copy looks softer than the
+      // compositor-filtered Chromium DOM. Keep the shared plane bounded.
+      const pixelBudget=8_388_608;
+      const lensDpr=Math.min(1.5,Math.max(devicePixelRatio||1,1.35),Math.sqrt(pixelBudget/(cssWidth*cssHeight)));
+      const lensWidth=Math.max(1,Math.floor(cssWidth*lensDpr)),lensHeight=Math.max(1,Math.floor(cssHeight*lensDpr));
+      if(canvas.width!==lensWidth || canvas.height!==lensHeight) { canvas.width=lensWidth;canvas.height=lensHeight; }
+      gl.viewport(0,0,lensWidth,lensHeight);gl.disable(gl.DEPTH_TEST);gl.enable(gl.BLEND);
+      gl.blendFunc(gl.ONE,gl.ONE_MINUS_SRC_ALPHA);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.useProgram(program);gl.bindVertexArray(vao);
+      gl.uniform2f(uniform("uResolution"),cssWidth,cssHeight);
+    },
+    update(element: HTMLElement,profile: LensProfile,lift: number,projection=1) {
+      const existing=entries.get(element);
+      if(lost || projection<=1.00001 || lift<=.0001) {
+        if(existing) reveal(existing);
+        fallback.update(element,profile,lift,projection);
+        return;
+      }
+      const entry=prepare(element,profile);
+      if(!entry.ready) {
+        if(entry.failed) fallback.update(element,profile,lift,projection);
+        return;
+      }
+      fallback.update(element,profile,lift,1);
+      if(!entry.active) { element.dataset.iceLensRaster=entry.id;entry.active=true; }
+      const padding=entry.field.padding+Math.max(profile.width,profile.height)*(projection-1)*.5;
+      const left=profile.left ?? 0,top=profile.top ?? 0;
+      gl.useProgram(program);gl.bindVertexArray(vao);
+      gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,entry.content);
+      gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,entry.rays);
+      gl.uniform4f(uniform("uDrawRect"),left-padding,top-padding,profile.width+padding*2,profile.height+padding*2);
+      gl.uniform4f(uniform("uCardRect"),left,top,profile.width,profile.height);
+      gl.uniform2f(uniform("uRayExtent"),profile.width+entry.field.padding*2,profile.height+entry.field.padding*2);
+      gl.uniform1f(uniform("uRange"),entry.field.range);
+      gl.uniform1f(uniform("uStrength"),lift);
+      gl.uniform1f(uniform("uProjection"),projection);
+      gl.drawArrays(gl.TRIANGLES,0,6);
+    },
+    retain(elements: Set<HTMLElement>) {
+      fallback.retain(elements);
+      for(const element of entries.keys()) if(!elements.has(element)) remove(element);
+    },
+    clear() {
+      fallback.clear();
+      for(const element of Array.from(entries.keys())) remove(element);
+      canvas.removeEventListener("webglcontextlost",contextLost);
+      gl.deleteVertexArray(vao);gl.deleteProgram(program);
+    },
+  };
+}
+
 /** DOM optics share the existing renderer's lift clock; there is no new loop. */
-export function createGlassLenses(definitions: SVGDefsElement, svgFilters = true) {
-  if(!svgFilters) return createScaleGlassLenses(definitions);
+export function createGlassLenses(definitions: SVGDefsElement, svgFilters = true, rasterCanvas?: HTMLCanvasElement, invalidate=()=>{}) {
+  if(!svgFilters) return rasterCanvas ? createRasterGlassLenses(definitions,rasterCanvas,invalidate) : createScaleGlassLenses(definitions);
   const entries=new Map<HTMLElement,LensEntry>();
   const maps=new Map<string,{href: string; padding: number; range: number}>();
   const bitmap=document.createElement("canvas");
@@ -289,6 +510,7 @@ export function createGlassLenses(definitions: SVGDefsElement, svgFilters = true
     if(!entry.active) { element.dataset.iceLensActive=entry.id; entry.active=true; }
   };
   return {
+    beginFrame(_width: number, _height: number, _dpr: number) { void _width; void _height; void _dpr; },
     update,
     retain(elements: Set<HTMLElement>) { for(const element of entries.keys()) if(!elements.has(element)) remove(element); },
     clear() { for(const element of entries.keys()) remove(element); maps.clear(); },
