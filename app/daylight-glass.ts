@@ -27,55 +27,58 @@ vec4 referenceGlass(vec2 pixel) {
   vec2 halfSize=uRect.zw*.5;
   vec2 base=pixel-uRect.xy-halfSize;
   vec2 p=base/uProjection;
-  float radius=min(uRadius,min(halfSize.x,halfSize.y)*.95);
+  // Restore only the visible soap profile from 3f3fcd6. Keep the approved
+  // transmission footprint for the shadow and the separate caustic pass.
+  float radius=min(56.0,min(halfSize.x,halfSize.y)*.95);
   float d=boxSDF(p,halfSize,radius);
-  float aa=1.1/(uDPR*uProjection);
-  float coverage=1.0-smoothstep(-aa,aa,d);
-  float depth=max(-d,0.0);
+  float aa=1.25/(uDPR*uProjection);
+  float coverage=1.0-smoothstep(-aa,0.0,d);
+  float depth=-d;
   float thickness=min(${DAYLIGHT_GLASS.thickness.toFixed(1)},min(halfSize.x,halfSize.y)*.4);
   float elevation=${DAYLIGHT_GLASS.clearance.toFixed(1)}+uLift*uLiftDistance;
   vec3 L=normalize(uSun);
   // Clear dielectric blocks only a small fraction of light: broad transmission
   // loss, not an opaque rectangle. Penumbra expands with the same elevation.
   vec2 shadowShift=-L.xy/L.z*(elevation+thickness*.55);
-  float shadowD=boxSDF(base-shadowShift,halfSize,radius);
+  float shadowRadius=min(uRadius,min(halfSize.x,halfSize.y)*.95);
+  float shadowD=boxSDF(base-shadowShift,halfSize,shadowRadius);
   float penumbra=3.5+elevation*.16;
   float shadowCoverage=1.0-smoothstep(-penumbra,penumbra*2.0,shadowD);
   float shadowRim=exp(-pow(shadowD/(penumbra*1.35),2.0));
   float shadowAlpha=shadowCoverage*.028+shadowRim*(.088-.018*uLift);
   vec4 result=vec4(vec3(.12,.22,.24)*shadowAlpha,shadowAlpha);
-  if(coverage<.001) return result;
-  vec3 surface=soapSurface(p,halfSize,radius,thickness);
-  vec3 N=normalize(vec3(-surface.xy,1.0));
-  vec2 edgeNormal=roundedSurfaceNormal(p,halfSize,radius);
-  vec3 R=reflect(vec3(0,0,-1),N);
-  float f0=pow((uGlass.x-1.0)/(uGlass.x+1.0),2.0);
-  float fresnel=f0+(1.0-f0)*pow(1.0-max(N.z,0.0),5.0);
-  float facing=dot(edgeNormal,normalize(L.xy));
-  float lit=.5+.5*facing;
-  // Narrow absorbing seam, clear polished interface, then the broad rolled
-  // shoulder. Each follows the same rounded contour and its changing normals.
-  float seam=exp(-pow((depth-1.15)/.88,2.0));
-  float innerSeam=exp(-pow((depth-4.2)/.72,2.0));
-  float polish=exp(-pow((depth-2.65)/.80,2.0));
-  float innerPolish=exp(-pow((depth-5.7)/1.1,2.0));
-  float shoulder=exp(-pow((depth-10.5)/5.2,2.0));
-  float absorption=(seam*(.48+.28*lit)+innerSeam*.20)*coverage;
-  float faceAlpha=(.018+.024*fresnel+.014*shoulder)*coverage;
-  float materialAlpha=clamp(absorption+faceAlpha,0.0,.78);
-  vec3 material=mix(vec3(.36,.72,.72),vec3(.035,.28,.30),seam*.86);
-  vec3 radiance=material*materialAlpha;
-  float window=exp(-pow((R.y+.56)/.24,2.0))*(.52+.48*lit);
-  float reflection=(polish*(.25+.62*lit)+innerPolish*(.14+.35*(1.0-lit))
-    +shoulder*window*.18)*coverage;
-  float reflectionAlpha=clamp(reflection,0.0,.85);
-  radiance=radiance*(1.0-reflectionAlpha)+vec3(.96,1.0,.99)*reflectionAlpha;
-  materialAlpha=reflectionAlpha+materialAlpha*(1.0-reflectionAlpha);
-  // Very broad, low-opacity reflection on the convex face; no white frosting.
-  float faceReflection=pow(max(dot(N,normalize(L+vec3(0,0,1))),0.0),18.0)*.024*coverage;
-  radiance+=vec3(.78,.94,.97)*faceReflection;
-  return vec4(radiance+result.rgb*(1.0-materialAlpha),
-    materialAlpha+result.a*(1.0-materialAlpha));
+  if(coverage<=0.0) return result;
+  // Material equations from 3f3fcd6, without its old shadow, lift or DOM lens.
+  vec2 referenceNormal=roundedSurfaceNormal(p,halfSize,radius);
+  float outerRim=exp(-depth/2.2);
+  float innerShoulder=exp(-pow((depth-7.0)/5.5,2.0));
+  vec2 crownSlope=-p/max(halfSize,vec2(1.0))*.10;
+  vec3 referenceN=normalize(vec3(-referenceNormal*outerRim*1.25+crownSlope,1.0));
+  vec2 referenceDirection=normalize(vec2(-.42,-.72));
+  float referenceF0=pow((uGlass.x-1.0)/(uGlass.x+1.0),2.0);
+  float referenceFresnel=referenceF0+(1.0-referenceF0)*pow(1.0-max(referenceN.z,0.0),5.0);
+  float sunRim=pow(max(dot(referenceNormal,referenceDirection),0.0),1.22);
+  float counterRim=pow(max(dot(referenceNormal,-referenceDirection),0.0),1.45);
+  float broadTop=exp(-pow((p.y+halfSize.y*.82)/max(13.0,halfSize.y*.22),2.0))
+    *exp(-pow((p.x+halfSize.x*.34)/max(54.0,halfSize.x*.70),2.0));
+  float lowerReflection=exp(-pow((p.y-halfSize.y*.78)/max(13.0,halfSize.y*.24),2.0))
+    *exp(-pow((p.x-halfSize.x*.42)/max(48.0,halfSize.x*.58),2.0));
+  float referenceAlpha=clamp((.010+referenceFresnel*.020
+    +outerRim*(.055+.075*sunRim+.045*counterRim)
+    +innerShoulder*(.018+.025*counterRim))*coverage,0.0,.19);
+  vec3 referenceRadiance=vec3(.86,.97,.98)*(.010+referenceFresnel*.012)*coverage;
+  referenceRadiance+=mix(vec3(.018,.105,.115),vec3(.10,.31,.32),counterRim)
+    *outerRim*(.055+.075*counterRim);
+  referenceRadiance+=vec3(.82,1.0,1.0)*outerRim*sunRim*.22;
+  referenceRadiance+=vec3(.54,.90,.92)*innerShoulder*(.018+.040*counterRim);
+  referenceRadiance+=vec3(.88,1.0,1.0)*(broadTop*.055+lowerReflection*.040)
+    *(1.0-.18*uLift);
+  float upperLip=pow(max(-referenceNormal.y,0.0),1.5)*.52;
+  float sideLip=max(-referenceNormal.x,0.0)*.12;
+  float polish=exp(-pow((depth-1.8)/3.0,2.0))*(upperLip+sideLip)*coverage;
+  vec4 glass=vec4(vec3(polish)+referenceRadiance*(1.0-polish),
+    polish+referenceAlpha*(1.0-polish));
+  return glass+result*(1.0-glass.a);
 }
 `;
 

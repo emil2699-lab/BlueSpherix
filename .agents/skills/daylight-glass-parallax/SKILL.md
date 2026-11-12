@@ -9,12 +9,16 @@ Use with the existing ice-glass-shader and visual-glass-testing skills. This
 project-specific material applies only to Today in light mode. Keep the existing
 dark material and other views. The user's current choices supersede older
 instructions about a cursor light or keeping every label on the base.
+The latest user choice restores only the visible soap material from `3f3fcd6`;
+preserve the animation, shadow, caustics and dashboard colours from `f30afa0`.
+Its visible contour is calibrated separately from the approved transmission
+footprint. Do not restore the old DOM lens, shadow or 82 px lift.
 
 ## Optical and interaction contract
 
 - Preserve layout and real selectable, accessible DOM content.
-- Reference: clear shallow convex slab, rounded corners, a narrow teal seam,
-  multiple polished edge interfaces, broad soft window reflection, clear centre.
+- Reference: the `3f3fcd6` clear convex slab, 56 px rounded corners, soft teal
+  rim, rolled shoulder and polished lip, broad reflection and clear centre.
 - One fixed natural source above and to the left. Its transmitted rays and cast
   shadow must travel down/right in page coordinates. Cursor controls height only.
 - Glass advances in Z. Text and icons advance by exactly half its Z distance.
@@ -25,7 +29,8 @@ instructions about a cursor light or keeping every label on the base.
   then intersecting the receiving plane. Estimate flux concentration from the
   projected/source area ratio; bound highlights and account for Fresnel losses.
   This is a planar-receiver approximation, not full scene path tracing.
-- Use the same height, profile and source for the material, shadow and caustics.
+- Use the same height and fixed source for the shadow and caustics, retaining
+  their approved transmission profile independently of the restored visible rim.
   Do not add animated noise, random decorative lines, or a separate light source.
 - Weak transmitted shadow and bright caustics coexist. Keep the shadow light;
   clear glass does not cast an opaque grey copy of the entire card.

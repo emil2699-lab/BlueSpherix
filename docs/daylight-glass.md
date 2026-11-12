@@ -4,9 +4,16 @@ Implemented from the user's photographic reference and choices: Today only,
 light mode only; text/icons at half the glass height; charts/images on the base;
 soft transmitted shadow plus caustics. Based on restored `0e6bf17`.
 
+The latest material-only revision restores the visible soap from `3f3fcd6`:
+56 px rounded corners and its original soft rim, shoulder, crown and polished
+lip equations. The 48 px glass / 24 px label animation, dashboard palette,
+transmitted shadow and cached caustic field remain those of `f30afa0`.
+The visible contour is calibrated independently from the retained transmission
+footprint so the approved shadow and caustic pattern do not change.
+
 ## Rendering
 
-- `app/daylight-glass.ts`: polished teal interfaces, rounded convex shoulder,
+- `app/daylight-glass.ts`: the restored soft teal rim, rounded convex shoulder,
   Fresnel reflection, a nearly clear face, and a weak transmitted shadow.
 - The fixed daylight direction is `(-.38, -.56, 1.4)`, above/left, with angular
   radius `.045`. Shadow and caustics travel according to this same source.
@@ -33,6 +40,11 @@ refraction.
 
 ## Verification
 
+- Material-only revision: isolated GPU comparison with `3f3fcd6` produces
+  identical RGBA pixels at three card sizes and three lift states. The same
+  comparison confirms the shadow is identical to `f30afa0` (18 comparisons,
+  zero changed channels). Caustic shaders/cache and motion parameters are
+  unchanged at source level.
 - Production build including TypeScript: passed.
 - Existing optical model checks and shader skill compilation: passed.
 - Skill manifest/reference validation: passed.
@@ -42,7 +54,7 @@ refraction.
   dark theme, scrolling, mobile, reduced motion, no-WebGL fallback and context
   loss/restoration.
 - Caustic ablation at 1440×1000: disabling only the equity card's caustic
-  composite changed 9,693 brightened pixels inside and 2,521 outside its original
+  composite changed 9,613 brightened pixels inside and 2,533 outside its original
   bounds (RGB-sum difference greater than 12).
 - Dark baseline/new screenshot comparison at 1440×1000: all 4,320,000 RGB
   channels identical, with reduced motion enabled in both captures.
