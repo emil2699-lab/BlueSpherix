@@ -93,6 +93,7 @@ uniform float uCrownHeight;
 // x: radial coverage, y: control flag, z: deselection fade, w: convex volume.
 uniform vec4 uCoating;
 uniform float uControlBrightness;
+uniform float uSwitchTint;
 uniform vec2 uCoatingOrigin;
 // Selected under-glass light: P&L ceiling and seconds since selection.
 uniform vec2 uUnderlight;
@@ -461,6 +462,15 @@ void main() {
     vec3 daylightRadiance=daylightBody*daylightAlpha;
     daylightRadiance+=caustic*vec3(.028,.038,.043)*spectralReach*rimDirection*(.72+solarFocus);
     daylightRadiance+=vec3(.66,.80,.78)*solarFocus*.034;
+    // Carry the sampled switch palette into the daylight branch: neutral
+    // switches receive dashboard aqua, while semantic controls keep their own
+    // hue. Absorption stays inside the transparent body instead of becoming a
+    // flat fill; card glass and non-switch controls remain unchanged.
+    if(uSwitchTint>.5) {
+      float tintAbsorption=coverage*(.048+.027*(1.0-bevel));
+      daylightAlpha=clamp(daylightAlpha+tintAbsorption,0.0,.13);
+      daylightRadiance+=uTint*tintAbsorption*.58;
+    }
     outColor=vec4(daylightRadiance,daylightAlpha);
     if(uLightGlass>.5) {
       // The polished lip belongs to this same projected volume. Keeping it in

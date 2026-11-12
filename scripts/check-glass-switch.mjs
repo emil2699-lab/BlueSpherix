@@ -24,8 +24,8 @@ try {
     window.switchFrames=[];const proto=WebGL2RenderingContext.prototype,names=new WeakMap(),get=proto.getUniformLocation;
     proto.getUniformLocation=function(p,n){const l=get.call(this,p,n);if(l)names.set(l,n);return l;};
     const state={};
-    for(const key of ['uniform1f','uniform4f']){const original=proto[key];proto[key]=function(location,...values){state[names.get(location)]=values;return original.call(this,location,...values);};}
-    const draw=proto.drawArrays;proto.drawArrays=function(...args){if(state.uControlBrightness?.[0]===1.5)window.switchFrames.push({time:performance.now(),rect:state.uRect,coating:state.uCoating});return draw.apply(this,args);};
+    for(const key of ['uniform1f','uniform3f','uniform4f']){const original=proto[key];proto[key]=function(location,...values){state[names.get(location)]=values;return original.call(this,location,...values);};}
+    const draw=proto.drawArrays;proto.drawArrays=function(...args){if(state.uControlBrightness?.[0]===1.5)window.switchFrames.push({time:performance.now(),rect:state.uRect,coating:state.uCoating,switchTint:state.uSwitchTint,tint:state.uTint});return draw.apply(this,args);};
   });
   const url=process.env.GLASS_SELECTION_URL||'http://127.0.0.1:3001/';
   await page.goto(`${url}#overview`);await page.locator('.content[data-ice-glass=ready]').waitFor();
@@ -33,8 +33,10 @@ try {
   const advance=async ms=>{await page.clock.runFor(2);await page.clock.fastForward(ms);await page.clock.runFor(2);};
   const oneMonth=page.getByRole('button',{name:'1M',exact:true});await oneMonth.click({force:true});await advance(920);
   assert.equal(await oneMonth.getAttribute('data-glass-selection'),'selected');
+  const neutralFrames=await page.evaluate(()=>window.switchFrames);
+  assert(neutralFrames.some(f=>f.switchTint?.[0]===1&&f.tint?.[1]>.8&&f.tint?.[0]<.4),'neutral selected switch receives the aqua glass tint');
   const destination=page.getByRole('button',{name:'1Y',exact:true});await destination.hover();await advance(500);
-  const box=await destination.boundingBox();await page.evaluate(()=>{window.switchFrames=[];});
+  const box=await destination.boundingBox(),layoutWidth=await destination.evaluate(el=>el.offsetWidth);await page.evaluate(()=>{window.switchFrames=[];});
   await destination.click({force:true});await advance(150);
   await page.screenshot({path:`${dir}/selector-stretched.png`});
   await advance(230);await page.screenshot({path:`${dir}/selector-recoil.png`});
@@ -43,7 +45,7 @@ try {
   const frames=await page.evaluate(()=>window.switchFrames);
   assert(frames.some(f=>f.rect[2]>box.width*1.2),'glass stretches between options');
   assert(Math.abs(frames.at(-1).rect[2]-box.width)<.1,'glass returns to original width');
-  assert(Math.abs((await destination.boundingBox()).width-box.width)<.01,'text and hit target do not stretch');
+  assert.equal(await destination.evaluate(el=>el.offsetWidth),layoutWidth,'text and hit target keep their layout width');
   await page.locator('.welcome h1:visible').click({force:true});await advance(240);
   assert.equal(await destination.getAttribute('data-glass-selection'),null);
   await page.evaluate(()=>{location.hash='risk';});await advance(800);
