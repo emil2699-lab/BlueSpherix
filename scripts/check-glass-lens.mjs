@@ -56,13 +56,13 @@ for(const [width,height] of [[369,134],[764,478],[1136,48],[280,540],[328,720],[
 
 // The Today prototype adds a centred paraxial term to make the convex lens's
 // magnification legible. It must remain upright, symmetric and reduce the
-// previously approved zoom excess by 20% without weakening the traced surface.
+// previous zoom excess by a further 20% without weakening the traced surface.
 const referenceWidth=784.6875,referenceHeight=479;
 const referenceProfile={width:referenceWidth,height:referenceHeight,
   radius:ICE_GLASS.todayRadius,thickness:ICE_GLASS.todayThickness,
   ior:ICE_GLASS.glassIOR,distance:ICE_GLASS.todayLift};
 const reference=buildLensField({...referenceProfile,paraxial:ICE_GLASS.todayParaxial});
-const previousReference=buildLensField({...referenceProfile,paraxial:.075});
+const previousReference=buildLensField({...referenceProfile,paraxial:.0514});
 const referenceStepX=(referenceWidth+2*reference.padding)/reference.width;
 const referenceStepY=(referenceHeight+2*reference.padding)/reference.height;
 let referenceMinimum=1;

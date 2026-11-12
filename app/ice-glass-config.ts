@@ -12,7 +12,7 @@ export const ICE_GLASS = {
   todayThickness: 16.5,
   todayLift: 62.73,
   todayPerspective: 1100,
-  todayParaxial: .0514,
+  todayParaxial: .03936,
   glassRoughness: .21,
   glassOpacity: .58,
   glassBodyOpacity: .14,
