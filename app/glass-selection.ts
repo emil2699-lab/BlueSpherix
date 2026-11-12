@@ -251,7 +251,12 @@ export function useGlassSelection(rootRef: RefObject<HTMLElement | null>) {
     const stopThumbs = () => { for (const animation of thumbAnimations.values()) animation.cancel(); thumbAnimations.clear(); };
     const navigation = () => { stopThumbs(); for (const element of materials.keys()) remove(element); selected = null; queueMicrotask(syncMultiple); };
     const change = () => queueMicrotask(syncMultiple);
-    const observer = new MutationObserver(syncMultiple);
+    const observer = new MutationObserver(records => {
+      // Optical definitions change during lift/fallback animation. They cannot
+      // change checked controls and must not trigger a dashboard-wide rescan.
+      if (records.every(record => record.target instanceof Element && record.target.closest('.ice-glass-refraction-defs'))) return;
+      syncMultiple();
+    });
     observer.observe(root,{ childList: true, subtree: true, attributes: true, attributeFilter: ['aria-pressed','aria-selected','checked','disabled','hidden','data-glass-multiple'] });
     root.addEventListener('change',change);
     root.addEventListener('pointerdown',rememberThumb,{passive:true});
