@@ -139,8 +139,25 @@ type LensEntry = { key: string; id: string; filter: SVGFilterElement; style: SVG
 const SVG_NS="http://www.w3.org/2000/svg";
 let nextLens=0;
 
+/**
+ * WebKit can report support for SVG filters on HTML while compositing an
+ * feImage/feDisplacementMap makes the filtered DOM disappear or stalls the
+ * page. Keep the material renderer active there, but leave real DOM content
+ * on its readable base plane. iOS browsers use WebKit too, including CriOS.
+ */
+export function supportsDomSvgLensFilters(userAgent: string) {
+  const webKit = /AppleWebKit/i.test(userAgent);
+  const desktopChromium = /(?:Chrome|Chromium|Edg|OPR)\//i.test(userAgent);
+  return !webKit || desktopChromium;
+}
+
 /** DOM optics share the existing renderer's lift clock; there is no new loop. */
-export function createGlassLenses(definitions: SVGDefsElement) {
+export function createGlassLenses(definitions: SVGDefsElement, enabled = true) {
+  if(!enabled) return {
+    update(...args: [HTMLElement, LensProfile, number, number?]) { void args; },
+    retain(...args: [Set<HTMLElement>]) { void args; },
+    clear() {},
+  };
   const entries=new Map<HTMLElement,LensEntry>();
   const maps=new Map<string,{href: string; padding: number; range: number}>();
   const bitmap=document.createElement("canvas");

@@ -5,7 +5,7 @@ import { ICE_GLASS as config } from "./ice-glass-config";
 import { glassFragment, glassVertex } from "./ice-glass-shader";
 import { coatingProgress, useGlassSelection } from "./glass-selection";
 import { soapSample } from "./ice-glass-volume";
-import { createGlassLenses } from "./ice-glass-lens";
+import { createGlassLenses, supportsDomSvgLensFilters } from "./ice-glass-lens";
 import { switchRect } from "./glass-switch-motion";
 
 type ViewportRect = { left: number; top: number; width: number; height: number };
@@ -28,7 +28,11 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     if (!canvas || !root || !definitions) return;
     const gl = canvas.getContext("webgl2", { alpha: true, antialias: false, depth: false, premultipliedAlpha: true, powerPreference: "low-power" });
     if (!gl) return; // The original dark cards are the no-WebGL fallback.
-    const lenses = createGlassLenses(definitions);
+    // Safari/WebKit advertises CSS/SVG filter support but can drop the whole
+    // filtered card (text included) and lock its compositor. Retain the shared
+    // WebGL material/caustics while using an unfiltered, readable DOM plane.
+    const domLensFilters = supportsDomSvgLensFilters(navigator.userAgent);
+    const lenses = createGlassLenses(definitions, domLensFilters);
     let program: WebGLProgram | null = null;
     let vao: WebGLVertexArrayObject | null = null;
     let shaders: WebGLShader[] = [];

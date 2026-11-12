@@ -1,10 +1,17 @@
 import assert from "node:assert/strict";
-import { buildLensField, soapLensSlope } from "../app/ice-glass-lens.ts";
+import { buildLensField, soapLensSlope, supportsDomSvgLensFilters } from "../app/ice-glass-lens.ts";
 import { soapSample } from "../app/ice-glass-volume.ts";
 import { ICE_GLASS } from "../app/ice-glass-config.ts";
 
 const profile=(width,height,ior=1.5) => ({width,height,ior,radius:Math.min(28,width*.475,height*.475),thickness:Math.min(12,width*.25,height*.25),distance:48});
 const close=(a,b,tolerance=1e-6) => assert(Math.abs(a-b)<=tolerance,`${a} differs from ${b}`);
+
+// Safari and every browser on iOS share the WebKit compositor. Its advertised
+// support is not enough: CSS url() filters containing feImage can blank HTML.
+assert.equal(supportsDomSvgLensFilters("Mozilla/5.0 (Macintosh) AppleWebKit/605.1.15 Version/18.1 Safari/605.1.15"),false);
+assert.equal(supportsDomSvgLensFilters("Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 CriOS/131.0 Mobile/15E148 Safari/604.1"),false);
+assert.equal(supportsDomSvgLensFilters("Mozilla/5.0 (Macintosh) AppleWebKit/537.36 Chrome/131.0 Safari/537.36"),true);
+assert.equal(supportsDomSvgLensFilters("Mozilla/5.0 Gecko/20100101 Firefox/133.0"),true);
 
 // An index-matched volume cannot focus light; the optical axis cannot drift.
 assert.deepEqual(soapLensSlope(120,40,profile(400,200,1)),[0,0]);
