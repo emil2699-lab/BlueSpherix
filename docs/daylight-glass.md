@@ -14,6 +14,16 @@ it to 47.5% of the smaller card dimension, including the narrow notice/strip.
 The caustic field follows the corrected corners; lighting, motion and colour
 parameters remain unchanged.
 
+Light-mode action buttons and navigation now retain a translucent coloured
+glass surface at rest, with inset polished interfaces. Aqua, violet and amber
+identify the existing action families; stress/removal controls use red. Selected,
+hover, disabled and keyboard-focus states remain distinct, including while a
+control has the shared WebGL selection material. Data rows, heatmaps and switch
+tracks retain their existing semantic surfaces. `app/glass-buttons.css` changes
+paint without added backdrop blur, shader work or a runtime loop. Compact text
+actions receive button padding and fit their label rather than stretching into
+a thin full-width strip; card geometry stays unchanged.
+
 ## Rendering
 
 - `app/daylight-glass.ts`: the restored soft teal rim, rounded convex shoulder,
@@ -43,6 +53,11 @@ refraction.
 
 ## Verification
 
+- Coloured controls: Chromium checks cover Today, Calendar, Risk, Lab and mobile;
+  selected controls retain their tint/rim alongside the WebGL coating, keyboard
+  focus is visible, range/filter/alert actions work, and the mobile scrim keeps
+  its original treatment. No runtime errors; zero settled-idle WebGL draws.
+  Dark screenshot comparison remains identical across all 4,320,000 RGB channels.
 - Corner correction: instrumented WebGL draws confirm matching glass/caustic
   radii at 1440×1000 and 390×844, including the smaller radius clamped for short
   cards. The shadow uses the glass's exact SDF radius. No browser runtime errors.
