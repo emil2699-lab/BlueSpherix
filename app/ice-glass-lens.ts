@@ -101,7 +101,10 @@ export function buildLensField(profile: LensProfile): LensField {
     const qx=Math.abs(px)-profile.width*.5+profile.radius;
     const qy=Math.abs(py)-profile.height*.5+profile.radius;
     const depth=profile.radius-Math.min(Math.max(qx,qy),0)-Math.hypot(Math.max(qx,0),Math.max(qy,0));
-    const shoulder=clamp((depth-8)/34,0,1);
+    // Finish the merge inside the optical lip. Letting this transition cross
+    // the content area would locally compress glyphs even though the map never
+    // mathematically folds.
+    const shoulder=clamp((depth-3)/15,0,1);
     const transmission=shoulder*shoulder*(3-2*shoulder);
     offsets[i]=offsets[i]*gain-px*(profile.paraxial ?? 0)*transmission;
     offsets[i+1]=offsets[i+1]*gain-py*(profile.paraxial ?? 0)*transmission;
