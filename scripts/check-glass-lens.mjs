@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { buildLensField, soapLensSlope, supportsDomSvgLensFilters } from "../app/ice-glass-lens.ts";
+import { buildLensField, fallbackLensMagnification, soapLensSlope, supportsDomSvgLensFilters } from "../app/ice-glass-lens.ts";
 import { soapSample } from "../app/ice-glass-volume.ts";
 import { ICE_GLASS } from "../app/ice-glass-config.ts";
 
@@ -12,6 +12,8 @@ assert.equal(supportsDomSvgLensFilters("Mozilla/5.0 (Macintosh) AppleWebKit/605.
 assert.equal(supportsDomSvgLensFilters("Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 CriOS/131.0 Mobile/15E148 Safari/604.1"),false);
 assert.equal(supportsDomSvgLensFilters("Mozilla/5.0 (Macintosh) AppleWebKit/537.36 Chrome/131.0 Safari/537.36"),true);
 assert.equal(supportsDomSvgLensFilters("Mozilla/5.0 Gecko/20100101 Firefox/133.0"),true);
+close(fallbackLensMagnification(1),1);
+close(fallbackLensMagnification(ICE_GLASS.todayPerspective/(ICE_GLASS.todayPerspective-ICE_GLASS.todayLift)),1.05443,1e-5);
 
 // An index-matched volume cannot focus light; the optical axis cannot drift.
 assert.deepEqual(soapLensSlope(120,40,profile(400,200,1)),[0,0]);

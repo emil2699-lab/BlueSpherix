@@ -136,6 +136,7 @@ export function buildLensField(profile: LensProfile): LensField {
 }
 
 type LensEntry = { key: string; id: string; filter: SVGFilterElement; style: SVGStyleElement; image: SVGFEImageElement; displacement: SVGFEDisplacementMapElement; range: number; padding: number; active: boolean; scale: string; projection: number };
+type ScaleLensEntry = { key: string; id: string; style: SVGStyleElement; origins: string; scale: string; active: boolean };
 const SVG_NS="http://www.w3.org/2000/svg";
 let nextLens=0;
 
@@ -151,13 +152,77 @@ export function supportsDomSvgLensFilters(userAgent: string) {
   return !webKit || desktopChromium;
 }
 
-/** DOM optics share the existing renderer's lift clock; there is no new loop. */
-export function createGlassLenses(definitions: SVGDefsElement, enabled = true) {
-  if(!enabled) return {
-    update(...args: [HTMLElement, LensProfile, number, number?]) { void args; },
-    retain(...args: [Set<HTMLElement>]) { void args; },
-    clear() {},
+export const fallbackLensMagnification = (projection: number) =>
+  1+(Math.max(1,projection)-1)*.9;
+
+/**
+ * Safari fallback: reproduce the paraxial magnification without asking WebKit
+ * to filter a large live DOM subtree. Every top-level content plane scales
+ * around the same optical centre, so the card layout and hit area stay fixed.
+ * Rules live in the ignored SVG definitions host to avoid MutationObserver
+ * feedback while the lift clock updates the scale.
+ */
+function createScaleGlassLenses(definitions: SVGDefsElement) {
+  const entries=new Map<HTMLElement,ScaleLensEntry>();
+  const remove=(element: HTMLElement) => {
+    const entry=entries.get(element);
+    entry?.style.remove();
+    delete element.dataset.iceLensFallback;
+    entries.delete(element);
   };
+  const prepare=(element: HTMLElement, profile: LensProfile) => {
+    let entry=entries.get(element);
+    const key=`${profile.width.toFixed(2)}:${profile.height.toFixed(2)}:${element.childElementCount}`;
+    if(!entry) {
+      const id=`ice-glass-scale-${++nextLens}`;
+      const style=document.createElementNS(SVG_NS,"style");
+      definitions.append(style);
+      entry={key:"",id,style,origins:"",scale:"",active:false};
+      entries.set(element,entry);
+    }
+    if(entry.key!==key) {
+      const wasActive=entry.active;
+      if(wasActive) delete element.dataset.iceLensFallback;
+      const card=element.getBoundingClientRect();
+      const centreX=card.left+card.width*.5,centreY=card.top+card.height*.5;
+      const selector=`html[data-theme="light"] .content[data-ice-glass="ready"] [data-ice-lens-fallback="${entry.id}"]`;
+      entry.origins=Array.from(element.children).map((child,index) => {
+        const rect=child.getBoundingClientRect();
+        return `${selector}>:nth-child(${index+1}){transform-origin:${(centreX-rect.left).toFixed(2)}px ${(centreY-rect.top).toFixed(2)}px}`;
+      }).join("");
+      entry.key=key;
+      entry.scale="";
+      if(wasActive) element.dataset.iceLensFallback=entry.id;
+    }
+    return entry;
+  };
+  return {
+    update(element: HTMLElement, profile: LensProfile, _lift: number, projection=1) {
+      void _lift;
+      const existing=entries.get(element);
+      if(projection<=1.00001) {
+        if(existing?.active) { delete element.dataset.iceLensFallback; existing.active=false; }
+        return;
+      }
+      const entry=prepare(element,profile);
+      // Match the accepted Today lens: 90% of its perspective enlargement is
+      // the readable paraxial image, reaching about 1.054x at full lift.
+      const scale=fallbackLensMagnification(projection).toFixed(5);
+      if(scale!==entry.scale) {
+        const selector=`html[data-theme="light"] .content[data-ice-glass="ready"] [data-ice-lens-fallback="${entry.id}"]`;
+        entry.style.textContent=`${entry.origins}${selector}>*{scale:${scale};transform-box:border-box}`;
+        entry.scale=scale;
+      }
+      if(!entry.active) { element.dataset.iceLensFallback=entry.id; entry.active=true; }
+    },
+    retain(elements: Set<HTMLElement>) { for(const element of entries.keys()) if(!elements.has(element)) remove(element); },
+    clear() { for(const element of entries.keys()) remove(element); },
+  };
+}
+
+/** DOM optics share the existing renderer's lift clock; there is no new loop. */
+export function createGlassLenses(definitions: SVGDefsElement, svgFilters = true) {
+  if(!svgFilters) return createScaleGlassLenses(definitions);
   const entries=new Map<HTMLElement,LensEntry>();
   const maps=new Map<string,{href: string; padding: number; range: number}>();
   const bitmap=document.createElement("canvas");
