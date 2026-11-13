@@ -261,16 +261,12 @@ void main() {
   // Inverse perspective maps the projected glass back to its material plane.
   // The centre never drifts, and the DOM/base rectangle is not transformed.
   float projectionScale=max(uProjection,1.0);
-  // The reference selector uses a slightly wider optical billet than its text
-  // box. Expand only the rendered material; layout and hit targets stay fixed.
-  vec2 projectionAxes=vec2(projectionScale*(uTheme>.5 && uSwitchTint>.5 ? 1.12 : 1.0),projectionScale);
-  vec2 p = basePoint/projectionAxes;
+  vec2 p = basePoint/projectionScale;
   // A soap volume needs a broad shoulder and rolled corners, rather than the
   // narrow fillet of the original flat slab. Keep its bounding rectangle fixed.
   float daylightCard = uTheme*uLightGlass;
   float radius = min(min(halfSize.x,halfSize.y)*.95,
     mix(max(uRadius*1.75,24.0),uRadius,daylightCard));
-  if(uTheme>.5 && uSwitchTint>.5) radius=min(radius,min(halfSize.x,halfSize.y)*.70);
   float d = boxSDF(p,halfSize,radius);
   float aa = 1.25/(uDPR*projectionScale);
   float coverage = 1.0-smoothstep(-aa,0.0,d);
@@ -280,17 +276,6 @@ void main() {
   float thickness = min(mix(uGlass.y*2.1,uDaylightThickness,daylightCard),
     min(halfSize.x,halfSize.y)*.50);
   if (coverage <= 0.0) {
-    if(uTheme>.5 && uSwitchTint>.5) {
-      // The reference switch has no drop shadow. Its small exterior footprint
-      // is transmitted daylight: a clear, aqua-biased caustic that hugs the
-      // lower shoulder and fades before reaching the neighbouring option.
-      vec2 outward=roundedSurfaceNormal(clamp(p,-halfSize,halfSize),halfSize,radius);
-      float receiver=max(dot(outward,normalize(vec2(.28,.96))),0.0);
-      float pool=exp(-pow(max(d,0.0)/3.8,2.0))*(.22+.78*receiver);
-      float poolAlpha=pool*.055;
-      outColor=vec4(vec3(poolAlpha)+uTint*pool*.018,poolAlpha);
-      return;
-    }
     if(uTheme<.5 || uLightGlass<.5) discard;
     // The same directional daylight that enters the glass projects its
     // dispersed caustic onto the dashboard plane, without a cast shadow.
@@ -482,59 +467,25 @@ void main() {
     // hue. Absorption stays inside the transparent body instead of becoming a
     // flat fill; card glass and non-switch controls remain unchanged.
     if(uSwitchTint>.5) {
-      // Selected switches use the compact, strongly convex lens from the
-      // reference: a clear aqua transmission beneath a double optical rim.
-      // Colour follows Beer-style path length, so it remains glass rather than
-      // becoming a flat opaque fill.
-      float switchBody=smoothstep(thickness*.10,thickness*.62,opticalDepth);
-      float clearRim=exp(-depth/max(1.15,thickness*.075));
-      float innerRim=exp(-pow((depth-thickness*.19)/(thickness*.12),2.0));
-      float switchAbsorption=coverage*(.180+.140*switchBody+.040*clearRim);
-      float rimAbsorption=coverage*clearRim*.17;
-      daylightAlpha=clamp(daylightAlpha+switchAbsorption+rimAbsorption,0.0,.38);
-      daylightRadiance+=uTint*(switchAbsorption*(.22+.03*daylightFresnel)
-        +coverage*(.120+.050*switchBody)+rimAbsorption*.12);
-
-      // A broad area-light reflection and a narrower crest share the analytic
-      // soap normal. They therefore bend around the crown instead of appearing
-      // as decorative gradients painted on the button.
-      vec3 switchHalf=normalize(sunL+V);
-      float switchIncidence=max(dot(N,switchHalf),0.0);
-      float curvedShoulder=smoothstep(.015,.42,1.0-N.z);
-      float broadReflection=pow(switchIncidence,9.0)*curvedShoulder;
-      float sharpReflection=pow(switchIncidence,34.0)*curvedShoulder;
-      vec2 switchUV=p/max(halfSize,vec2(1.0));
-      // Project the finite ceiling/window source onto the curved normal field.
-      // Its oblique footprint becomes the broad white patch seen on real glass.
-      vec2 sourceUV=switchUV-vec2(-.43,-.48);
-      vec2 sourceAxis=vec2(sourceUV.x*.91+sourceUV.y*.42,
-        -sourceUV.x*.42+sourceUV.y*.91);
-      float areaReflection=exp(-dot(sourceAxis*vec2(2.8,6.2),sourceAxis*vec2(2.8,6.2)));
-      float upperRim=pow(max(-surfaceNormal.y,0.0),1.22);
-      float sideRim=pow(max(abs(surfaceNormal.x),0.0),1.65);
-      float internalCurve=.23+.12*sin((switchUV.x+.18)*2.75);
-      float internalCaustic=exp(-pow((switchUV.y-internalCurve)/.065,2.0))
-        *smoothstep(.86,-.72,switchUV.x);
-      float whiteReflection=clamp(
-        broadReflection*.38+sharpReflection*.68+areaReflection*.92
-        +clearRim*(.025+.58*upperRim+.08*sideRim)
-        +innerRim*(.07+.20*upperRim)+internalCaustic*.24,0.0,.94)*coverage;
-
-      // Dispersion belongs to the same transmitted paths used by the general
-      // material. It is strongest where curvature and the polished rim meet.
-      vec3 switchPrism=caustic*vec3(.19,.14,.22)
-        *spectralReach*(.30+.70*curvedShoulder)*coverage;
-      float upperPrism=exp(-dot((switchUV-vec2(.61,-.47))*vec2(7.0,9.0),
-        (switchUV-vec2(.61,-.47))*vec2(7.0,9.0)));
-      float lowerPrism=exp(-dot((switchUV-vec2(-.57,.55))*vec2(8.0,10.0),
-        (switchUV-vec2(-.57,.55))*vec2(8.0,10.0)));
-      switchPrism+=vec3(.46,.085,.52)*upperPrism+vec3(.04,.31,.37)*lowerPrism;
-      daylightRadiance+=switchPrism;
-      outColor=vec4(vec3(whiteReflection)
-          +daylightRadiance*(1.0-whiteReflection),
-        whiteReflection+daylightAlpha*(1.0-whiteReflection));
-    } else {
-      outColor=vec4(daylightRadiance,daylightAlpha);
+      // Daylight washes a weak tint out. Concentrate pigment only after the ray
+      // has crossed enough of the body, even on compact convex switches, while
+      // the low-pigment shoulder preserves the white polished reflection.
+      float tintBody=smoothstep(1.5,max(4.0,thickness*.22),opticalDepth);
+      float tintAbsorption=coverage*(.055+.22*tintBody);
+      daylightAlpha=clamp(daylightAlpha+tintAbsorption,0.0,.32);
+      daylightRadiance+=uTint*tintAbsorption*(.72+.04*daylightFresnel);
+    }
+    outColor=vec4(daylightRadiance,daylightAlpha);
+    if(uSwitchTint>.5) {
+      // Compact switches are not liftable card surfaces, so give their own SDF
+      // shoulder a directional white polish. The chromatic body remains below
+      // it and visible through the clear, untinted rim.
+      float switchUpper=pow(max(-surfaceNormal.y,0.0),1.35)*.48;
+      float switchSide=pow(abs(surfaceNormal.x),1.8)*.11;
+      float switchPolish=exp(-pow((depth-1.35)/1.75,2.0))
+        *(switchUpper+switchSide)*coverage;
+      outColor=vec4(vec3(switchPolish)+outColor.rgb*(1.0-switchPolish),
+        switchPolish+outColor.a*(1.0-switchPolish));
     }
     if(uLightGlass>.5) {
       // The polished lip belongs to this same projected volume. Keeping it in
