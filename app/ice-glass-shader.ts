@@ -93,7 +93,7 @@ uniform float uCrownHeight;
 // x: radial coverage, y: control flag, z: deselection fade, w: convex volume.
 uniform vec4 uCoating;
 uniform float uControlBrightness;
-uniform float uSwitchTint;
+uniform float uSwitchGlass;
 uniform vec2 uCoatingOrigin;
 // Selected under-glass light: P&L ceiling and seconds since selection.
 uniform vec2 uUnderlight;
@@ -462,31 +462,7 @@ void main() {
     vec3 daylightRadiance=daylightBody*daylightAlpha;
     daylightRadiance+=caustic*vec3(.028,.038,.043)*spectralReach*rimDirection*(.72+solarFocus);
     daylightRadiance+=vec3(.66,.80,.78)*solarFocus*.034;
-    // Carry the sampled switch palette into the daylight branch: neutral
-    // switches receive dashboard aqua, while semantic controls keep their own
-    // hue. Absorption stays inside the transparent body instead of becoming a
-    // flat fill; card glass and non-switch controls remain unchanged.
-    if(uSwitchTint>.5) {
-      // Daylight washes a weak tint out. Concentrate pigment only after the ray
-      // has crossed enough of the body, even on compact convex switches, while
-      // the low-pigment shoulder preserves the white polished reflection.
-      float tintBody=smoothstep(1.5,max(4.0,thickness*.22),opticalDepth);
-      float tintAbsorption=coverage*(.055+.22*tintBody);
-      daylightAlpha=clamp(daylightAlpha+tintAbsorption,0.0,.32);
-      daylightRadiance+=uTint*tintAbsorption*(.72+.04*daylightFresnel);
-    }
     outColor=vec4(daylightRadiance,daylightAlpha);
-    if(uSwitchTint>.5) {
-      // Compact switches are not liftable card surfaces, so give their own SDF
-      // shoulder a directional white polish. The chromatic body remains below
-      // it and visible through the clear, untinted rim.
-      float switchUpper=pow(max(-surfaceNormal.y,0.0),1.35)*.48;
-      float switchSide=pow(abs(surfaceNormal.x),1.8)*.11;
-      float switchPolish=exp(-pow((depth-1.35)/1.75,2.0))
-        *(switchUpper+switchSide)*coverage;
-      outColor=vec4(vec3(switchPolish)+outColor.rgb*(1.0-switchPolish),
-        switchPolish+outColor.a*(1.0-switchPolish));
-    }
     if(uLightGlass>.5) {
       // The polished lip belongs to this same projected volume. Keeping it in
       // the material avoids a second, stationary CSS outline on the base.
@@ -509,9 +485,23 @@ void main() {
     // the material geometry and the crisp interface above the optical layer.
     outColor.rgb+=illumination*coverage;
   }
-  // The tinted daylight body already carries its own transmitted radiance.
-  // Brightening it again clips the colour toward white and reads as plastic.
-  outColor.rgb *= uSwitchTint>.5 ? 1.0 : max(1.0,uControlBrightness);
+  // Switches use the shared theme material at its native exposure.
+  outColor.rgb *= uSwitchGlass>.5 ? 1.0 : max(1.0,uControlBrightness);
+  if(uSwitchGlass>.5) {
+    // A polished cut follows the exact rounded contour. Only a pixel-wide
+    // antialiasing transition softens its boundaries, not a Gaussian glow.
+    float cutAA=.5/(uDPR*projectionScale);
+    float cut=1.0-smoothstep(.62-cutAA,.62+cutAA,abs(depth-1.35));
+    float incidence=dot(surfaceNormal,normalize(L.xy+vec2(.001)));
+    float primary=smoothstep(.12,.23,incidence);
+    float returnReflection=smoothstep(.52,.64,-incidence)*.62;
+    float polish=cut*max(primary,returnReflection)*coverage
+      *smoothstep(.05,.8,volume)*mix(.45,.96,attenuation);
+    // Composite neutral white after the material tint and exposure, so even
+    // semantic controls keep white specular highlights in both environments.
+    outColor=vec4(vec3(polish)+outColor.rgb*(1.0-polish),
+      polish+outColor.a*(1.0-polish));
+  }
   if(uCoating.y>.5) {
     vec2 origin=uCoatingOrigin*uRect.zw;
     // CSS-pixel distance keeps the spreading front circular on wide controls.

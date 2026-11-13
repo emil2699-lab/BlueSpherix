@@ -1827,6 +1827,9 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
   background: linear-gradient(135deg,rgb(var(--glass-control-tint) / .16),rgb(var(--glass-control-tint) / .07)) !important;
   backdrop-filter: blur(8px);
 }
+.content:not([data-ice-glass="ready"]) [data-glass-selection][data-glass-switch] {
+  box-shadow: inset 1px 1px 0 rgb(255 255 255 / .92), inset -1px -1px 0 rgb(255 255 255 / .5) !important;
+}
 
 /* Borderless surfaces retain their original border-box size and glass optics.
    Use single shared dividers between related rows, never enclosing frames. */

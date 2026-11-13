@@ -25,7 +25,7 @@ try {
     proto.getUniformLocation=function(p,n){const l=get.call(this,p,n);if(l)names.set(l,n);return l;};
     const state={};
     for(const key of ['uniform1f','uniform3f','uniform4f']){const original=proto[key];proto[key]=function(location,...values){state[names.get(location)]=values;return original.call(this,location,...values);};}
-    const draw=proto.drawArrays;proto.drawArrays=function(...args){if(state.uControlBrightness?.[0]===1.5)window.switchFrames.push({time:performance.now(),rect:state.uRect,coating:state.uCoating,switchTint:state.uSwitchTint,tint:state.uTint});return draw.apply(this,args);};
+    const draw=proto.drawArrays;proto.drawArrays=function(...args){if(state.uControlBrightness?.[0]===1.5)window.switchFrames.push({time:performance.now(),rect:state.uRect,coating:state.uCoating,switchGlass:state.uSwitchGlass,tint:state.uTint});return draw.apply(this,args);};
   });
   const url=process.env.GLASS_SELECTION_URL||'http://127.0.0.1:3001/';
   await page.goto(`${url}#overview`);await page.locator('.content[data-ice-glass=ready]').waitFor();
@@ -34,7 +34,7 @@ try {
   const oneMonth=page.getByRole('button',{name:'1M',exact:true});await oneMonth.click({force:true});await advance(920);
   assert.equal(await oneMonth.getAttribute('data-glass-selection'),'selected');
   const neutralFrames=await page.evaluate(()=>window.switchFrames);
-  assert(neutralFrames.some(f=>f.switchTint?.[0]===1&&f.tint?.[1]>.8&&f.tint?.[0]<.4),'neutral selected switch receives the aqua glass tint');
+  assert(neutralFrames.some(f=>f.switchGlass?.[0]===1),'selected switch receives the polished theme glass');
   const destination=page.getByRole('button',{name:'1Y',exact:true});await destination.hover();await advance(500);
   const box=await destination.boundingBox(),layoutWidth=await destination.evaluate(el=>el.offsetWidth);await page.evaluate(()=>{window.switchFrames=[];});
   await destination.click({force:true});await advance(150);

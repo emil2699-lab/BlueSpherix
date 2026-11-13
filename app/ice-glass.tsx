@@ -286,7 +286,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         gl.scissor(Math.max(0,Math.floor(drawRect.left*dpr)),Math.max(0,Math.floor((viewHeight-drawRect.bottom)*dpr)),Math.ceil(Math.min(drawRect.right,viewWidth)*dpr)-Math.max(0,Math.floor(drawRect.left*dpr)),Math.ceil(Math.min(drawRect.bottom,viewHeight)*dpr)-Math.max(0,Math.floor(drawRect.top*dpr)));
         const [reveal, isControl, opacity, moving, volume] = coating ? coatingProgress(coating, time, reduced.matches) : [1, thumb ? 1 : 0, 1, 0, 1];
         gl.uniform1f(uniform("uControlBrightness"), coating?.luminous || thumb ? 1.5 : 1);
-        gl.uniform1f(uniform("uSwitchTint"), coating?.luminous ? 1 : 0);
+        gl.uniform1f(uniform("uSwitchGlass"), coating?.luminous || thumb ? 1 : 0);
         coatingMoving ||= moving > 0;
         const receivesSpill = !!(!today && emitter && power > .35 && element.matches('.glass-card')
           && !element.contains(emitter.element) && !emitter.element.contains(element));
