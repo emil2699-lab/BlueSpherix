@@ -25,9 +25,10 @@ try {
     proto.getUniformLocation=function(p,n){const l=get.call(this,p,n);if(l)names.set(l,n);return l;};
     const state={};
     for(const key of ['uniform1f','uniform3f','uniform4f']){const original=proto[key];proto[key]=function(location,...values){state[names.get(location)]=values;return original.call(this,location,...values);};}
-    const draw=proto.drawArrays;proto.drawArrays=function(...args){if(state.uControlBrightness?.[0]===1.5)window.switchFrames.push({time:performance.now(),rect:state.uRect,coating:state.uCoating,switchGlass:state.uSwitchGlass,tint:state.uTint});return draw.apply(this,args);};
+    const draw=proto.drawArrays;proto.drawArrays=function(...args){if(state.uControlBrightness?.[0]===1.5)window.switchFrames.push({time:performance.now(),rect:state.uRect,projection:state.uProjection,coating:state.uCoating,switchGlass:state.uSwitchGlass,tint:state.uTint});return draw.apply(this,args);};
   });
   const url=process.env.GLASS_SELECTION_URL||'http://127.0.0.1:3001/';
+  await page.addInitScript(()=>localStorage.setItem('bluespherix-theme','light'));
   await page.goto(`${url}#overview`);await page.locator('.content[data-ice-glass=ready]').waitFor();
   await page.clock.install();await page.clock.pauseAt(new Date(Date.now()+100));
   const advance=async ms=>{await page.clock.runFor(2);await page.clock.fastForward(ms);await page.clock.runFor(2);};
@@ -43,11 +44,16 @@ try {
   await advance(340);await page.screenshot({path:`${dir}/selector-rest.png`});
   assert.equal(await destination.getAttribute('data-glass-selection'),'selected');
   const frames=await page.evaluate(()=>window.switchFrames);
-  assert(frames.some(f=>f.rect[2]>box.width*1.2),'glass stretches between options');
-  assert(Math.abs(frames.at(-1).rect[2]-box.width)<.1,'glass returns to original width');
+  assert(frames.some(f=>f.rect[2]*(f.projection?.[0]??1)>box.width*1.2),'glass stretches between options');
+  const rest=frames.at(-1),scale=rest.projection?.[0]??1;
+  const rendered={left:rest.rect[0]-rest.rect[2]*(scale-1)*.5,top:rest.rect[1]-rest.rect[3]*(scale-1)*.5,width:rest.rect[2]*scale,height:rest.rect[3]*scale};
+  const canvasBox=await page.locator('.ice-glass-canvas').boundingBox();
+  assert(Math.abs(rendered.width-box.width)<.1,'glass returns to the projected control width');
+  assert(Math.abs(rendered.left-(box.x-canvasBox.x))<1.5&&Math.abs(rendered.top-(box.y-canvasBox.y))<1.5,'glass follows the lifted card label plane');
   assert.equal(await destination.evaluate(el=>el.offsetWidth),layoutWidth,'text and hit target keep their layout width');
   await page.locator('.welcome h1:visible').click({force:true});await advance(240);
   assert.equal(await destination.getAttribute('data-glass-selection'),null);
+  await page.getByRole('button',{name:'Attiva modalità scura'}).click();await advance(700);
   await page.evaluate(()=>{location.hash='risk';});await advance(800);
   const toggle=page.locator('.protection-switch').first(),thumb=toggle.locator('.glass-switch-thumb');
   assert.equal(await page.locator('.glass-switch-thumb').count(),4);

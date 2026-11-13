@@ -41,6 +41,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     let dirty = true;
     let lost = false;
     let cards: Measurement[] = [];
+    let surfaces = new Map<HTMLElement,Measurement>();
     let dpr = Math.min(devicePixelRatio || 1, config.maxDPR);
     let dprCap: number = config.maxDPR;
     let maxBufferWidth = 1;
@@ -137,9 +138,24 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
           : element.matches(".amber, .calendar-strip, .warning, .risk-warning") ? [1,.62,.24]
           : [.31,.77,.87]);
         const domRect = element.getBoundingClientRect();
-        const left = domRect.left-nextViewport.left;
-        const top = domRect.top-nextViewport.top;
-        const rect = { left, top, width: domRect.width, height: domRect.height, right: left+domRect.width, bottom: top+domRect.height };
+        let left = domRect.left-nextViewport.left,top = domRect.top-nextViewport.top;
+        let rectWidth=domRect.width,rectHeight=domRect.height;
+        // Label descendants may already be projected by the preceding frame.
+        // Recover their dashboard-plane bounds before caching measurements, so
+        // the shared renderer applies the current projection exactly once.
+        const labelLayer=!element.matches(LIFTABLE_SURFACE_SELECTOR) ? element.closest<HTMLElement>('[data-glass-label]') : null;
+        const hostElement=labelLayer?.closest<HTMLElement>(LIFTABLE_SURFACE_SELECTOR);
+        if(document.documentElement.dataset.theme === "light" && hostElement?.closest('.today-dashboard')) {
+          const hostRect=hostElement.getBoundingClientRect();
+          const scale=daylightPlanes(lifts.get(hostElement)?.value ?? 0).labelScale;
+          const hostX=hostRect.left-nextViewport.left+hostRect.width*.5;
+          const hostY=hostRect.top-nextViewport.top+hostRect.height*.5;
+          const centreX=left+rectWidth*.5,centreY=top+rectHeight*.5;
+          rectWidth/=scale;rectHeight/=scale;
+          left=hostX+(centreX-hostX)/scale-rectWidth*.5;
+          top=hostY+(centreY-hostY)/scale-rectHeight*.5;
+        }
+        const rect = { left, top, width: rectWidth, height: rectHeight, right: left+rectWidth, bottom: top+rectHeight };
         const radius=parseFloat(style.borderTopLeftRadius) || 14;
         const halfWidth=rect.width*.5,halfHeight=rect.height*.5;
         const daylightCard=document.documentElement.dataset.theme === "light" && element.matches(LIFTABLE_SURFACE_SELECTOR);
@@ -150,6 +166,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         return { element, rect, radius, tint, crownHeight, reference };
       });
       cards = cards.filter(card=>card.rect.width>0 && card.rect.height>0);
+      surfaces = new Map(cards.map(card=>[card.element,card]));
       const currentElements=new Set(cards.map(card=>card.element));
       for(const element of lifts.keys()) if(!currentElements.has(element)) lifts.delete(element);
       lenses.retain(currentElements);
@@ -246,11 +263,11 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         const thumb = element.matches('.glass-switch-thumb');
         const thumbOn = thumb && (element.closest('.protection-switch')?.classList.contains('on')
           || element.closest('.lab-cost-toggle')?.querySelector<HTMLInputElement>('input')?.checked);
-        const rect = coating?.travel && !reduced.matches
+        const baseRect = coating?.travel && !reduced.matches
           ? switchRect(measuredRect,coating.travel,(coating.exiting ?? time)-coating.started) : measuredRect;
         const liftable = element.matches(LIFTABLE_SURFACE_SELECTOR);
         const pointerX=pointer.x-viewport.left, pointerY=pointer.y-viewport.top;
-        const hovered=lightMode && liftable && pointer.presence>0 && pointerX>=rect.left && pointerX<=rect.right && pointerY>=rect.top && pointerY<=rect.bottom;
+        const hovered=lightMode && liftable && pointer.presence>0 && pointerX>=baseRect.left && pointerX<=baseRect.right && pointerY>=baseRect.top && pointerY<=baseRect.bottom;
         let liftState=lifts.get(element);
         if(!liftState) { liftState={ value: 0, updated: time }; lifts.set(element,liftState); }
         const liftTarget=hovered && !reduced.matches ? 1 : 0;
@@ -266,8 +283,26 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         const lift=liftState.value;
         // Project only the optical layer towards the viewer. Hit testing and
         // DOM content keep the original rectangle, with no X/Y translation.
-        const projection=referenceGlass ? daylightPlanes(lift).glassScale : lightMode && liftable
+        let projection=referenceGlass ? daylightPlanes(lift).glassScale : lightMode && liftable
           ? config.daylightPerspective/(config.daylightPerspective-lift*config.daylightLift) : 1;
+        let rect=baseRect;
+        // A selected control is a separate WebGL surface, while its real DOM
+        // lives on the card's label plane. Project its centre around the same
+        // card origin and let the shader scale its soap volume by that exact
+        // amount, so the control cannot remain pinned to the dashboard base.
+        const labelLayer=!liftable ? element.closest<HTMLElement>('[data-glass-label]') : null;
+        const hostElement=labelLayer?.closest<HTMLElement>(LIFTABLE_SURFACE_SELECTOR);
+        const host=hostElement ? surfaces.get(hostElement) : undefined;
+        if(lightMode && host?.reference) {
+          const hostLift=lifts.get(host.element)?.value ?? 0;
+          projection=daylightPlanes(hostLift).labelScale;
+          const hostX=host.rect.left+host.rect.width*.5,hostY=host.rect.top+host.rect.height*.5;
+          const centreX=baseRect.left+baseRect.width*.5,centreY=baseRect.top+baseRect.height*.5;
+          const projectedX=hostX+(centreX-hostX)*projection;
+          const projectedY=hostY+(centreY-hostY)*projection;
+          rect={ left:projectedX-baseRect.width*.5,top:projectedY-baseRect.height*.5,
+            width:baseRect.width,height:baseRect.height,right:projectedX+baseRect.width*.5,bottom:projectedY+baseRect.height*.5 };
+        }
         if(referenceGlass) parallax.update(element,lift);
         lenses.update(element,{
           width:rect.width,height:rect.height,
