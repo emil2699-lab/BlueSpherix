@@ -275,7 +275,10 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
           thickness:Math.min(config.daylightThickness,rect.width*.25,rect.height*.25),
           ior:config.glassIOR,distance:config.daylightLift,
         },lightMode && liftable && !referenceGlass && !reduced.matches ? lift : 0,projection);
-        const projectionPad=referenceGlass ? 72+lift*18 : lightMode && liftable ? 38+lift*10 : 0;
+        // Selected compact switches project only a tiny transmitted-light pool.
+        // Give it enough scissor room without expanding hit targets or layout.
+        const switchPad=lightMode && coating?.luminous ? 7 : 0;
+        const projectionPad=referenceGlass ? 72+lift*18 : lightMode && liftable ? 38+lift*10 : switchPad;
         const padX=projectionPad+rect.width*(projection-1)*.5;
         const padY=projectionPad+rect.height*(projection-1)*.5;
         const drawRect={ left:rect.left-padX, top:rect.top-padY, width:rect.width+padX*2,
