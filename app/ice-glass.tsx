@@ -8,7 +8,7 @@ import { soapSample } from "./ice-glass-volume";
 import { createGlassLenses } from "./ice-glass-lens";
 import { switchRect } from "./glass-switch-motion";
 import { createDaylightCaustics, DAYLIGHT_GLASS, daylightPlanes } from "./daylight-glass";
-import { createDaylightParallax } from "./daylight-parallax";
+import { createDaylightParallax, DAYLIGHT_LABEL_SELECTOR, isDaylightStaticVisual } from "./daylight-parallax";
 
 type ViewportRect = { left: number; top: number; width: number; height: number };
 type GlassRect = ViewportRect & { right: number; bottom: number };
@@ -44,6 +44,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     let surfaces = new Map<HTMLElement,Measurement>();
     let dpr = Math.min(devicePixelRatio || 1, config.maxDPR);
     let dprCap: number = config.maxDPR;
+    let softwareRenderer = false;
     let maxBufferWidth = 1;
     let maxBufferHeight = 1;
     let resolutionQuery: MediaQueryList | null = null;
@@ -94,10 +95,16 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
         const viewportLimits = gl.getParameter(gl.MAX_VIEWPORT_DIMS) as Int32Array;
         const sideLimit = Math.min(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE),gl.getParameter(gl.MAX_TEXTURE_SIZE));
+        const rendererInfo=gl.getExtension("WEBGL_debug_renderer_info");
+        const renderer=rendererInfo ? String(gl.getParameter(rendererInfo.UNMASKED_RENDERER_WEBGL)) : "";
+        softwareRenderer=/swiftshader|software|llvmpipe/i.test(renderer);
         maxBufferWidth = Math.min(sideLimit,viewportLimits[0]);
         maxBufferHeight = Math.min(sideLimit,viewportLimits[1]);
         dprCap = config.maxDPR;
-        caustics = createDaylightCaustics(gl, glassGeometry);
+        // The material remains available on software WebGL, but the external
+        // multi-pass caustic field is reserved for hardware acceleration.
+        // This is the graceful low-power fallback for SwiftShader/llvmpipe.
+        caustics = softwareRenderer ? undefined : createDaylightCaustics(gl, glassGeometry);
       } catch (error) {
         console.warn("Ice Glass uses the dark-card fallback:", error);
         dispose();
@@ -143,9 +150,9 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         // Label descendants may already be projected by the preceding frame.
         // Recover their dashboard-plane bounds before caching measurements, so
         // the shared renderer applies the current projection exactly once.
-        const labelLayer=!element.matches(LIFTABLE_SURFACE_SELECTOR) ? element.closest<HTMLElement>('[data-glass-label]') : null;
+        const labelLayer=!element.matches(LIFTABLE_SURFACE_SELECTOR) ? element.closest<HTMLElement>(DAYLIGHT_LABEL_SELECTOR) : null;
         const hostElement=labelLayer?.closest<HTMLElement>(LIFTABLE_SURFACE_SELECTOR);
-        if(document.documentElement.dataset.theme === "light" && hostElement?.closest('.today-dashboard')) {
+        if(document.documentElement.dataset.theme === "light" && hostElement) {
           const hostRect=hostElement.getBoundingClientRect();
           const scale=daylightPlanes(lifts.get(hostElement)?.value ?? 0).labelScale;
           const hostX=hostRect.left-nextViewport.left+hostRect.width*.5;
@@ -162,7 +169,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         const opticalRadius=Math.min(Math.min(halfWidth,halfHeight)*.95,daylightCard ? radius : Math.max(radius*1.75,24));
         const thickness=Math.min(daylightCard ? config.daylightThickness : config.glassThickness*2.1,Math.min(halfWidth,halfHeight)*.5);
         const crownHeight=rect.width && rect.height ? soapSample(0,0,halfWidth,halfHeight,opticalRadius,thickness)[2] : 0;
-        const reference=!!element.closest('.today-dashboard') && element.matches(LIFTABLE_SURFACE_SELECTOR);
+        const reference=element.matches(LIFTABLE_SURFACE_SELECTOR);
         return { element, rect, radius, tint, crownHeight, reference };
       });
       cards = cards.filter(card=>card.rect.width>0 && card.rect.height>0);
@@ -209,8 +216,10 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       // Daylight caustics extend beyond every silhouette. A modest shared raster
       // scale offsets that extra fill cost without creating a second render loop
       // or changing CSS-pixel geometry, pointer coordinates or optical lengths.
-      const referenceToday=lightMode && !!root.querySelector('.today-dashboard:not([hidden])');
-      const buffer = fitDrawingBuffer(referenceToday ? Math.min(1,1.25/(devicePixelRatio || 1)) : lightMode ? .82 : 1);
+      const referenceVisible=lightMode && cards.some(card=>card.reference);
+      const referenceQuality=softwareRenderer ? Math.min(.58,.9/(devicePixelRatio || 1))
+        : Math.min(.86,1.15/(devicePixelRatio || 1));
+      const buffer = fitDrawingBuffer(referenceVisible ? referenceQuality : lightMode ? .82 : 1);
       if (!buffer) return;
       const { width, height } = buffer;
       gl.disable(gl.SCISSOR_TEST);
@@ -257,7 +266,6 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       gl.uniform2f(uniform("uSpillOrigin"),...(emission?.origin ?? [.5,.5] as [number,number]));
       gl.uniform3f(uniform("uSpillTint"),emissionTint[0],emissionTint[1],emissionTint[2]);
       for (const { element, rect: measuredRect, radius, tint, crownHeight, reference } of cards) {
-        const today=lightMode && !!element.closest('.today-dashboard');
         const referenceGlass=lightMode && reference;
         const coating = coatings.current.get(element);
         const thumb = element.matches('.glass-switch-thumb');
@@ -290,8 +298,9 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         // lives on the card's label plane. Project its centre around the same
         // card origin and let the shader scale its soap volume by that exact
         // amount, so the control cannot remain pinned to the dashboard base.
-        const labelLayer=!liftable ? element.closest<HTMLElement>('[data-glass-label]') : null;
-        const hostElement=labelLayer?.closest<HTMLElement>(LIFTABLE_SURFACE_SELECTOR);
+        const labelLayer=!liftable ? element.closest<HTMLElement>(DAYLIGHT_LABEL_SELECTOR) : null;
+        const hostElement=labelLayer?.closest<HTMLElement>(LIFTABLE_SURFACE_SELECTOR)
+          ?? (!isDaylightStaticVisual(element) ? element.closest<HTMLElement>(LIFTABLE_SURFACE_SELECTOR) : null);
         const host=hostElement ? surfaces.get(hostElement) : undefined;
         if(lightMode && host?.reference) {
           const hostLift=lifts.get(host.element)?.value ?? 0;
@@ -323,12 +332,15 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         gl.uniform1f(uniform("uControlBrightness"), coating?.luminous || thumb ? 1.5 : 1);
         gl.uniform1f(uniform("uSwitchGlass"), coating?.luminous || thumb ? 1 : 0);
         coatingMoving ||= moving > 0;
-        const receivesSpill = !!(!today && emitter && power > .35 && element.matches('.glass-card')
+        // The Today material has no animated underlight. Keep that rule global
+        // in daylight so selected controls do not force a permanent render loop.
+        const referenceContext=lightMode;
+        const receivesSpill = !!(!referenceContext && emitter && power > .35 && element.matches('.glass-card')
           && !element.contains(emitter.element) && !emitter.element.contains(element));
         gl.uniform4f(uniform("uSpill"),power,reduced.matches ? 0 : emission ? (time-emission.started)/1000 : 0,
           emissionPhase[0]*emissionPhase[2]*emissionPhase[4],receivesSpill ? 1 : 0);
         underlightMoving ||= receivesSpill && power > .35 && !reduced.matches && emission?.exiting === undefined;
-        const underlight = today ? 0 : coating
+        const underlight = referenceContext ? 0 : coating
           ? Math.max(0, Math.min(1, Number(element.dataset.glassUnderlight ?? 1) || 0)) : thumbOn ? .45 : 0;
         underlightMoving ||= underlight > 0 && !reduced.matches && coating?.exiting === undefined;
         gl.uniform2f(uniform("uUnderlight"), underlight,
@@ -396,8 +408,8 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       const event = nativeEvent as PointerEvent;
       if (event.pointerType === "touch" || root.hidden || reduced.matches) return;
       pointer.x = event.clientX; pointer.y = event.clientY; pointer.presence = 1;
-      const today=lightDaylight();
-      if(today) {
+      const daylight=lightDaylight();
+      if(daylight) {
         const x=event.clientX-viewport.left,y=event.clientY-viewport.top;
         const next=cards.find(card=>card.reference && x>=card.rect.left && x<=card.rect.right && y>=card.rect.top && y<=card.rect.bottom)?.element;
         if(next===hoveredReference) return;
@@ -406,7 +418,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       schedule();
     };
     const lightDaylight=()=>document.documentElement.dataset.theme === "light"
-      && !!root.querySelector('.today-dashboard:not([hidden])');
+      && cards.some(card=>card.reference);
     const leave = (event: PointerEvent) => { if (!event.relatedTarget) { pointer.presence = 0; hoveredReference=undefined; schedule(); } };
     const visibility = () => { if (document.hidden) { clearTimeout(underlightTimer); underlightTimer = undefined; cancelAnimationFrame(frame); frame = 0; } else invalidate(); };
     const contextLost = (event: Event) => {

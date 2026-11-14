@@ -1,4 +1,4 @@
-/** Today material: a shallow clear slab and one shared, finite daylight source. */
+/** Shared daylight material: a shallow clear slab and one finite light source. */
 export const DAYLIGHT_GLASS = {
   lift: 48,
   perspective: 900,

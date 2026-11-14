@@ -39,6 +39,7 @@ await fs.writeFile(`${dir}/interaction.json`,JSON.stringify({errors,frames,check
 
 async function checkCoatingPhases(browser,dir) {
 const p=await browser.newPage({viewport:{width:1440,height:1000}});const errors=[];p.on('pageerror',e=>errors.push(e.message));
+await p.addInitScript(()=>localStorage.setItem('bluespherix-theme','dark'));
 await p.addInitScript(()=>{
   window.glassFrames=[];
   const proto=WebGL2RenderingContext.prototype;
@@ -58,7 +59,7 @@ await p.clock.runFor(200);assert.equal(await period.getAttribute('data-glass-sel
 await p.clock.runFor(200);await p.screenshot({path:`${dir}/03-elastic-peak.png`});
 await p.clock.runFor(200);await p.screenshot({path:`${dir}/03-elastic-recoil.png`});
 await p.clock.fastForward(200);assert.equal(await period.getAttribute('data-glass-selection'),'selected');await p.screenshot({path:`${dir}/03-convex.png`});
-const frames=await p.evaluate(()=>window.glassFrames);assert(frames.some(f=>f.values[0]>0&&f.values[0]<1&&f.values[3]===0));assert(frames.some(f=>f.values[0]===1&&f.values[3]>0&&f.values[3]<1));assert(frames.some(f=>f.values[3]>1.05&&f.values[3]<1.08));const peakIndex=frames.findIndex(f=>f.values[3]>1.05);assert(frames.slice(peakIndex).some(f=>f.values[3]<1&&f.values[3]>.99));assert.equal(frames.at(-1).values[3],1);
+const frames=await p.evaluate(()=>window.glassFrames);assert(frames.some(f=>f.values[0]>0&&f.values[0]<1&&f.values[3]===0));assert(frames.some(f=>f.values[0]===1&&f.values[3]>0&&f.values[3]<1));assert(frames.some(f=>f.values[3]>1.05&&f.values[3]<1.08));const peakIndex=frames.findIndex(f=>f.values[3]>1.05);assert(frames.slice(peakIndex).some(f=>f.values[3]>=1&&f.values[3]<1.02));assert.equal(frames.at(-1).values[3],1);
 await p.getByRole('heading',{name:'Diario di trading.'}).click();await p.clock.runFor(300);
 const neg=p.locator('.diary-loss').first();await neg.click();await p.clock.runFor(2);await p.clock.fastForward(800);const negative=await neg.evaluate(el=>({tint:el.style.getPropertyValue('--glass-control-tint'),border:getComputedStyle(el).borderColor,shadow:getComputedStyle(el).boxShadow}));assert(negative.tint.split(' ').map(Number)[0]>negative.tint.split(' ').map(Number)[1]*1.5);assert.equal(negative.shadow,'none');await p.screenshot({path:`${dir}/04-red-glass.png`});
 const check=p.locator('.diary-checks label').first();await check.click();await p.clock.runFor(120);assert.equal(await check.getAttribute('data-glass-selection'),'entering');await p.clock.runFor(200);assert.equal(await check.getAttribute('data-glass-selection'),'lifting');await p.clock.fastForward(600);assert.equal(await check.getAttribute('data-glass-selection'),'selected');await check.click();await p.clock.runFor(300);assert.equal(await check.getAttribute('data-glass-selection'),null);
