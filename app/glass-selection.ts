@@ -8,7 +8,7 @@ export const RISE_MS = 360;
 export const SETTLE_MS = 240;
 const ENTER_MS = SPREAD_MS + RISE_MS;
 const EXIT_MS = 200;
-const SWITCH_GROUPS = '.range-switch, .stress-tabs, .monte-carlo-switch, .focus-tabs, .session-tabs, .risk-presets, .lab-parameter, .lab-friction-profiles, .lab-sensitivity, .proposal-picker, [role="tablist"]';
+const SWITCH_GROUPS = '.range-switch, .stress-tabs, .monte-carlo-switch, .focus-tabs, .session-tabs, .risk-presets, .lab-parameter, .lab-friction-profiles, .lab-sensitivity, .proposal-picker, .trade-filters, .calendar-impact-filters, [role="tablist"]';
 const NEUTRAL_CONTROL_TINT = [.56, .64, .71];
 const SELECTABLE = [
   'button[aria-pressed]', 'button[aria-selected]', 'button[role="tab"]', 'button[aria-expanded]',
@@ -90,8 +90,8 @@ function materialTint(element: HTMLElement, context: CanvasRenderingContext2D | 
   return NEUTRAL_CONTROL_TINT;
 }
 
-// Exclusive controls have one temporary selection. Multi-select controls keep
-// their material for as long as their actual checked/pressed state is enabled.
+// Switches keep their material for as long as their actual selected state is
+// enabled. Other controls retain the temporary click coating.
 export function useGlassSelection(rootRef: RefObject<HTMLElement | null>) {
   const coatings = useRef(new Map<HTMLElement, Coating>());
   useEffect(() => {
@@ -140,6 +140,7 @@ export function useGlassSelection(rootRef: RefObject<HTMLElement | null>) {
     const inputOf = (element: HTMLElement) => element.matches('input') ? element as HTMLInputElement
       : (element.matches('.lab-cost-toggle > i') ? element.parentElement : element)?.querySelector<HTMLInputElement>('input[type="checkbox"], input[type="radio"]');
     const multiple = (element: HTMLElement) => inputOf(element)?.type === 'checkbox' || !!element.closest('[data-glass-multiple]');
+    const persistentSwitch = (element: HTMLElement) => multiple(element) || !!element.closest(SWITCH_GROUPS);
     const enabled = (element: HTMLElement) => {
       const input = inputOf(element);
       return element.isConnected && root.contains(element) && !element.closest('[hidden]')
@@ -167,13 +168,13 @@ export function useGlassSelection(rootRef: RefObject<HTMLElement | null>) {
         }, duration);
       }
     };
-    const syncMultiple = () => {
+    const syncPersistentState = () => {
       if (disposed) return;
       const active = new Set<HTMLElement>();
-      root.querySelectorAll<HTMLElement>('[data-glass-multiple] button[aria-pressed], [data-glass-multiple] button[aria-selected], input[type="checkbox"]').forEach(control => {
+      root.querySelectorAll<HTMLElement>(SELECTABLE).forEach(control => {
         const label = control.matches('input') ? (control as HTMLInputElement).closest('label') : null;
         const element = label ? labelSurface(label) : control;
-        if (enabled(element)) active.add(element);
+        if (persistentSwitch(element) && enabled(element)) active.add(element);
       });
       for (const [element, coating] of materials) {
         if (!element.isConnected || element.closest('[hidden]')) { if (selected === element) selected = null; remove(element); }
@@ -189,7 +190,7 @@ export function useGlassSelection(rootRef: RefObject<HTMLElement | null>) {
     const select = (element: HTMLElement | null, origin: [number, number], travel?: SwitchTravel) => {
       if (disposed) return;
       if (!element || !enabled(element)) { if (element) release(element); clear(); return; }
-      const persistent = multiple(element);
+      const persistent = persistentSwitch(element);
       if (travel) {
         const group = element.closest(SWITCH_GROUPS);
         for (const previous of materials.keys()) {
@@ -245,7 +246,7 @@ export function useGlassSelection(rootRef: RefObject<HTMLElement | null>) {
             }
           }
         }
-        pendingClick = null; select(element, origin, travel); syncMultiple();
+        pendingClick = null; select(element, origin, travel); syncPersistentState();
       }, 0);
     };
     const key = (event: KeyboardEvent) => {
@@ -254,9 +255,9 @@ export function useGlassSelection(rootRef: RefObject<HTMLElement | null>) {
       else if (event.key === ' ' || event.key === 'Enter') rememberThumb(event);
     };
     const stopThumbs = () => { for (const animation of thumbAnimations.values()) animation.cancel(); thumbAnimations.clear(); };
-    const navigation = () => { stopThumbs(); for (const element of materials.keys()) remove(element); selected = null; queueMicrotask(syncMultiple); };
-    const change = () => queueMicrotask(syncMultiple);
-    const observer = new MutationObserver(syncMultiple);
+    const navigation = () => { stopThumbs(); for (const element of materials.keys()) remove(element); selected = null; queueMicrotask(syncPersistentState); };
+    const change = () => queueMicrotask(syncPersistentState);
+    const observer = new MutationObserver(syncPersistentState);
     observer.observe(root,{ childList: true, subtree: true, attributes: true, attributeFilter: ['aria-pressed','aria-selected','checked','disabled','hidden','data-glass-multiple'] });
     root.addEventListener('change',change);
     root.addEventListener('pointerdown',rememberThumb,{passive:true});
@@ -264,7 +265,7 @@ export function useGlassSelection(rootRef: RefObject<HTMLElement | null>) {
     document.addEventListener('click', click, true);
     document.addEventListener('keydown', key);
     window.addEventListener('hashchange', navigation);
-    syncMultiple();
+    syncPersistentState();
     return () => {
       disposed = true;
       observer.disconnect();

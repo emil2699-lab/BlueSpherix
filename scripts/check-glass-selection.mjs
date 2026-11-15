@@ -12,10 +12,10 @@ await period.locator('xpath=self::*[@data-glass-selection]').waitFor({timeout:20
 assert.equal(await period.getAttribute('data-glass-selection'),'entering');
 await page.screenshot({path:`${dir}/01-coating.png`});
 await settled(period);assert.equal(await period.getAttribute('data-glass-selection'),'selected');
-assert.equal(await page.locator('[data-glass-selection=selected]:not([data-glass-persistent])').count(),1);
+assert.notEqual(await period.getAttribute('data-glass-persistent'),null);
 await page.screenshot({path:`${dir}/02-glass.png`});
 await page.getByRole('heading',{name:'Diario di trading.'}).click();await cleared();
-assert.equal(await page.locator('[data-glass-selection]:not([data-glass-persistent])').count(),0);assert.equal(await period.getAttribute('aria-pressed'),'true');
+assert.equal(await period.getAttribute('data-glass-selection'),'selected');assert.equal(await period.getAttribute('aria-pressed'),'true');
 const negative=page.locator('.diary-loss').first();await negative.click();await settled(negative);
 assert.equal(await negative.getAttribute('data-glass-selection'),'selected');
 assert.equal(await negative.locator('[data-sign=negative]').count(),1);
@@ -23,18 +23,18 @@ await page.screenshot({path:`${dir}/03-negative.png`});
 const tag=page.getByRole('button',{name:'Pazienza',exact:true});await tag.click();await settled(tag);assert.equal(await tag.getAttribute('data-glass-selection'),'selected');
 await tag.click();await tag.locator('xpath=self::*[not(@data-glass-selection)]').waitFor();assert.equal(await tag.getAttribute('data-glass-selection'),null);
 await page.getByRole('button',{name:'30G',exact:true}).focus();await page.keyboard.press('Space');await settled(page.getByRole('button',{name:'30G',exact:true}));assert.equal(await page.getByRole('button',{name:'30G',exact:true}).getAttribute('data-glass-selection'),'selected');
-await page.keyboard.press('Escape');await cleared();assert.equal(await page.locator('[data-glass-selection]:not([data-glass-persistent])').count(),0);
+await page.keyboard.press('Escape');await cleared();assert.equal(await page.getByRole('button',{name:'30G',exact:true}).getAttribute('data-glass-selection'),'selected');
 await page.locator('.diary-filters .filter-select-control').first().click();await page.getByRole('option',{name:'Da revisionare',exact:true}).click();await settled(page.locator('.diary-filters .filter-select-control').first());
 assert.equal(await page.locator('.diary-filters .filter-select-control').first().getAttribute('data-glass-selection'),'selected');
 await page.locator('nav').getByRole('button',{name:'Analisi',exact:true}).click();await page.getByRole('button',{name:'90G',exact:true}).click();await settled(page.getByRole('button',{name:'90G',exact:true}));
-assert.equal(await page.locator('[data-glass-selection=selected]:not([data-glass-persistent])').count(),1);
+assert.notEqual(await page.getByRole('button',{name:'90G',exact:true}).getAttribute('data-glass-persistent'),null);
 const frames=await page.evaluate(()=>new Promise(resolve=>{let last;const times=[];function frame(t){if(last)times.push(t-last);last=t;if(times.length<40)requestAnimationFrame(frame);else {times.sort((a,b)=>a-b);resolve({p50:times[20],p95:times[38]});}}requestAnimationFrame(frame);}));
 await page.setViewportSize({width:390,height:844});await page.getByRole('button',{name:'30G',exact:true}).click();await settled(page.getByRole('button',{name:'30G',exact:true}));
 assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:`${dir}/04-mobile.png`});
 assert.equal(await page.locator('canvas').count(),1);assert.deepEqual(errors,[]);
 const fallback=await browser.newPage({viewport:{width:1024,height:820},reducedMotion:'reduce'});
 await fallback.addInitScript(()=>{const original=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(type,...args){if(type==='webgl2')return null;return original.call(this,type,...args);};});
-await fallback.goto(`${process.env.GLASS_SELECTION_URL || 'http://127.0.0.1:3001/'}#journal`);const f=fallback.getByRole('button',{name:'90G',exact:true});await f.click();await settled(f);assert.equal(await f.getAttribute('data-glass-selection'),'selected');await fallback.getByRole('heading',{name:'Diario di trading.'}).click();await fallback.waitForFunction(()=>!document.querySelector('[data-glass-selection]:not([data-glass-persistent])'));assert.equal(await f.getAttribute('data-glass-selection'),null);
+await fallback.goto(`${process.env.GLASS_SELECTION_URL || 'http://127.0.0.1:3001/'}#journal`);const f=fallback.getByRole('button',{name:'90G',exact:true});await f.click();await settled(f);assert.equal(await f.getAttribute('data-glass-selection'),'selected');await fallback.getByRole('heading',{name:'Diario di trading.'}).click();await fallback.waitForFunction(()=>!document.querySelector('[data-glass-selection]:not([data-glass-persistent])'));assert.equal(await f.getAttribute('data-glass-selection'),'selected');
 await fs.writeFile(`${dir}/interaction.json`,JSON.stringify({errors,frames,checks:'selection, outside, transfer, negative, toggle, keyboard, Escape, dropdown, navigation, mobile, single canvas, reduced motion, no WebGL'},null,2));await checkCoatingPhases(browser,dir);console.log(JSON.stringify({pass:true,frames,errors}));await browser.close();
 
 async function checkCoatingPhases(browser,dir) {
@@ -50,7 +50,7 @@ await p.addInitScript(()=>{
 });
 await p.goto(`${process.env.GLASS_SELECTION_URL || 'http://127.0.0.1:3001/'}#journal`);await p.locator('.content[data-ice-glass=ready]').waitFor();await p.waitForTimeout(1200);
 await p.clock.install();await p.clock.pauseAt(new Date(Date.now()+100));
-const period=p.getByRole('button',{name:'30G',exact:true});const box=await period.boundingBox();
+const period=p.locator('.diary-trade:not(.diary-loss)').first();const box=await period.boundingBox();
 await period.click({position:{x:box.width*.2,y:box.height*.25}});await p.clock.runFor(120);
 let state=await period.evaluate(el=>({phase:el.dataset.glassSelection,x:el.style.getPropertyValue('--glass-origin-x'),y:el.style.getPropertyValue('--glass-origin-y'),tint:el.style.getPropertyValue('--glass-control-tint'),border:getComputedStyle(el).borderColor,shadow:getComputedStyle(el).boxShadow}));
 assert.equal(state.phase,'entering');assert(Math.abs(parseFloat(state.x)-20)<2);assert(Math.abs(parseFloat(state.y)-25)<5);assert.equal(state.shadow,'none');assert(state.border.includes('0)'));

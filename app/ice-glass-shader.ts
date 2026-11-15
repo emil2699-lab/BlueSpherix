@@ -94,6 +94,7 @@ uniform float uCrownHeight;
 uniform vec4 uCoating;
 uniform float uControlBrightness;
 uniform float uSwitchGlass;
+uniform float uSelectedSwitch;
 uniform vec2 uCoatingOrigin;
 // Selected under-glass light: P&L ceiling and seconds since selection.
 uniform vec2 uUnderlight;
@@ -463,6 +464,17 @@ void main() {
     daylightRadiance+=caustic*vec3(.028,.038,.043)*spectralReach*rimDirection*(.72+solarFocus);
     daylightRadiance+=vec3(.66,.80,.78)*solarFocus*.034;
     outColor=vec4(daylightRadiance,daylightAlpha);
+    if(uSelectedSwitch>.5) {
+      // A selected switch remains visibly darker than its rail, but the colour
+      // is still a transparent body transmission. White cut reflections are
+      // composited later and therefore remain clean rather than tinted.
+      vec3 selectedPigment=uTint/max(max(uTint.r,uTint.g),max(uTint.b,.001));
+      vec3 selectedBody=mix(vec3(.055,.095,.105),selectedPigment*.18,.38);
+      float selectedAlpha=(.11+.035*(1.0-daylightFresnel))*coverage
+        *smoothstep(.08,.72,volume);
+      outColor=vec4(selectedBody*selectedAlpha+outColor.rgb*(1.0-selectedAlpha),
+        selectedAlpha+outColor.a*(1.0-selectedAlpha));
+    }
     if(uLightGlass>.5) {
       // The polished lip belongs to this same projected volume. Keeping it in
       // the material avoids a second, stationary CSS outline on the base.

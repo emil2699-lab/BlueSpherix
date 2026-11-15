@@ -331,6 +331,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         const [reveal, isControl, opacity, moving, volume] = coating ? coatingProgress(coating, time, reduced.matches) : [1, thumb ? 1 : 0, 1, 0, 1];
         gl.uniform1f(uniform("uControlBrightness"), coating?.luminous || thumb ? 1.5 : 1);
         gl.uniform1f(uniform("uSwitchGlass"), coating?.luminous || thumb ? 1 : 0);
+        gl.uniform1f(uniform("uSelectedSwitch"), coating?.luminous ? 1 : 0);
         coatingMoving ||= moving > 0;
         // The Today material has no animated underlight. Keep that rule global
         // in daylight so selected controls do not force a permanent render loop.

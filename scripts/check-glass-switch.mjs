@@ -52,7 +52,8 @@ try {
   assert(Math.abs(rendered.left-(box.x-canvasBox.x))<1.5&&Math.abs(rendered.top-(box.y-canvasBox.y))<1.5,'glass follows the lifted card label plane');
   assert.equal(await destination.evaluate(el=>el.offsetWidth),layoutWidth,'text and hit target keep their layout width');
   await page.locator('.welcome h1:visible').click({force:true});await advance(240);
-  assert.equal(await destination.getAttribute('data-glass-selection'),null);
+  assert.equal(await destination.getAttribute('data-glass-selection'),'selected','exclusive switch keeps glass after outside click');
+  assert.notEqual(await destination.getAttribute('data-glass-persistent'),null);
   await page.getByRole('button',{name:'Attiva modalità scura'}).click();await advance(700);
   await page.evaluate(()=>{location.hash='risk';});await advance(800);
   const toggle=page.locator('.protection-switch').first(),thumb=toggle.locator('.glass-switch-thumb');
