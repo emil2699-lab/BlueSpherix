@@ -385,7 +385,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .content[data-ice-glass="ready"] .heatmap button[data-glass-selection]::before { opacity: 0; }
 .heatmap button:hover { transform: translateY(-1px); }
 .content .heatmap button.selected { z-index: 2; }
-.content .heatmap button.selected::before { filter: saturate(1.75) brightness(1.04); }
+.content .heatmap button.selected::before { background: rgb(184 138 36 / var(--heat-base-alpha)); filter: saturate(1.16) brightness(1.03); }
 .heatmap button strong { font-size: 11px; }
 .heatmap button small { color: var(--muted); font-size: 8px; }
 .heat-legend { display: flex; align-items: center; justify-content: flex-end; gap: 5px; color: var(--muted); font-size: 9px; margin-top: 14px; }

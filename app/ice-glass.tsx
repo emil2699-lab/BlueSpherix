@@ -42,6 +42,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     let lost = false;
     let cards: Measurement[] = [];
     let surfaces = new Map<HTMLElement,Measurement>();
+    let heatBounds: Pick<GlassRect,"left" | "top" | "right" | "bottom"> | undefined;
     let dpr = Math.min(devicePixelRatio || 1, config.maxDPR);
     let dprCap: number = config.maxDPR;
     let softwareRenderer = false;
@@ -174,6 +175,11 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       });
       cards = cards.filter(card=>card.rect.width>0 && card.rect.height>0);
       surfaces = new Map(cards.map(card=>[card.element,card]));
+      const heatSurfaces=cards.filter(card=>card.element.matches('.heatmap button'));
+      heatBounds=heatSurfaces.length ? heatSurfaces.reduce((bounds,card)=>({
+        left:Math.min(bounds.left,card.rect.left),top:Math.min(bounds.top,card.rect.top),
+        right:Math.max(bounds.right,card.rect.right),bottom:Math.max(bounds.bottom,card.rect.bottom),
+      }),{ left:Infinity,top:Infinity,right:-Infinity,bottom:-Infinity }) : undefined;
       const currentElements=new Set(cards.map(card=>card.element));
       for(const element of lifts.keys()) if(!currentElements.has(element)) lifts.delete(element);
       lenses.retain(currentElements);
@@ -265,6 +271,10 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       const selectedHeat = cards.find(card=>card.element.matches('.heatmap button.selected'));
       const selectedHeatX = selectedHeat ? selectedHeat.rect.left+selectedHeat.rect.width*.5 : 0;
       const selectedHeatY = selectedHeat ? selectedHeat.rect.top+selectedHeat.rect.height*.5 : 0;
+      const pointerX=pointer.x-viewport.left,pointerY=pointer.y-viewport.top;
+      const pointerInHeatmap=!!heatBounds && pointer.presence>0
+        && pointerX>=heatBounds.left && pointerX<=heatBounds.right
+        && pointerY>=heatBounds.top && pointerY<=heatBounds.bottom;
       gl.uniform4f(uniform("uSpillRect"), emitterRect?.left ?? 0,emitterRect?.top ?? 0,emitterRect?.width ?? 1,emitterRect?.height ?? 1);
       gl.uniform2f(uniform("uSpillOrigin"),...(emission?.origin ?? [.5,.5] as [number,number]));
       gl.uniform3f(uniform("uSpillTint"),emissionTint[0],emissionTint[1],emissionTint[2]);
@@ -277,7 +287,6 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         const baseRect = coating?.travel && !reduced.matches
           ? switchRect(measuredRect,coating.travel,(coating.exiting ?? time)-coating.started) : measuredRect;
         const liftable = element.matches(LIFTABLE_SURFACE_SELECTOR);
-        const pointerX=pointer.x-viewport.left, pointerY=pointer.y-viewport.top;
         const hovered=lightMode && liftable && pointer.presence>0 && pointerX>=baseRect.left && pointerX<=baseRect.right && pointerY>=baseRect.top && pointerY<=baseRect.bottom;
         let liftState=lifts.get(element);
         if(!liftState) { liftState={ value: 0, updated: time }; lifts.set(element,liftState); }
@@ -363,16 +372,17 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
           Math.min(config.glassThickness*2.1,Math.min(rect.width,rect.height)*.25))[2] : crownHeight;
         gl.uniform1f(uniform("uCrownHeight"),movingCrown);
         const selectedHeatSurface=element===selectedHeat?.element;
-        const tintLuminance=tint[0]*.2126+tint[1]*.7152+tint[2]*.0722;
-        const materialTint=selectedHeatSurface
-          ? tint.map(channel=>Math.max(0,Math.min(1,tintLuminance+(channel-tintLuminance)*1.4)))
-          : tint;
+        // Mustard is transmitted through the existing transparent material;
+        // it changes neither coverage nor the convex Fresnel/edge response.
+        const materialTint=selectedHeatSurface ? [.722,.541,.141] : tint;
         gl.uniform3f(uniform("uTint"),materialTint[0],materialTint[1],materialTint[2]);
-        // The selected soap is not a blurred emitter. Every Edge Map surface
-        // sees the exact point light produced by a cursor held at its centre.
+        // The selected soap is the resting point light for the Edge Map. As
+        // soon as the real cursor enters the map it takes precedence, keeping
+        // the original continuous interaction instead of pinning the optics.
         const usesSelectedHeatLight=!!selectedHeat && element.matches('.heatmap button');
-        gl.uniform3f(uniform("uLight"),usesSelectedHeatLight ? selectedHeatX : pointer.x-viewport.left,
-          usesSelectedHeatLight ? selectedHeatY : pointer.y-viewport.top,
+        const usesPointerHeatLight=usesSelectedHeatLight && pointerInHeatmap;
+        gl.uniform3f(uniform("uLight"),usesPointerHeatLight ? pointerX : usesSelectedHeatLight ? selectedHeatX : pointerX,
+          usesPointerHeatLight ? pointerY : usesSelectedHeatLight ? selectedHeatY : pointerY,
           usesSelectedHeatLight ? 1 : reduced.matches ? 0 : pointer.presence);
         gl.uniform1f(uniform("uInteractiveLight"),usesSelectedHeatLight ? 1 : 0);
         gl.drawArrays(gl.TRIANGLES,0,6);
@@ -420,6 +430,7 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       }
     };
     let hoveredReference: HTMLElement | undefined;
+    let hoveredHeatmap=false;
     const move: EventListener = (nativeEvent) => {
       const event = nativeEvent as PointerEvent;
       if (event.pointerType === "touch" || root.hidden || reduced.matches) return;
@@ -428,14 +439,17 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       if(daylight) {
         const x=event.clientX-viewport.left,y=event.clientY-viewport.top;
         const next=cards.find(card=>card.reference && x>=card.rect.left && x<=card.rect.right && y>=card.rect.top && y<=card.rect.bottom)?.element;
-        if(next===hoveredReference) return;
+        const overInteractiveHeat=!!heatBounds && x>=heatBounds.left && x<=heatBounds.right
+          && y>=heatBounds.top && y<=heatBounds.bottom;
+        if(next===hoveredReference && !overInteractiveHeat && !hoveredHeatmap) return;
         hoveredReference=next;
+        hoveredHeatmap=overInteractiveHeat;
       }
       schedule();
     };
     const lightDaylight=()=>document.documentElement.dataset.theme === "light"
       && cards.some(card=>card.reference);
-    const leave = (event: PointerEvent) => { if (!event.relatedTarget) { pointer.presence = 0; hoveredReference=undefined; schedule(); } };
+    const leave = (event: PointerEvent) => { if (!event.relatedTarget) { pointer.presence = 0; hoveredReference=undefined; hoveredHeatmap=false; schedule(); } };
     const visibility = () => { if (document.hidden) { clearTimeout(underlightTimer); underlightTimer = undefined; cancelAnimationFrame(frame); frame = 0; } else invalidate(); };
     const contextLost = (event: Event) => {
       event.preventDefault();lost=true;clearTimeout(underlightTimer);underlightTimer=undefined;cancelAnimationFrame(frame);frame=0;
