@@ -466,8 +466,8 @@ void main() {
     outColor=vec4(daylightRadiance,daylightAlpha);
     if(uSelectedSwitch>.5) {
       // A selected switch remains visibly darker than its rail, but the colour
-      // is still a transparent body transmission. White cut reflections are
-      // composited later and therefore remain clean rather than tinted.
+      // is still a transparent body transmission. Its reflection stays part
+      // of the shared glass material instead of adding a switch-only outline.
       vec3 selectedPigment=uTint/max(max(uTint.r,uTint.g),max(uTint.b,.001));
       vec3 selectedBody=mix(vec3(.055,.095,.105),selectedPigment*.18,.38);
       float selectedAlpha=(.11+.035*(1.0-daylightFresnel))*coverage
@@ -497,25 +497,11 @@ void main() {
     // the material geometry and the crisp interface above the optical layer.
     outColor.rgb+=illumination*coverage;
   }
-  // The cut-polished switch material belongs to daylight only. In the dark
-  // room retain the original control exposure and reflections unchanged.
+  // In the dark room retain the original control exposure and reflections.
+  // Daylight switches use the same continuous reflection as every other glass
+  // surface; a separate cut-polished rim would read as an unrelated outline.
   float daylightSwitch=uSwitchGlass*uTheme;
   outColor.rgb *= daylightSwitch>.5 ? 1.0 : max(1.0,uControlBrightness);
-  if(daylightSwitch>.5) {
-    // A polished cut follows the exact rounded contour. Only a pixel-wide
-    // antialiasing transition softens its boundaries, not a Gaussian glow.
-    float cutAA=.5/(uDPR*projectionScale);
-    float cut=1.0-smoothstep(.62-cutAA,.62+cutAA,abs(depth-1.35));
-    float incidence=dot(surfaceNormal,normalize(L.xy+vec2(.001)));
-    float primary=smoothstep(.12,.23,incidence);
-    float returnReflection=smoothstep(.52,.64,-incidence)*.62;
-    float polish=cut*max(primary,returnReflection)*coverage
-      *smoothstep(.05,.8,volume)*mix(.45,.96,attenuation);
-    // Composite neutral white after the material tint and exposure, so even
-    // semantic controls keep white specular highlights in daylight.
-    outColor=vec4(vec3(polish)+outColor.rgb*(1.0-polish),
-      polish+outColor.a*(1.0-polish));
-  }
   if(uCoating.y>.5) {
     vec2 origin=uCoatingOrigin*uRect.zw;
     // CSS-pixel distance keeps the spreading front circular on wide controls.
