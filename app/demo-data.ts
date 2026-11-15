@@ -308,7 +308,7 @@ function analyticsFor(period: DemoPeriod) {
     for (let window = 0; window < 5; window += 1) {
       const matching = trades.filter((trade) => {
         const opened = new Date(trade.openedAt);
-        return opened.getUTCDay() - 1 === day && heatWindow(opened.getUTCHours()) === window;
+        return trade.status === "Chiusa" && opened.getUTCDay() - 1 === day && heatWindow(opened.getUTCHours()) === window;
       });
       heat[day][window] = {
         net: round(sum(matching.map((trade) => trade.netPnl))),
