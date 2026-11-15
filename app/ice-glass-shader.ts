@@ -485,9 +485,11 @@ void main() {
     // the material geometry and the crisp interface above the optical layer.
     outColor.rgb+=illumination*coverage;
   }
-  // Switches use the shared theme material at its native exposure.
-  outColor.rgb *= uSwitchGlass>.5 ? 1.0 : max(1.0,uControlBrightness);
-  if(uSwitchGlass>.5) {
+  // The cut-polished switch material belongs to daylight only. In the dark
+  // room retain the original control exposure and reflections unchanged.
+  float daylightSwitch=uSwitchGlass*uTheme;
+  outColor.rgb *= daylightSwitch>.5 ? 1.0 : max(1.0,uControlBrightness);
+  if(daylightSwitch>.5) {
     // A polished cut follows the exact rounded contour. Only a pixel-wide
     // antialiasing transition softens its boundaries, not a Gaussian glow.
     float cutAA=.5/(uDPR*projectionScale);
@@ -498,7 +500,7 @@ void main() {
     float polish=cut*max(primary,returnReflection)*coverage
       *smoothstep(.05,.8,volume)*mix(.45,.96,attenuation);
     // Composite neutral white after the material tint and exposure, so even
-    // semantic controls keep white specular highlights in both environments.
+    // semantic controls keep white specular highlights in daylight.
     outColor=vec4(vec3(polish)+outColor.rgb*(1.0-polish),
       polish+outColor.a*(1.0-polish));
   }
