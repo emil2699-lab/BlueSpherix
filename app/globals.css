@@ -381,12 +381,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .heatmap { display: grid; grid-template-columns: 50px repeat(5,minmax(78px,1fr)); gap: 7px; margin-top: 24px; min-width: 570px; }
 .heat-label { display: flex; align-items: center; justify-content: center; min-height: 27px; color: var(--muted); font-size: 10px; }
 .heatmap button { min-height: 70px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--text); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; position: relative; isolation: isolate; transition: transform .18s ease; }
-.heatmap button::before { content: ""; position: absolute; inset: 1px; z-index: -1; border-radius: 24px; background: rgb(var(--heat-rgb) / var(--heat-base-alpha)); opacity: 1; transition: opacity .2s var(--ease-apple-fade),box-shadow .42s var(--ease-apple-fade); }
-.heatmap button::after { content: ""; position: absolute; inset: 1px; z-index: -1; border-radius: 24px; pointer-events: none; opacity: var(--edge-reflection,0); background: radial-gradient(ellipse 72% 112% at var(--edge-light-x,50%) var(--edge-light-y,50%),transparent 30%,rgb(255 255 255 / .58) 38%,rgb(var(--edge-light-rgb,86 217 202) / .48) 43%,transparent 55%),radial-gradient(ellipse 46% 74% at var(--edge-light-x,50%) var(--edge-light-y,50%),rgb(255 255 255 / .42),rgb(var(--edge-light-rgb,86 217 202) / .30) 24%,transparent 64%); mix-blend-mode: screen; transition: opacity .42s var(--ease-apple-fade); }
+.heatmap button::before { content: ""; position: absolute; inset: 1px; z-index: -1; border-radius: 24px; background: rgb(var(--heat-rgb) / var(--heat-base-alpha)); opacity: 1; transition: opacity .2s var(--ease-apple-fade),filter .32s var(--ease-apple-fade); }
 .content[data-ice-glass="ready"] .heatmap button[data-glass-selection]::before { opacity: 0; }
 .heatmap button:hover { transform: translateY(-1px); }
 .content .heatmap button.selected { z-index: 2; }
-.content .heatmap button.selected::before { box-shadow: 0 0 12px 3px rgb(var(--heat-rgb) / .30),0 0 28px 8px rgb(var(--heat-rgb) / .12),inset 0 0 20px rgb(var(--heat-rgb) / .12); }
+.content .heatmap button.selected::before { filter: saturate(1.75) brightness(1.04); }
 .heatmap button strong { font-size: 11px; }
 .heatmap button small { color: var(--muted); font-size: 8px; }
 .heat-legend { display: flex; align-items: center; justify-content: flex-end; gap: 5px; color: var(--muted); font-size: 9px; margin-top: 14px; }

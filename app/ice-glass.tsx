@@ -262,6 +262,9 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       const emissionTint = emission?.tint ?? [1,1,1];
       const emitterRect = emitter && emission?.travel && !reduced.matches
         ? switchRect(emitter.rect,emission.travel,(emission.exiting ?? time)-emission.started) : emitter?.rect;
+      const selectedHeat = cards.find(card=>card.element.matches('.heatmap button.selected'));
+      const selectedHeatX = selectedHeat ? selectedHeat.rect.left+selectedHeat.rect.width*.5 : 0;
+      const selectedHeatY = selectedHeat ? selectedHeat.rect.top+selectedHeat.rect.height*.5 : 0;
       gl.uniform4f(uniform("uSpillRect"), emitterRect?.left ?? 0,emitterRect?.top ?? 0,emitterRect?.width ?? 1,emitterRect?.height ?? 1);
       gl.uniform2f(uniform("uSpillOrigin"),...(emission?.origin ?? [.5,.5] as [number,number]));
       gl.uniform3f(uniform("uSpillTint"),emissionTint[0],emissionTint[1],emissionTint[2]);
@@ -359,7 +362,19 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
           Math.min(Math.min(rect.width,rect.height)*.475,Math.max(radius*1.75,24)),
           Math.min(config.glassThickness*2.1,Math.min(rect.width,rect.height)*.25))[2] : crownHeight;
         gl.uniform1f(uniform("uCrownHeight"),movingCrown);
-        gl.uniform3f(uniform("uTint"),tint[0],tint[1],tint[2]);
+        const selectedHeatSurface=element===selectedHeat?.element;
+        const tintLuminance=tint[0]*.2126+tint[1]*.7152+tint[2]*.0722;
+        const materialTint=selectedHeatSurface
+          ? tint.map(channel=>Math.max(0,Math.min(1,tintLuminance+(channel-tintLuminance)*1.4)))
+          : tint;
+        gl.uniform3f(uniform("uTint"),materialTint[0],materialTint[1],materialTint[2]);
+        // The selected soap is not a blurred emitter. Every Edge Map surface
+        // sees the exact point light produced by a cursor held at its centre.
+        const usesSelectedHeatLight=!!selectedHeat && element.matches('.heatmap button');
+        gl.uniform3f(uniform("uLight"),usesSelectedHeatLight ? selectedHeatX : pointer.x-viewport.left,
+          usesSelectedHeatLight ? selectedHeatY : pointer.y-viewport.top,
+          usesSelectedHeatLight ? 1 : reduced.matches ? 0 : pointer.presence);
+        gl.uniform1f(uniform("uInteractiveLight"),usesSelectedHeatLight ? 1 : 0);
         gl.drawArrays(gl.TRIANGLES,0,6);
         if(referenceGlass) {
           caustics?.draw(element,width,height,dpr,rect,drawRect,radius,lift,config.glassIOR);

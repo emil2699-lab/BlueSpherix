@@ -105,6 +105,9 @@ uniform vec2 uSpillOrigin;
 uniform vec3 uSpillTint;
 uniform vec3 uTint;
 uniform vec3 uLight;
+// Reuse the cursor point light at a selected Edge Map cell's centre while the
+// daylight environment remains unchanged.
+uniform float uInteractiveLight;
 uniform vec4 uGlass; // IOR, thickness, roughness, opacity
 uniform float uBodyOpacity;
 uniform vec4 uOptics; // Fresnel, dispersion, refraction, internal reflection
@@ -350,12 +353,13 @@ void main() {
   float distanceXY = length(delta.xy);
   vec3 cursorL = normalize(delta);
   vec3 sunL = normalize(vec3(-.42,-.72,1.55));
-  vec3 L = normalize(mix(cursorL,sunL,uTheme));
+  float daylightSource=uTheme*(1.0-uInteractiveLight);
+  vec3 L = normalize(mix(cursorL,sunL,daylightSource));
   vec3 H = normalize(L+V);
   float attenuation = 1.0/(1.0+pow(distanceXY/uEnergy.w,2.0)*3.0);
   attenuation *= 1.0-smoothstep(uEnergy.w*1.75,uEnergy.w*2.75,distanceXY);
   attenuation *= uLight.z;
-  attenuation=mix(attenuation,1.0,uTheme);
+  attenuation=mix(attenuation,1.0,daylightSource);
   float ndl = max(dot(N,L),0.0);
   float ndh = max(dot(N,H),0.0);
   float f0 = pow((uGlass.x-1.0)/(uGlass.x+1.0),2.0);
@@ -373,7 +377,7 @@ void main() {
   // A parallel source produces an edge-parallel, straight spectral band.
   // Only the difference between local Snell paths and that parallel reference
   // bends it. There is no UV/noise curve or distance-driven bend animation.
-  vec3 referenceL=normalize(mix(vec3(uLight.xy-uRect.xy-halfSize,max(uEnergy.z-mix(.6,uCrownHeight,volume),1.0)),sunL,uTheme));
+  vec3 referenceL=normalize(mix(vec3(uLight.xy-uRect.xy-halfSize,max(uEnergy.z-mix(.6,uCrownHeight,volume),1.0)),sunL,daylightSource));
   vec3 referenceR=refract(-referenceL,N,1.0/(uGlass.x-uOptics.y));
   vec3 referenceG=refract(-referenceL,N,1.0/uGlass.x);
   vec3 referenceB=refract(-referenceL,N,1.0/(uGlass.x+uOptics.y));

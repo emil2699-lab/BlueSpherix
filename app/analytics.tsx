@@ -29,23 +29,11 @@ export default function Analytics() {
   const selectedValue = selectedCell.net;
   const selectedTrades = selectedCell.trades;
   const selectedFactor = selectedCell.factor.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const sourceRgb = heatRgb(selectedValue);
-  const cellStyle = (value: number, dayIndex: number, windowIndex: number) => {
+  const cellStyle = (value: number) => {
     const intensity = Math.min(.28, .055 + Math.abs(value) / 3500);
-    const columnDistance = cell.window - windowIndex;
-    const rowDistance = cell.day - dayIndex;
-    const distance = Math.hypot(columnDistance, rowDistance);
-    const physicalLength = Math.hypot(columnDistance * 1.65, rowDistance) || 1;
-    const lightX = 50 + columnDistance * 1.65 / physicalLength * 72;
-    const lightY = 50 + rowDistance / physicalLength * 88;
-    const reflection = distance === 0 ? 0 : Math.max(0, 1 - (distance - .7) / 3.2);
     return {
       "--heat-rgb": heatRgb(value),
       "--heat-base-alpha": intensity,
-      "--edge-light-rgb": sourceRgb,
-      "--edge-light-x": `${lightX}%`,
-      "--edge-light-y": `${lightY}%`,
-      "--edge-reflection": reflection,
     } as CSSProperties;
   };
   const cellLight = (value: number) => value === 0 ? 0 : .25 + .75 * Math.abs(value) / strongestHeat;
@@ -65,7 +53,7 @@ export default function Analytics() {
       <article className="glass-card edge-map-card">
         <div className="section-head"><div><p className="eyebrow">Edge map</p><h2>Dove nasce il risultato.</h2></div><div className="range-switch edge-toggle" aria-label="Metrica mappa">{(["Risultato", "Profit factor"] as HeatMetric[]).map(item => <button key={item} aria-pressed={metric === item} className={metric === item ? "active" : ""} onClick={() => setMetric(item)}>{item}</button>)}</div></div>
         <p className="portfolio-caption">Ogni cella combina giorno e orario di apertura. Selezionala per leggere il contesto.</p>
-        <div className="heatmap" role="grid" aria-label={`${metric} per giorno e fascia oraria`}><span />{windows.map(window => <span className="heat-label" key={window}>{window}</span>)}{days.flatMap((day, dayIndex) => [<span className="heat-label" key={`${day}-label`}>{day}</span>, ...windows.map((window, windowIndex) => { const heatCell = analytics.heat[dayIndex][windowIndex]; const value = heatCell.net; const label = metric === "Risultato" ? euro(value) : `${heatCell.factor.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PF`; const tone = value > 0 ? "positive" : value < 0 ? "negative" : "neutral"; return <button role="gridcell" aria-selected={cell.day === dayIndex && cell.window === windowIndex} aria-label={`${day}, ${window}: ${label}`} key={`${day}-${window}`} className={`heat-${tone}${cell.day === dayIndex && cell.window === windowIndex ? " selected" : ""}`} data-glass-base data-glass-underlight={cellLight(value)} data-glass-selection-effect="glow" style={cellStyle(value, dayIndex, windowIndex)} onClick={() => setCell({ day: dayIndex, window: windowIndex })}><strong data-sign={metric === "Risultato" ? valueSign(value) : undefined}>{metric === "Risultato" ? `${value >= 0 ? "+" : "−"}$${Math.abs(Math.round(value)).toLocaleString("it-IT")}` : label}</strong><small>{heatCell.trades} trade</small></button>; })])}</div>
+        <div className="heatmap" role="grid" aria-label={`${metric} per giorno e fascia oraria`}><span />{windows.map(window => <span className="heat-label" key={window}>{window}</span>)}{days.flatMap((day, dayIndex) => [<span className="heat-label" key={`${day}-label`}>{day}</span>, ...windows.map((window, windowIndex) => { const heatCell = analytics.heat[dayIndex][windowIndex]; const value = heatCell.net; const label = metric === "Risultato" ? euro(value) : `${heatCell.factor.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PF`; const tone = value > 0 ? "positive" : value < 0 ? "negative" : "neutral"; return <button role="gridcell" aria-selected={cell.day === dayIndex && cell.window === windowIndex} aria-label={`${day}, ${window}: ${label}`} key={`${day}-${window}`} className={`heat-${tone}${cell.day === dayIndex && cell.window === windowIndex ? " selected" : ""}`} data-glass-base data-glass-underlight={cellLight(value)} data-glass-selection-effect="point-light" style={cellStyle(value)} onClick={() => setCell({ day: dayIndex, window: windowIndex })}><strong data-sign={metric === "Risultato" ? valueSign(value) : undefined}>{metric === "Risultato" ? `${value >= 0 ? "+" : "−"}$${Math.abs(Math.round(value)).toLocaleString("it-IT")}` : label}</strong><small>{heatCell.trades} trade</small></button>; })])}</div>
         <div className="heat-legend"><span>Debole</span><i className="negative" /><i /><i /><i className="positive" /><span>Forte</span></div>
       </article>
 

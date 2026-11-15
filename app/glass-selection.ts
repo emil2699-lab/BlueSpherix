@@ -11,7 +11,7 @@ const EXIT_MS = 200;
 const SWITCH_GROUPS = '.range-switch, .stress-tabs, .monte-carlo-switch, .focus-tabs, .session-tabs, .risk-presets, .lab-parameter, .lab-friction-profiles, .lab-sensitivity, .proposal-picker, .trade-filters, .calendar-impact-filters, [role="tablist"]';
 const NEUTRAL_CONTROL_TINT = [.56, .64, .71];
 const SELECTABLE = [
-  'button[aria-pressed]', 'button[aria-selected]:not([data-glass-selection-effect="glow"])', 'button[role="tab"]', 'button[aria-expanded]',
+  'button[aria-pressed]', 'button[aria-selected]:not([data-glass-selection-effect])', 'button[role="tab"]', 'button[aria-expanded]',
   '.range-switch button', '.trade-filters button', '.proposal-picker button',
   '.timeline-trade', '.diary-trade', '.diary-days button', '.exposure-row',
   '.position-table button.table-row',
