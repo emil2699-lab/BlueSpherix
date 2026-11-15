@@ -380,11 +380,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .edge-toggle button { min-width: 92px; }
 .heatmap { display: grid; grid-template-columns: 50px repeat(5,minmax(78px,1fr)); gap: 7px; margin-top: 24px; min-width: 570px; }
 .heat-label { display: flex; align-items: center; justify-content: center; min-height: 27px; color: var(--muted); font-size: 10px; }
-.heatmap button { min-height: 70px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--text); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; position: relative; isolation: isolate; transition: transform .18s ease, box-shadow .34s var(--ease-apple-fade); }
-.heatmap button::before { content: ""; position: absolute; inset: 1px; z-index: -1; border-radius: 24px; background: rgb(var(--heat-rgb) / var(--heat-base-alpha)); opacity: 1; transition: opacity .2s var(--ease-apple-fade); }
+.heatmap button { min-height: 70px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--text); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; position: relative; isolation: isolate; transition: transform .18s ease; }
+.heatmap button::before { content: ""; position: absolute; inset: 1px; z-index: -1; border-radius: 24px; background: rgb(var(--heat-rgb) / var(--heat-base-alpha)); opacity: 1; transition: opacity .2s var(--ease-apple-fade),box-shadow .42s var(--ease-apple-fade); }
 .content[data-ice-glass="ready"] .heatmap button[data-glass-selection]::before { opacity: 0; }
 .heatmap button:hover { transform: translateY(-1px); }
-.content .heatmap button.selected { box-shadow: 0 0 18px rgb(var(--heat-rgb) / .34), 0 0 38px rgb(var(--heat-rgb) / .18), inset 0 0 20px rgb(var(--heat-rgb) / .12) !important; }
+.content .heatmap button.selected { z-index: 2; }
+.content .heatmap button.selected::before { box-shadow: 0 0 16px 4px rgb(var(--heat-rgb) / .34), 0 0 42px 14px rgb(var(--heat-rgb) / .20), 0 0 82px 26px rgb(var(--heat-rgb) / .10), inset 0 0 20px rgb(var(--heat-rgb) / .12); }
 .heatmap button strong { font-size: 11px; }
 .heatmap button small { color: var(--muted); font-size: 8px; }
 .heat-legend { display: flex; align-items: center; justify-content: flex-end; gap: 5px; color: var(--muted); font-size: 9px; margin-top: 14px; }
