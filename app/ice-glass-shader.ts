@@ -538,7 +538,10 @@ void main() {
     }
     // Only the underlight changes: preserve alpha, the cursor's RGB reflection,
     // the material geometry and the crisp interface above the optical layer.
-    outColor.rgb+=illumination*coverage;
+    // Match the switch lamp's exposure only for the selected night heat cell.
+    // Leave its glass coverage and the two independent surface lights intact.
+    float lampExposure=uTheme<.5 && uInteractiveLight>.5 && uCoating.y<.5 ? 1.5 : 1.0;
+    outColor.rgb+=illumination*coverage*lampExposure;
   }
   // In the dark room retain the original control exposure and reflections.
   // Daylight switches use the same continuous reflection as every other glass

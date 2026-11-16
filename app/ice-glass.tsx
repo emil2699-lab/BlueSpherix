@@ -361,8 +361,11 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         gl.uniform4f(uniform("uSpill"),power,reduced.matches ? 0 : emission ? (time-emission.started)/1000 : 0,
           emissionPhase[0]*emissionPhase[2]*emissionPhase[4],receivesSpill ? 1 : 0);
         underlightMoving ||= receivesSpill && power > .35 && !reduced.matches && emission?.exiting === undefined;
-        const underlight = referenceContext ? 0 : coating || nightHeatSelection
-          ? Math.max(0, Math.min(1, Number(element.dataset.glassUnderlight ?? 1) || 0)) : thumbOn ? .45 : 0;
+        const underlightPower=Math.max(0, Math.min(1, Number(element.dataset.glassUnderlight ?? 1) || 0));
+        // Selection has its own lamp, including empty P&L cells. Keep the result
+        // weighting, but never confuse a zero result with an unlit selection.
+        const underlight = referenceContext ? 0 : nightHeatSelection
+          ? .65+.35*underlightPower : coating ? underlightPower : thumbOn ? .45 : 0;
         underlightMoving ||= underlight > 0 && !reduced.matches && coating?.exiting === undefined;
         gl.uniform2f(uniform("uUnderlight"), underlight,
           reduced.matches ? 0 : coating ? (time-coating.started)/1000
