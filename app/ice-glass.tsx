@@ -56,6 +56,8 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
     let resize: ResizeObserver | null = null;
     const observedSurfaces = new Set<Element>();
     const pointer = { x: -10000, y: -10000, presence: 0 };
+    let heatSelection: HTMLElement | undefined;
+    let heatSelectionStarted=0;
     const lifts = new Map<HTMLElement,{ value: number; updated: number; target?: number }>();
     const reduced = matchMedia("(prefers-reduced-motion: reduce)");
     const locations = new Map<string, WebGLUniformLocation | null>();
@@ -269,6 +271,10 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       const emitterRect = emitter && emission?.travel && !reduced.matches
         ? switchRect(emitter.rect,emission.travel,(emission.exiting ?? time)-emission.started) : emitter?.rect;
       const selectedHeat = cards.find(card=>card.element.matches('.heatmap button.selected'));
+      if(heatSelection!==selectedHeat?.element) {
+        heatSelection=selectedHeat?.element;
+        heatSelectionStarted=time;
+      }
       const selectedHeatX = selectedHeat ? selectedHeat.rect.left+selectedHeat.rect.width*.5 : 0;
       const selectedHeatY = selectedHeat ? selectedHeat.rect.top+selectedHeat.rect.height*.5 : 0;
       const pointerX=pointer.x-viewport.left,pointerY=pointer.y-viewport.top;
@@ -281,6 +287,8 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
       for (const { element, rect: measuredRect, radius, tint, crownHeight, reference } of cards) {
         const referenceGlass=lightMode && reference;
         const coating = coatings.current.get(element);
+        const selectedHeatSurface=element===selectedHeat?.element;
+        const nightHeatSelection=!lightMode && selectedHeatSurface;
         const thumb = element.matches('.glass-switch-thumb');
         const thumbOn = thumb && (element.closest('.protection-switch')?.classList.contains('on')
           || element.closest('.lab-cost-toggle')?.querySelector<HTMLInputElement>('input')?.checked);
@@ -353,11 +361,12 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         gl.uniform4f(uniform("uSpill"),power,reduced.matches ? 0 : emission ? (time-emission.started)/1000 : 0,
           emissionPhase[0]*emissionPhase[2]*emissionPhase[4],receivesSpill ? 1 : 0);
         underlightMoving ||= receivesSpill && power > .35 && !reduced.matches && emission?.exiting === undefined;
-        const underlight = referenceContext ? 0 : coating
+        const underlight = referenceContext ? 0 : coating || nightHeatSelection
           ? Math.max(0, Math.min(1, Number(element.dataset.glassUnderlight ?? 1) || 0)) : thumbOn ? .45 : 0;
         underlightMoving ||= underlight > 0 && !reduced.matches && coating?.exiting === undefined;
         gl.uniform2f(uniform("uUnderlight"), underlight,
-          reduced.matches ? 0 : coating ? (time-coating.started)/1000 : thumb ? time/1000 : 0);
+          reduced.matches ? 0 : coating ? (time-coating.started)/1000
+            : nightHeatSelection ? (time-heatSelectionStarted)/1000 : thumb ? time/1000 : 0);
         gl.uniform4f(uniform("uCoating"), reveal, isControl, opacity, volume);
         gl.uniform2f(uniform("uCoatingOrigin"), ...(coating?.origin ?? [.5, .5] as [number, number]));
         gl.uniform4f(uniform("uRect"),rect.left,rect.top,rect.width,rect.height);
@@ -371,10 +380,11 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
           Math.min(Math.min(rect.width,rect.height)*.475,Math.max(radius*1.75,24)),
           Math.min(config.glassThickness*2.1,Math.min(rect.width,rect.height)*.25))[2] : crownHeight;
         gl.uniform1f(uniform("uCrownHeight"),movingCrown);
-        const selectedHeatSurface=element===selectedHeat?.element;
-        // Mustard is transmitted through the existing transparent material;
-        // it changes neither coverage nor the convex Fresnel/edge response.
-        const materialTint=selectedHeatSurface ? [.722,.541,.141] : tint;
+        // Daylight uses mustard transmission. The night room retains the
+        // original cell pigment and its softly varying internal light.
+        const tintLuminance=tint[0]*.2126+tint[1]*.7152+tint[2]*.0722;
+        const materialTint=selectedHeatSurface ? lightMode ? [.722,.541,.141]
+          : tint.map(channel=>Math.max(0,Math.min(1,tintLuminance+(channel-tintLuminance)*1.4))) : tint;
         gl.uniform3f(uniform("uTint"),materialTint[0],materialTint[1],materialTint[2]);
         // In the dark room the selected source stays on while the independent
         // cursor source moves across it. Both use the same curved surface.

@@ -529,7 +529,7 @@ void main() {
     }
   }
   if(uSpill.w>.5 && depth<26.0) outColor.rgb+=underlightSpill(pixel,depth)*coverage;
-  if(uUnderlight.x>0.0 && uCoating.y>.5) {
+  if(uUnderlight.x>0.0 && (uCoating.y>.5 || uInteractiveLight>.5)) {
     vec3 illumination=softUnderlight(materialPixel,depth,fresnel,volume);
     float shoulderTransport=smoothstep(.02,.18,1.0-N.z);
     if(shoulderTransport>.001 && volume>.2) {
