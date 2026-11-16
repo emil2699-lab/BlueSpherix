@@ -105,6 +105,8 @@ uniform vec2 uSpillOrigin;
 uniform vec3 uSpillTint;
 uniform vec3 uTint;
 uniform vec3 uLight;
+// An independent moving source; the selected Edge Map source is never replaced.
+uniform vec3 uCursorLight;
 // Reuse the cursor point light at a selected Edge Map cell's centre while the
 // daylight environment remains unchanged.
 uniform float uInteractiveLight;
@@ -257,6 +259,100 @@ vec3 underlightSpill(vec2 pixel, float depth) {
   float rim=exp(-depth/5.0)*(1.0-smoothstep(18.0,26.0,depth));
   return underlightTransmission(uSpillTint,level)*radiance*attenuation*rim*(.07*1.15);
 }
+struct GlassLighting {
+  vec3 face;
+  vec3 edge;
+  vec3 caustic;
+  vec3 bandDistance;
+  float bandEnergy;
+  float attenuation;
+  float specular;
+};
+// Each source follows the same normals and Snell paths. Geometry, ambient
+// reflection and material coverage are evaluated once outside this function.
+GlassLighting sampleGlassLight(vec3 source, float daylightSource, vec2 pixel,
+  vec3 N, float surfaceHeight, float volume, vec2 halfSize, vec2 surfaceNormal,
+  float depth, float opticalDepth, float thickness, float bevel) {
+  GlassLighting result;
+  vec3 V=vec3(0,0,1);
+  vec3 delta=vec3(source.xy-pixel,max(uEnergy.z-surfaceHeight,1.0));
+  float distanceXY=length(delta.xy);
+  vec3 sunL=normalize(vec3(-.42,-.72,1.55));
+  vec3 L=normalize(mix(normalize(delta),sunL,daylightSource));
+  vec3 H=normalize(L+V);
+  float attenuation=1.0/(1.0+pow(distanceXY/uEnergy.w,2.0)*3.0);
+  attenuation*=1.0-smoothstep(uEnergy.w*1.75,uEnergy.w*2.75,distanceXY);
+  attenuation*=source.z;
+  attenuation=mix(attenuation,1.0,daylightSource);
+  float ndh=max(dot(N,H),0.0);
+  float a2=pow(uGlass.z,4.0);
+  float denominator=ndh*ndh*(a2-1.0)+1.0;
+  float ggx=a2/max(3.141593*denominator*denominator,.0001);
+  float specular=min(ggx*.06,1.4)+pow(ndh,uFinish.x)*.19;
+  float edge=exp(-opticalDepth/(thickness*.74));
+  float shoulder=exp(-pow((opticalDepth-thickness*.72)/(thickness*.58),2.0));
+  vec3 transmittedR=refract(-L,N,1.0/(uGlass.x-uOptics.y));
+  vec3 transmittedG=refract(-L,N,1.0/uGlass.x);
+  vec3 transmittedB=refract(-L,N,1.0/(uGlass.x+uOptics.y));
+  vec3 refracted=vec3(environment(transmittedR).r,environment(transmittedG).g,environment(transmittedB).b);
+  vec3 referenceL=normalize(mix(vec3(source.xy-uRect.xy-halfSize,
+    max(uEnergy.z-mix(.6,uCrownHeight,volume),1.0)),sunL,daylightSource));
+  vec3 referenceR=refract(-referenceL,N,1.0/(uGlass.x-uOptics.y));
+  vec3 referenceG=refract(-referenceL,N,1.0/uGlass.x);
+  vec3 referenceB=refract(-referenceL,N,1.0/(uGlass.x+uOptics.y));
+  vec2 tangent=vec2(-surfaceNormal.y,surfaceNormal.x);
+  float shear=dot(transmittedG-referenceG,vec3(surfaceNormal,0));
+  float bend=.42*shear/sqrt(.64+shear*shear);
+  float focus=depth/thickness+bend;
+  float referenceIncidence=dot(referenceL.xy,tangent);
+  float spread=uOptics.y*4.2*exp(-depth/thickness)*(.25+.75*referenceIncidence);
+  vec3 differentialR=(transmittedR-transmittedG)-(referenceR-referenceG);
+  vec3 differentialB=(transmittedB-transmittedG)-(referenceB-referenceG);
+  vec3 focalDepth=vec3(.42+spread+dot(differentialR,N)*.3,
+    .42,.42-spread+dot(differentialB,N)*.3);
+  float bandWidth=.15+.018*shear*shear/(.04+shear*shear);
+  float separation=smoothstep(uEnergy.z*1.25,uEnergy.z*4.0,length(delta));
+  separation=max(separation,uCoating.y*sin(clamp(uCoating.x,0.0,1.0)*3.14159265)*.85);
+  focalDepth=mix(vec3(.42),focalDepth,separation);
+  float reflectionWidth=bandWidth*mix(.72,1.0,separation);
+  vec3 bandDistance=(vec3(focus)-focalDepth)/reflectionWidth;
+  vec3 caustic=exp(-pow(bandDistance,vec3(2.0)))*(bandWidth/reflectionWidth);
+  vec3 channelOverlap=caustic*(reflectionWidth/bandWidth);
+  float polishedCore=pow(channelOverlap.r*channelOverlap.g*channelOverlap.b,1.5)
+    *(1.0-separation)*(1.0-separation);
+  float facing=.11+.89*max(dot(N.xy,normalize(delta.xy+vec2(.001))),0.0);
+  float light=attenuation*uEnergy.y*facing;
+  float alongEdge=dot(delta.xy,tangent);
+  float spectralFocus=exp(-pow(alongEdge/(uEnergy.z*1.8),2.0));
+  float rim=exp(-depth/max(1.5,thickness*.07));
+  float whiteCore=pow(attenuation,4.2)*spectralFocus*exp(-depth/max(2.0,thickness*.14));
+  vec3 tint=mix(vec3(.48,.70,1.0),uTint,.22);
+  vec3 absorption=exp(-vec3(.09,.06,.035)*thickness*.12);
+  float frontSpread=attenuation*(.20+.80*max(dot(N,L),0.0));
+  result.face=refracted*frontSpread*(.12+.18*(1.0-bevel))*absorption;
+  result.face+=mix(vec3(.32,.53,.78),uTint,.25)*attenuation*exp(-opticalDepth/(thickness*3.3))*.20;
+  result.face+=mix(vec3(.23,.36,.54),uTint,.45)*light*exp(-opticalDepth/(thickness*4.8))*.14;
+  result.face+=vec3(.63,.76,.92)*attenuation*(1.0-bevel)*.035;
+  result.edge=light*(vec3(.93,.96,1.0)*specular*rim+tint*shoulder*.18);
+  float spectralReach=exp(-opticalDepth/(thickness*1.55));
+  result.edge+=light*caustic*spectralReach*spectralFocus*uOptics.z*.92;
+  result.edge+=vec3(1.0)*light*polishedCore*spectralReach*spectralFocus*uOptics.z*.55;
+  result.edge+=vec3(.92,.98,1.0)*whiteCore*.31;
+  result.edge+=light*tint*edge*uOptics.w*.08;
+  result.caustic=caustic;
+  result.bandDistance=bandDistance;
+  result.bandEnergy=light*spectralReach*spectralFocus*uOptics.z*.92*(bandWidth/reflectionWidth);
+  result.attenuation=attenuation;
+  result.specular=specular;
+  return result;
+}
+vec3 joinedReflection(vec3 a, vec3 b) {
+  // A smooth union in optical band space forms a small neck where two curved
+  // reflections approach. No screen-space halo or time-driven wobble is added.
+  vec3 h=max(vec3(.9)-abs(a-b),vec3(0.0))/.9;
+  vec3 distanceToBand=max(min(a,b)-h*h*(.9*.25),vec3(0.0));
+  return exp(-distanceToBand*distanceToBand)-max(exp(-a*a),exp(-b*b));
+}
 void main() {
   vec2 pixel = vec2(gl_FragCoord.x/uDPR, (uResolution.y-gl_FragCoord.y)/uDPR);
   if(uReferenceGlass>.5) { outColor=referenceGlass(pixel); return; }
@@ -349,92 +445,32 @@ void main() {
   vec2 normalXY = -surface.xy + waveGradient*3.2*bevel*smoothstep(0.0,thickness*.4,depth);
   vec3 N = normalize(vec3(normalXY*volume,1.0));
   vec3 V = vec3(0,0,1);
-  vec3 delta = vec3(uLight.xy-pixel,max(uEnergy.z-surfaceHeight,1.0));
-  float distanceXY = length(delta.xy);
-  vec3 cursorL = normalize(delta);
   vec3 sunL = normalize(vec3(-.42,-.72,1.55));
   float daylightSource=uTheme*(1.0-uInteractiveLight);
-  vec3 L = normalize(mix(cursorL,sunL,daylightSource));
-  vec3 H = normalize(L+V);
-  float attenuation = 1.0/(1.0+pow(distanceXY/uEnergy.w,2.0)*3.0);
-  attenuation *= 1.0-smoothstep(uEnergy.w*1.75,uEnergy.w*2.75,distanceXY);
-  attenuation *= uLight.z;
-  attenuation=mix(attenuation,1.0,daylightSource);
-  float ndl = max(dot(N,L),0.0);
-  float ndh = max(dot(N,H),0.0);
   float f0 = pow((uGlass.x-1.0)/(uGlass.x+1.0),2.0);
   float fresnel = f0+(1.0-f0)*pow(1.0-max(N.z,0.0),5.0);
-  float a2 = pow(uGlass.z,4.0);
-  float denominator = ndh*ndh*(a2-1.0)+1.0;
-  float ggx = a2/max(3.141593*denominator*denominator,.0001);
-  float specular = min(ggx*.06,1.4) + pow(ndh,uFinish.x)*.19;
   float edge = exp(-opticalDepth/(thickness*.74));
   float shoulder = exp(-pow((opticalDepth-thickness*.72)/(thickness*.58),2.0));
-  vec3 transmittedR = refract(-L,N,1.0/(uGlass.x-uOptics.y));
-  vec3 transmittedG = refract(-L,N,1.0/uGlass.x);
-  vec3 transmittedB = refract(-L,N,1.0/(uGlass.x+uOptics.y));
-  vec3 refracted = vec3(environment(transmittedR).r,environment(transmittedG).g,environment(transmittedB).b);
-  // A parallel source produces an edge-parallel, straight spectral band.
-  // Only the difference between local Snell paths and that parallel reference
-  // bends it. There is no UV/noise curve or distance-driven bend animation.
-  vec3 referenceL=normalize(mix(vec3(uLight.xy-uRect.xy-halfSize,max(uEnergy.z-mix(.6,uCrownHeight,volume),1.0)),sunL,daylightSource));
-  vec3 referenceR=refract(-referenceL,N,1.0/(uGlass.x-uOptics.y));
-  vec3 referenceG=refract(-referenceL,N,1.0/uGlass.x);
-  vec3 referenceB=refract(-referenceL,N,1.0/(uGlass.x+uOptics.y));
-  vec2 tangent=vec2(-surfaceNormal.y,surfaceNormal.x);
-  float shear=dot(transmittedG-referenceG,vec3(surfaceNormal,0));
-  float bend=.42*shear/sqrt(.64+shear*shear);
-  float focus=depth/thickness+bend;
-  float referenceIncidence=dot(referenceL.xy,tangent);
-  float spread=uOptics.y*4.2*exp(-depth/thickness)*(.25+.75*referenceIncidence);
-  vec3 differentialR=(transmittedR-transmittedG)-(referenceR-referenceG);
-  vec3 differentialB=(transmittedB-transmittedG)-(referenceB-referenceG);
-  vec3 focalDepth=vec3(.42+spread+dot(differentialR,N)*.3,
-    .42,.42-spread+dot(differentialB,N)*.3);
-  float bandWidth=.15+.018*shear*shear/(.04+shear*shear);
-  // One reflection, from overlapping white to the existing dispersed RGB.
-  // Evaluate proximity at the surface, so only the nearby part becomes glossy;
-  // the distant band retains its exact Snell paths, width and colour balance.
-  float separation=smoothstep(uEnergy.z*1.25,uEnergy.z*4.0,length(delta));
-  // A brief, source-dependent spectral split accompanies the material coating.
-  // Ordinary cards keep their exact existing optical paths and parameters.
-  separation=max(separation,uCoating.y*sin(clamp(uCoating.x,0.0,1.0)*3.14159265)*.85);
-  focalDepth=mix(vec3(.42),focalDepth,separation);
-  float reflectionWidth=bandWidth*mix(.72,1.0,separation);
-  // Normalize the narrower channel profiles, rather than placing an unrelated
-  // white glow over the coloured material.
-  vec3 caustic = exp(-pow((vec3(focus)-focalDepth)/reflectionWidth,vec3(2.0)))
-    *(bandWidth/reflectionWidth);
-  // A sharper neutral crest grows only where the same RGB paths overlap.
-  // Keep the soft reflection and all three spectral fringes underneath it.
-  vec3 channelOverlap=caustic*(reflectionWidth/bandWidth);
-  float polishedCore=pow(channelOverlap.r*channelOverlap.g*channelOverlap.b,1.5)
-    *(1.0-separation)*(1.0-separation);
-  float facing = .11+.89*max(dot(N.xy,normalize(delta.xy+vec2(.001))),0.0);
-  float light = attenuation*uEnergy.y*facing;
-  float alongEdge = dot(delta.xy,tangent);
-  float spectralFocus = exp(-pow(alongEdge/(uEnergy.z*1.8),2.0));
-  float rim=exp(-depth/max(1.5,thickness*.07));
-  // Keep the white reflection on the rim as a broad streak, without isolated
-  // GGX dots on the front or rounded shoulders of neighbouring cards.
-  float whiteCore=pow(attenuation,4.2)*spectralFocus*exp(-depth/max(2.0,thickness*.14));
-  vec3 tint = mix(vec3(.48,.70,1.0),uTint,.22);
-  vec3 absorption = exp(-vec3(.09,.06,.035)*thickness*.12);
-  // The existing environment is reflected by the same convex surface, rather
-  // than by a flat UV-based direction unrelated to the material's geometry.
+  GlassLighting primary=sampleGlassLight(uLight,daylightSource,pixel,N,
+    surfaceHeight,volume,halfSize,surfaceNormal,depth,opticalDepth,thickness,bevel);
+  float attenuation=primary.attenuation;
+  float specular=primary.specular;
+  vec3 caustic=primary.caustic;
+  float spectralReach=exp(-opticalDepth/(thickness*1.55));
   vec3 ambient = environment(reflect(-V,N));
-  float frontSpread = attenuation*(.20+.80*max(dot(N,L),0.0));
-  vec3 face = ambient*(1.75+.35*(1.0-bevel)) + uTint*.018;
-  face += refracted*frontSpread*(.12+.18*(1.0-bevel))*absorption;
-  face += mix(vec3(.32,.53,.78),uTint,.25)*attenuation*exp(-opticalDepth/(thickness*3.3))*.20;
-  face += mix(vec3(.23,.36,.54),uTint,.45)*light*exp(-opticalDepth/(thickness*4.8))*.14;
-  face += vec3(.63,.76,.92)*attenuation*(1.0-bevel)*.035;
-  vec3 edgeLight = light*(vec3(.93,.96,1.0)*specular*rim + tint*shoulder*.18);
-  float spectralReach = exp(-opticalDepth/(thickness*1.55));
-  edgeLight += light*caustic*spectralReach*spectralFocus*uOptics.z*.92;
-  edgeLight += vec3(1.0)*light*polishedCore*spectralReach*spectralFocus*uOptics.z*.55;
-  edgeLight += vec3(.92,.98,1.0)*whiteCore*.31;
-  edgeLight += light*tint*edge*uOptics.w*.08;
+  vec3 face=ambient*(1.75+.35*(1.0-bevel))+uTint*.018+primary.face;
+  vec3 edgeLight=primary.edge;
+  vec3 cursorRadiance=vec3(0.0);
+  if(uTheme<.5 && uCursorLight.z>0.0) {
+    GlassLighting cursor=sampleGlassLight(uCursorLight,0.0,pixel,N,
+      surfaceHeight,volume,halfSize,surfaceNormal,depth,opticalDepth,thickness,bevel);
+    vec3 bridge=joinedReflection(abs(primary.bandDistance),abs(cursor.bandDistance))
+      *min(primary.bandEnergy,cursor.bandEnergy)*.65;
+    // Keep the stationary source at full strength. Compress just the added
+    // highlight at intersections, so overlapping reflections retain detail.
+    cursorRadiance=cursor.face+cursor.edge/(vec3(1.0)+primary.edge*2.0)
+      *( .32+.68*edge)+bridge*(.32+.68*edge);
+  }
   if(uCoating.y>.5) {
     // Keep the original control hue throughout the glass and lightly filter its
     // existing reflection, without flattening the spectral separation to one hue.
@@ -455,6 +491,9 @@ void main() {
   float alpha=mix(uBodyOpacity*coverage,opticalAlpha,exp(-depth/(thickness*.45)));
   vec3 body=face*(.72+uOptics.x*fresnel);
   outColor=vec4(color*opticalAlpha-body*(opticalAlpha-alpha),alpha);
+  // Light changes radiance, not opacity. The cursor cannot switch off the
+  // selected source, obscure the glass, or erase its neighbouring reflections.
+  outColor.rgb+=cursorRadiance*(.72+uOptics.x*fresnel)*opticalAlpha;
   if(uTheme>.5) {
     // In daylight the transparent body is read mostly through Fresnel, edge
     // thickness and focused transmitted sunlight. Radiance remains separate

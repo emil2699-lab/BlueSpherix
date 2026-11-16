@@ -376,14 +376,16 @@ export function IceGlass({ rootRef }: { rootRef: RefObject<HTMLElement | null> }
         // it changes neither coverage nor the convex Fresnel/edge response.
         const materialTint=selectedHeatSurface ? [.722,.541,.141] : tint;
         gl.uniform3f(uniform("uTint"),materialTint[0],materialTint[1],materialTint[2]);
-        // The selected soap is the resting point light for the Edge Map. As
-        // soon as the real cursor enters the map it takes precedence, keeping
-        // the original continuous interaction instead of pinning the optics.
+        // In the dark room the selected source stays on while the independent
+        // cursor source moves across it. Both use the same curved surface.
+        // Keep the existing daylight interaction unchanged.
         const usesSelectedHeatLight=!!selectedHeat && element.matches('.heatmap button');
-        const usesPointerHeatLight=usesSelectedHeatLight && pointerInHeatmap;
+        const usesPointerHeatLight=lightMode && usesSelectedHeatLight && pointerInHeatmap;
         gl.uniform3f(uniform("uLight"),usesPointerHeatLight ? pointerX : usesSelectedHeatLight ? selectedHeatX : pointerX,
           usesPointerHeatLight ? pointerY : usesSelectedHeatLight ? selectedHeatY : pointerY,
           usesSelectedHeatLight ? 1 : reduced.matches ? 0 : pointer.presence);
+        gl.uniform3f(uniform("uCursorLight"),pointerX,pointerY,
+          !lightMode && usesSelectedHeatLight && !reduced.matches ? pointer.presence : 0);
         gl.uniform1f(uniform("uInteractiveLight"),usesSelectedHeatLight ? 1 : 0);
         gl.drawArrays(gl.TRIANGLES,0,6);
         if(referenceGlass) {
