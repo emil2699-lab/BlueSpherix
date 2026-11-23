@@ -63,7 +63,7 @@ try {
     const cardBefore = await card.boundingBox();
     const labelBefore = await label.boundingBox();
     await card.hover({ position: { x: Math.min(80, cardBefore.width / 2), y: Math.min(60, cardBefore.height / 2) } });
-    await page.waitForFunction(element => Number.parseFloat(getComputedStyle(element).scale) > 1.02,
+    await page.waitForFunction(element => Number.parseFloat(getComputedStyle(element).scale) > 1.015,
       await label.elementHandle(), { timeout: 6000 });
     const cardAfter = await card.boundingBox();
     const labelAfter = await label.boundingBox();
@@ -71,7 +71,7 @@ try {
     assert(Math.abs(cardAfter.x-cardBefore.x) < 1.5 && Math.abs(cardAfter.y-cardBefore.y) < 1.5,
       `${view} keeps the semantic card and hit target on the base (${cardBefore.x},${cardBefore.y} -> ${cardAfter.x},${cardAfter.y})`);
     assert(labelAfter.width > labelBefore.width * 1.01 && labelScale !== "none",
-      `${view} projects text and controls on the half-height label plane (${labelBefore.width} -> ${labelAfter.width}, scale ${labelScale})`);
+      `${view} projects text and controls on the 40%-height label plane (${labelBefore.width} -> ${labelAfter.width}, scale ${labelScale})`);
 
     const staticVisual = page.locator(".content :is(.equity-chart,.mini-chart,.allocation-bar,[class*='heatmap'],[class*='orbit'],[class*='ring']):visible").first();
     if (await staticVisual.count()) {
@@ -94,8 +94,8 @@ try {
   await page.evaluate(() => { window.globalGlassFrames = []; });
   await nestedControl.click();
   await nestedControl.locator("xpath=self::*[@data-glass-selection='selected']").waitFor({ timeout: 5000 });
-  await page.waitForFunction(() => window.globalGlassFrames.some(frame => frame.projection > 1.02));
-  assert(await page.evaluate(() => window.globalGlassFrames.some(frame => frame.projection > 1.02)),
+  await page.waitForFunction(() => window.globalGlassFrames.some(frame => frame.projection > 1.015));
+  assert(await page.evaluate(() => window.globalGlassFrames.some(frame => frame.projection > 1.015)),
     "a nested selected control follows its host card label plane");
 
   await page.evaluate(() => { location.hash = "analytics"; });
@@ -106,7 +106,7 @@ try {
   await dataCard.scrollIntoViewIfNeeded();
   const trackBefore = await dataTrack.boundingBox();
   await dataCard.hover();
-  await page.waitForFunction(element => Number.parseFloat(getComputedStyle(element).scale) > 1.02,
+  await page.waitForFunction(element => Number.parseFloat(getComputedStyle(element).scale) > 1.015,
     await dataLabel.elementHandle(), { timeout: 6000 });
   const trackAfter = await dataTrack.boundingBox();
   assert(Math.abs(trackAfter.x-trackBefore.x) < .5 && Math.abs(trackAfter.y-trackBefore.y) < .5

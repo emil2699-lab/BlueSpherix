@@ -2,7 +2,7 @@
 export const DAYLIGHT_GLASS = {
   lift: 48,
   perspective: 900,
-  labelRatio: .5,
+  labelRatio: .4,
   thickness: 8,
   clearance: 5,
   // Direction to a distant area source, in page XY / viewer-facing Z space.

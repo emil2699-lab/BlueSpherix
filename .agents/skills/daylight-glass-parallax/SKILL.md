@@ -22,7 +22,7 @@ same size clamp. Do not restore the old DOM lens, shadow or 82 px lift.
   rim, rolled shoulder and polished lip, broad reflection and clear centre.
 - One fixed natural source above and to the left. Its transmitted rays and cast
   shadow must travel down/right in page coordinates. Cursor controls height only.
-- Glass advances in Z. Text and icons advance by exactly half its Z distance.
+- Glass advances in Z. Text and icons advance by 40% of its Z distance.
   Images, charts and decorative diagrams stay on the base. Project both planes
   with `P / (P - z)`, around the same card centre. This is perspective parallax,
   **not optical refraction of text**. No SVG displacement or DOM rasterization.
@@ -44,7 +44,7 @@ geometry on layout invalidation, never on pointer movement. Ignore only renderer
 owned style mutations. Stop when lift settles and nothing else is animated.
 Respect reduced motion, hidden documents, context restoration and CSS fallback.
 
-Verify shader compilation, half-height ratio, stationary chart geometry, absence
+Verify shader compilation, 40% height ratio, stationary chart geometry, absence
 of SVG filters on Today content, real controls, both themes, scrolling, mobile,
 and idle draw count. Report headless frame timings as environment-specific.
 Attempt WebKit; report its exact availability rather than claiming Safari parity.

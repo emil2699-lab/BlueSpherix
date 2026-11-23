@@ -1,13 +1,13 @@
 # Today: clear glass and intermediate labels
 
 Implemented from the user's photographic reference and choices: Today only,
-light mode only; text/icons at half the glass height; charts/images on the base;
+light mode only; text/icons at 40% of the glass height; charts/images on the base;
 soft transmitted shadow plus caustics. Based on restored `0e6bf17`.
 
 The latest material-only revision restores the visible soap from `3f3fcd6`:
 56 px rounded corners and its original soft rim, shoulder, crown and polished
-lip equations. The 48 px glass / 24 px label animation, dashboard palette,
-shadow softness and caustic intensity remain those of `f30afa0`.
+lip equations. The glass travels 48 px and the labels now travel 19.2 px.
+The dashboard palette, shadow softness and caustic intensity remain those of `f30afa0`.
 The subsequent corner correction uses the same measured 56 px CSS radius for
 the visible contour, shadow SDF and caustic source mesh/mask. Every pass clamps
 it to 47.5% of the smaller card dimension, including the narrow notice/strip.
@@ -21,9 +21,9 @@ parameters remain unchanged.
 - The fixed daylight direction is `(-.38, -.56, 1.4)`, above/left, with angular
   radius `.045`. Shadow and caustics travel according to this same source.
 - The glass advances 48 CSS px, with perspective distance 900 px. Labels advance
-  exactly 24 px at full hover, using the same continuous lift clock and card
+  exactly 19.2 px at full hover, using the same continuous lift clock and card
   centre. The projected scales differ according to `P / (P - z)`; the screen-space
-  enlargement is therefore not an arbitrary 50% scale multiplier.
+  enlargement is therefore not an arbitrary 40% scale multiplier.
 - `app/daylight-parallax.ts` moves real DOM label/icon groups. Charts and images
   are excluded. Today does not use the previous SVG displacement filter or a DOM
   screenshot. Text stays selectable and controls keep their native behaviour.
@@ -56,7 +56,7 @@ refraction.
 - Existing optical model checks and shader skill compilation: passed.
 - Skill manifest/reference validation: passed.
 - ESLint: no errors; existing unused `basename` warning in the skill validator.
-- Chromium browser tests: label Z = 24 px; unchanged chart and card bounds;
+- Earlier Chromium browser tests (with label Z = 24 px): unchanged chart and card bounds;
   no Today content displacement filters; working range buttons and navigation;
   dark theme, scrolling, mobile, reduced motion, no-WebGL fallback and context
   loss/restoration.
