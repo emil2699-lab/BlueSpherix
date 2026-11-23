@@ -10,6 +10,8 @@
   --violet: #9d8bff;
   --amber: #ffb85c;
   --red: #ff6f7d;
+  --neutral-accent: #aebac3;
+  --neutral-accent-wash: rgb(174 186 195 / .11);
   --ease-apple-layout: cubic-bezier(.32,.72,0,1);
   --ease-apple-spring: cubic-bezier(.34,1.38,.64,1);
   --ease-apple-press: cubic-bezier(.2,0,0,1);
@@ -1995,4 +1997,92 @@ html[data-theme="light"] .content:not([data-ice-glass="ready"]) [data-glass-sele
   .timeline-trade > strong::before { left: -6px; }
   .monte-carlo-controls > div + div::before { left: -10px; inset-block: 4px; }
   .session-metrics > span + span::before { left: -9px; }
+}
+
+/* Informational purple and yellow were hard to scan across the dashboard.
+   Keep financial green and red plus every selected state intact, while the
+   remaining copy, status marks and pictograms share one neutral ink. */
+nav button em,
+.icon-button i,
+.today-kpi-icon,
+.insight-icon,
+.analytics-icon,
+.detail-insight svg,
+.dna-insight svg,
+.status-badge.warning,
+.risk-live-status.warning,
+.risk-budget-card .section-head svg,
+.risk-kpi > span,
+.simulator-verdict.warning,
+.correlation-card .section-head svg,
+.protections-card .section-head svg,
+.protection-row.warning .protection-icon,
+.read-only-note svg,
+.monte-carlo-readout.warning .monte-carlo-message,
+.monte-carlo-readout > small svg,
+.risk-insight > svg,
+.flow-insight svg,
+.trade-note svg,
+.hybrid-insight svg,
+.hybrid-note svg,
+.trade-journey .section-head svg,
+.inspector-note svg,
+.screenshot-upload,
+.lab-beta,
+.lab-experiments button > span,
+.lab-rule > svg,
+.lab-verdict-icon,
+.lab-verdict > span,
+.lab-validation .section-head > svg,
+.lab-confidence > svg,
+.lab-oos-head > span,
+.lab-oos-verdict > span,
+.lab-sensitivity .section-head > span,
+.lab-vault .section-head > svg,
+.lab-vault-list article > div > span,
+.diary-kpi-icon,
+.diary-context span,
+.diary-rating button,
+.diary-upload,
+.diary-empty > svg,
+.calendar-strip svg,
+.event-pills button,
+.calendar-signal,
+.calendar-risk-copy button svg,
+.calendar-exposure-orbit .exposure-core,
+.calendar-exposure-orbit .node-xau,
+.currency-orb.currency-usd,
+.calendar-context-time strong,
+.calendar-sensitivity,
+.calendar-sensitivity strong {
+  color: var(--neutral-accent) !important;
+}
+
+nav button em,
+.today-kpi-icon,
+.insight-icon,
+.analytics-icon,
+.risk-kpi > span,
+.protection-row.warning .protection-icon,
+.lab-beta,
+.lab-experiments button > span,
+.lab-verdict-icon,
+.lab-verdict > span,
+.lab-oos-head > span,
+.diary-kpi-icon,
+.diary-upload,
+.currency-orb.currency-usd,
+.calendar-sensitivity {
+  background-color: var(--neutral-accent-wash) !important;
+}
+
+.demo-notice,
+.setup-tag,
+.monte-carlo-badge,
+.timeline-status.pending,
+.plan-status.caution,
+.pattern-score > span,
+.lab-vault-empty,
+.lab-vault-empty strong {
+  color: var(--muted) !important;
 }

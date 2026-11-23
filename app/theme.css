@@ -12,6 +12,8 @@
   --violet: #6650ad;
   --amber: #966013;
   --red: #b52e42;
+  --neutral-accent: #54666d;
+  --neutral-accent-wash: rgb(84 102 109 / .11);
 }
 
 html[data-theme="light"] body {
