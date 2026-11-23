@@ -55,6 +55,11 @@ export function buildPerformanceReport(
     symbols: [...new Set(available.map(trade => trade.symbol))].sort(),
     monthly: keys.map(month => ({ month, ...tradeSummary(filtered.filter(trade => trade.closedAt.startsWith(month))) })),
     total: tradeSummary(selected),
+    activity: [...new Set(selected.map(trade => trade.symbol))].map(symbol => ({
+      symbol,
+      ...tradeSummary(selected.filter(trade => trade.symbol === symbol)),
+      share: selected.length ? selected.filter(trade => trade.symbol === symbol).length / selected.length * 100 : 0,
+    })).sort((a, b) => b.count - a.count || a.symbol.localeCompare(b.symbol)),
     direction: [...new Set(selected.map(trade => trade.symbol))].sort().flatMap(symbol =>
       (["Long", "Short"] as const).map(side => ({ symbol, side,
         ...tradeSummary(selected.filter(trade => trade.symbol === symbol && trade.side === side)),

@@ -15,6 +15,30 @@ const pip: Field = { key: "pip", label: "Dimensione di un pip (es. 0,0001 o 0,01
 const entry: Field = { key: "entry", label: "Prezzo di ingresso", initial: 1.08, min: .00000001 };
 const balance: Field = { key: "balance", label: "Capitale", initial: 10000, min: .01 };
 
+// The account risks a fixed fraction of its current equity on every trade.
+// States with the same number of wins share the same equity; paths that touch
+// the loss threshold are removed before the next trade.
+export function riskOfRuin(winRate: number, winLossRatio: number, riskPct: number, lossLevel: number, trades: number) {
+  const threshold = Math.log1p(-lossLevel / 100);
+  const logWin = Math.log1p(riskPct / 100 * winLossRatio);
+  const logLoss = Math.log1p(-riskPct / 100);
+  const p = winRate / 100;
+  let surviving = new Float64Array(trades + 1);
+  surviving[0] = 1;
+  for (let count = 1; count <= trades; count++) {
+    const next = new Float64Array(trades + 1);
+    for (let wins = 0; wins < count; wins++) {
+      const probability = surviving[wins];
+      if (!probability) continue;
+      const losses = count - 1 - wins;
+      if ((wins + 1) * logWin + losses * logLoss > threshold) next[wins + 1] += probability * p;
+      if (wins * logWin + (losses + 1) * logLoss > threshold) next[wins] += probability * (1 - p);
+    }
+    surviving = next;
+  }
+  return Math.max(0, Math.min(100, (1 - surviving.reduce((total, value) => total + value, 0)) * 100));
+}
+
 export const calculators = {
   position: {
     name: "Dimensione posizione",
@@ -86,6 +110,17 @@ export const calculators = {
       result.push({ label: "Crescita per il recupero", value: remaining ? (1 / remaining - 1) * 100 : Infinity, unit: "percent" });
       return result;
     },
+  },
+  ruin: {
+    name: "Rischio di rovina",
+    note: "Probabilità di perdere almeno la quota indicata del capitale iniziale entro il numero di trade scelto. Modello a esiti indipendenti: il rischio è una percentuale del capitale corrente e ogni vincita/perdita usa la media inserita. È una stima teorica, non una previsione.",
+    fields: [{ key: "winRate", label: "Win rate (%)", initial: 50, min: 0, max: 100 },
+      { key: "averageWin", label: "Vincita media", initial: 150, min: .000001 },
+      { key: "averageLoss", label: "Perdita media (valore positivo)", initial: 100, min: .000001 },
+      { key: "risk", label: "Rischio per trade (%)", initial: 2, min: 0, max: 99.99 },
+      { key: "lossLevel", label: "Perdita dal capitale iniziale (%)", initial: 30, min: .001, max: 99.99 },
+      { key: "trades", label: "Numero di trade", initial: 100, min: 1, max: 300, integer: true }],
+    calculate: v => [{ label: "Probabilità di raggiungere la perdita", value: riskOfRuin(v.winRate, v.averageWin / v.averageLoss, v.risk, v.lossLevel, v.trades), unit: "percent" }],
   },
   consistency: {
     name: "Consistenza",

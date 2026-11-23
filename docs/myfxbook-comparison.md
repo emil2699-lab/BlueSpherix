@@ -5,10 +5,10 @@ Fonti pubbliche consultate: [Features](https://www.myfxbook.com/features), [Fore
 | Funzione | Stato in BlueSpherix | Dipendenza per il passo successivo |
 | --- | --- | --- |
 | Panoramica dei conti e confronto strategie | Portafoglio, curve e confronto già disponibili con dati demo | Bridge MT5 in sola lettura, conto e storico verificabili |
-| Report mensile, statistiche direzionali, durata media | In Analisi. Solo trade chiusi, filtri per data, strumento, direzione e dettaglio per mese | Dati reali dal bridge |
+| Report mensile, statistiche direzionali, durata media e frequenza per strumento | In Analisi. Solo trade chiusi, filtri per data, strumento, direzione e dettaglio per mese. La frequenza usa lo stesso campione filtrato ed è inclusa negli export | Dati reali dal bridge |
 | Esportazione conto | Il report filtrato si scarica in CSV e HTML o si salva via Stampa/PDF. Operazioni esporta già il registro | La preview usa il registro demo |
 | Statistiche orarie, per strumento e sessione | Edge Map e riepiloghi già presenti | Magic number e rendimento in pip richiedono campi e specifiche strumenti nel ledger |
-| Calcolatori Forex | Size, pip, margine, P&L, cambio manuale, interesse composto, drawdown, consistenza, pivot e Fibonacci | Quotazioni live e specifiche broker per tassi automatici, swap e costi reali |
+| Calcolatori Forex | Size, pip, margine, P&L, cambio manuale, interesse composto, drawdown, rischio di rovina, consistenza, pivot e Fibonacci. Il rischio di rovina usa un modello esatto a esiti indipendenti e quota di capitale corrente costante per trade | Quotazioni live e specifiche broker per tassi automatici, swap e costi reali |
 | Calendario e avvisi | Calendario demo con filtri e fusi. Export ICS; gli eventi contrassegnati come programmati includono un promemoria a 15 minuti | Feed autorizzato per eventi live; consegna email o push richiede servizi e preferenze utente |
 | Diario | Diario e note sui trade già disponibili nel browser | Account e storage per sincronizzazione e condivisione |
 | Backtest | Lab simula scenari sul ledger; manca l’archivio dei report di Strategy Tester | Definire formati di importazione e persistenza |

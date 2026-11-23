@@ -38,6 +38,11 @@ export default function MonthlyPerformance() {
     columns: ["Strumento", "Direzione", "Trade chiusi", "Netto", "Win rate", "Profit factor", "Durata media"],
     rows: report.direction.map(row => [row.symbol, row.side, String(row.count), currency.format(row.net), rate(row.winRate), factor(row.factor), hold(row.holdingMinutes)]),
   };
+  const activity: ReportTable = {
+    title: "Frequenza per strumento",
+    columns: ["Strumento", "Trade chiusi", "Quota del campione", "Netto"],
+    rows: report.activity.map(row => [row.symbol, String(row.count), rate(row.share), currency.format(row.net)]),
+  };
   const reset = () => { setSymbol(""); setSide(""); setFrom(""); setTo(""); setMonth(""); };
   const summary = [
     ["Trade chiusi", String(report.total.count)],
@@ -47,7 +52,7 @@ export default function MonthlyPerformance() {
     ["Durata media", hold(report.total.holdingMinutes)],
   ];
   const exportAs = (format: "csv" | "html") => downloadReport("Report di performance · BlueSpherix", context,
-    [{ title: "Riepilogo", columns: ["Metrica", "Valore"], rows: summary }, monthly, directional], format);
+    [{ title: "Riepilogo", columns: ["Metrica", "Valore"], rows: summary }, monthly, activity, directional], format);
 
   return <section className="glass-card performance-report" aria-labelledby="performance-title">
     <div className="section-head">
@@ -82,6 +87,16 @@ export default function MonthlyPerformance() {
       <div className="performance-detail" aria-live="polite">
         <div className="section-head"><h3>{month ? months(month) : "Intero periodo"}</h3>{month && <button type="button" className="portfolio-export" onClick={() => setMonth("")}>Mostra tutti i mesi</button>}</div>
         <dl className="performance-summary">{summary.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+        {report.activity.length > 0 && <div className="performance-activity" aria-label="Frequenza operativa per strumento">
+          <h4>{activity.title}</h4>
+          <p className="portfolio-caption">Quota delle operazioni chiuse nel campione filtrato. Il colore del netto resta indipendente dalla frequenza.</p>
+          <div className="performance-activity-list">{report.activity.map(row => <div className="performance-activity-row" key={row.symbol}>
+            <strong>{row.symbol}</strong>
+            <div className="performance-activity-track" role="img" aria-label={`${rate(row.share)} delle operazioni`}><i style={{ width: `${row.share}%` }} /></div>
+            <span>{row.count} trade · {rate(row.share)}</span>
+            <b data-sign={valueSign(row.net)}>{currency.format(row.net)}</b>
+          </div>)}</div>
+        </div>}
         {directional.rows.length ? <div className="performance-table" tabIndex={0} role="region" aria-label={directional.title}>
           <table><caption>{directional.title}</caption><thead><tr>{directional.columns.map(column => <th key={column} scope="col">{column}</th>)}</tr></thead>
             <tbody>{directional.rows.map(([instrument, direction, count, net, win, pf, duration], index) => <tr key={`${instrument}-${direction}`}>
