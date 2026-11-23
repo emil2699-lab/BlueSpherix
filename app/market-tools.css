@@ -1,0 +1,60 @@
+.market-tools-view, .performance-report { min-width: 0; }
+.market-tools, .performance-report { padding: clamp(24px, 4vw, 40px); }
+.performance-report { margin-bottom: 20px; }
+.market-tool-choice { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; color: var(--aqua); font-size: 13px; }
+.market-tool-choice select { flex: 0 1 250px; }
+.market-workbench { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: clamp(20px, 4vw, 48px); margin-top: 24px; }
+.market-workbench h2, .market-workbench h3, .performance-detail h3 { margin: 0; }
+.market-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 145px), 1fr)); gap: 12px; margin-block: 18px; align-items: end; }
+.market-fields label { display: grid; gap: 7px; min-width: 0; color: var(--muted); font-size: 12px; }
+.market-fields input, .market-fields select, .market-tool-choice select {
+  width: 100%; min-width: 0; min-height: 40px; padding: 8px 10px;
+  font: inherit; font-size: 13px; color: var(--text); background: var(--panel);
+  border: 1px solid var(--stroke-strong); border-radius: 10px;
+}
+.market-fields :is(input,select):focus-visible, .market-tool-choice select:focus-visible,
+.performance-month:focus-visible, .performance-table:focus-visible { outline: 2px solid var(--aqua); outline-offset: 2px; }
+.market-result { align-self: start; padding: 18px; border: 1px solid var(--stroke); border-radius: 18px; background: var(--panel); }
+.market-result dl, .performance-summary { margin: 12px 0; }
+.market-result dl > div { padding: 12px 0; border-bottom: 1px solid var(--stroke); }
+.market-result dt, .performance-summary dt { font-size: 12px; color: var(--muted); }
+.market-result dd, .performance-summary dd { margin: 5px 0 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.market-result dd { font-size: clamp(17px, 3vw, 25px); color: var(--aqua); }
+.market-result dd[data-sign="negative"] { color: var(--red); }
+.performance-report .section-head { flex-wrap: wrap; align-items: center; }
+.performance-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.performance-report button:disabled { opacity: .55; cursor: default; }
+.performance-filters button { justify-self: start; min-height: 40px; }
+.performance-table { overflow-x: auto; }
+.performance-table table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.performance-table caption { text-align: left; color: var(--text); font-size: 13px; font-weight: 650; margin: 5px 0 9px; }
+.performance-table :is(th,td) { text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--stroke); }
+.performance-table th:first-child { text-align: left; }
+.performance-table thead th { color: var(--muted); font-weight: 550; }
+.performance-month { text-align: left; color: var(--text); background: transparent; border: 1px solid transparent; border-radius: 7px; padding: 6px 8px; cursor: pointer; }
+.performance-month:hover, .performance-month[aria-pressed="true"] { color: var(--aqua); border-color: var(--stroke); background: var(--panel); }
+.performance-detail { margin-top: 22px; }
+.performance-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(122px, 1fr)); gap: 10px; }
+.performance-summary > div { padding: 12px; border: 1px solid var(--stroke); border-radius: 12px; }
+.performance-summary dd { font-size: 15px; font-weight: 600; }
+
+@media (max-width: 700px) { .market-workbench { grid-template-columns: minmax(0, 1fr); } }
+
+@media print {
+  html:has(.performance-report), html:has(.performance-report) body { background: #fff !important; color: #000 !important; }
+  .app-shell:has(.performance-report) { display: block; }
+  .app-shell:has(.performance-report) > :not(.workspace),
+  .workspace:has(.performance-report) > :not(.content),
+  .content:has(.performance-report) > :not(.analytics-view),
+  .analytics-view:has(.performance-report) > :not(.performance-report),
+  .performance-report :is(.performance-actions,.performance-filters,.performance-detail .portfolio-export) { display: none !important; }
+  .app-shell:has(.performance-report) :is(.workspace,.content,.analytics-view,.performance-report) {
+    display: block; position: static; margin: 0; padding: 0; max-width: none; width: auto;
+    border: 0 !important; background: transparent !important; color: #000 !important;
+    box-shadow: none !important; backdrop-filter: none !important;
+    --text: #000; --muted: #333; --stroke: #aaa; --aqua: #064f46; --red: #831725;
+  }
+  .performance-table { overflow: visible; }
+  .performance-table table { white-space: normal; }
+  .performance-table tr { break-inside: avoid; }
+}

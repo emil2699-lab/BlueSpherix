@@ -21,6 +21,8 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { calendarEventFile } from "./calendar-export";
+import { downloadFile } from "./download-file";
 
 type Impact = "Alto" | "Medio" | "Basso";
 type EventState = "scheduled" | "released";
@@ -78,6 +80,21 @@ function eventPlacement(event: EconomicEvent, timezoneOffset: number) {
   return { day: (event.day + dayShift + 7) % 7, time: `${String(Math.floor(normalized / 60)).padStart(2, "0")}:${String(normalized % 60).padStart(2, "0")}` };
 }
 
+function exportCalendarEvent(event: EconomicEvent) {
+  const utcDay = addDays(baseMonday, event.day);
+  const [hours, minutes] = event.time.split(":").map(Number);
+  // The editorial dataset is anchored to Rome (UTC+1 for this week).
+  utcDay.setUTCHours(hours - 1, minutes);
+  const file = calendarEventFile({
+    id: event.id,
+    start: utcDay,
+    title: `[Demo] ${event.currency} · ${event.title}`,
+    description: `Evento dimostrativo BlueSpherix.\n${event.description}`,
+    reminder: event.state === "scheduled",
+  });
+  downloadFile(file, "text/calendar;charset=utf-8", `bluespherix-${event.id}-demo.ics`);
+}
+
 function ImpactDots({ impact }: { impact: Impact }) {
   const count = impact === "Alto" ? 3 : impact === "Medio" ? 2 : 1;
   return <span className={`calendar-impact impact-${impact.toLowerCase()}`} aria-label={`Impatto ${impact}`}>{[0, 1, 2].map((index) => <i key={index} className={index < count ? "filled" : ""} />)}</span>;
@@ -91,7 +108,6 @@ export default function Calendar() {
   const [currency, setCurrency] = useState("Tutte");
   const [query, setQuery] = useState("");
   const [timezoneOffset, setTimezoneOffset] = useState(1);
-  const [alertOn, setAlertOn] = useState(true);
   const weekStart = useMemo(() => addDays(baseMonday, weekOffset * 7), [weekOffset]);
   const weekDates = useMemo(() => dayNames.map((name, index) => ({ name, date: addDays(weekStart, index), index })), [weekStart]);
   const filtered = useMemo(() => weekOffset === 0 ? events.filter((event) =>
@@ -101,12 +117,12 @@ export default function Calendar() {
     (!query.trim() || `${event.title} ${event.currency}`.toLowerCase().includes(query.toLowerCase()))
   ).sort((a, b) => eventPlacement(a, timezoneOffset).time.localeCompare(eventPlacement(b, timezoneOffset).time)) : [], [currency, impact, query, selectedDay, timezoneOffset, weekOffset]);
 
-  const selected = filtered.find((event) => event.id === selectedId) ?? filtered[0] ?? events.find((event) => event.id === selectedId) ?? events[4];
+  const selected = filtered.find((event) => event.id === selectedId) ?? filtered[0];
   const dayEvents = weekOffset === 0 ? events.filter((event) => eventPlacement(event, timezoneOffset).day === selectedDay).sort((a, b) => eventPlacement(a, timezoneOffset).time.localeCompare(eventPlacement(b, timezoneOffset).time)) : [];
   const dayHighImpact = dayEvents.filter((event) => event.impact === "Alto").length;
   const exposedCount = new Set(dayEvents.flatMap((event) => event.exposed)).size;
   const firstEventTime = dayEvents.length ? eventPlacement(dayEvents[0], timezoneOffset).time : "—";
-  const selectedPlacement = eventPlacement(selected, timezoneOffset);
+  const selectedPlacement = selected && eventPlacement(selected, timezoneOffset);
   const gdpTime = eventPlacement(events[4], timezoneOffset).time;
   const timezoneTag = `UTC${timezoneOffset >= 0 ? "+" : ""}${timezoneOffset}`;
   const resetToToday = () => { setWeekOffset(0); setSelectedDay(2); setSelectedId("us-gdp"); };
@@ -132,7 +148,7 @@ export default function Calendar() {
           <span className="calendar-signal"><ShieldAlert size={15} /> Finestra critica</span>
           <h2>Due dati USA nello stesso minuto.</h2>
           <p>Alle {gdpTime} PIL e Core PCE possono generare segnali opposti. EURUSD e oro sono direttamente esposti.</p>
-          <button type="button" onClick={() => { setSelectedDay(2); setSelectedId("us-gdp"); }}><span>Apri il contesto</span><ArrowRight size={14} /></button>
+        <button type="button" onClick={() => { resetToToday(); setImpact("Tutti"); setCurrency("Tutte"); setQuery(""); }}><span>Apri il contesto</span><ArrowRight size={14} /></button>
         </div>
         <div className="calendar-risk-time"><small>Prossimo cluster</small><strong>{gdpTime}</strong><span>mer 28 ott</span></div>
         <div className="calendar-exposure-orbit" aria-label="Tre strumenti esposti">
@@ -164,7 +180,7 @@ export default function Calendar() {
         <article><span><TrendingUp size={16} /></span><div><small>Esposizioni</small><strong>{exposedCount}</strong><p>strumenti coinvolti</p></div></article>
       </section>
 
-      <section className={`calendar-workspace ${weekOffset !== 0 ? "calendar-workspace-single" : ""}`}>
+      <section className={`calendar-workspace ${!selected ? "calendar-workspace-single" : ""}`}>
         <article className="calendar-agenda glass-card">
           <header className="calendar-agenda-head">
             <div><p className="eyebrow">Agenda</p><h2>{dateLabel(weekDates[selectedDay].date, { weekday: "long", day: "numeric", month: "long" })}</h2></div>
@@ -176,7 +192,7 @@ export default function Calendar() {
           </div>
           <div className="calendar-table-head"><span>Ora</span><span>Evento</span><span>Impatto</span><span>Prec.</span><span>Atteso</span><span>Effettivo</span></div>
           <div className="calendar-event-list">
-            {filtered.map((event) => <button type="button" key={event.id} className={`calendar-event-row ${selected.id === event.id ? "selected" : ""}`} onClick={() => setSelectedId(event.id)} aria-pressed={selected.id === event.id} data-glass-selection={selected.id === event.id ? "selected" : undefined}>
+            {filtered.map((event) => <button type="button" key={event.id} className={`calendar-event-row ${selected?.id === event.id ? "selected" : ""}`} onClick={() => setSelectedId(event.id)} aria-pressed={selected?.id === event.id} data-glass-selection={selected?.id === event.id ? "selected" : undefined}>
               <time>{eventPlacement(event, timezoneOffset).time}</time>
               <span className="calendar-event-name"><i>{event.currency}</i><span><strong>{event.title}</strong><small>{event.exposed.length ? `Espone ${event.exposed.join(" · ")}` : "Nessuna esposizione diretta"}</small></span></span>
               <ImpactDots impact={event.impact} />
@@ -187,7 +203,7 @@ export default function Calendar() {
           </div>
         </article>
 
-        {weekOffset === 0 && <aside className="calendar-context glass-card" aria-live="polite">
+        {selected && selectedPlacement && <aside className="calendar-context glass-card" aria-live="polite">
           <header><div><span className={`currency-orb currency-${selected.currency.toLowerCase()}`}>{selected.currency.slice(0, 2)}</span><div><p className="eyebrow">Contesto evento</p><h2>{selected.shortTitle}</h2></div></div><ImpactDots impact={selected.impact} /></header>
           <div className="calendar-context-time"><Clock3 size={14} /><span>{dayNames[selectedPlacement.day]} · {selectedPlacement.time}</span><strong>{selected.impact} impatto</strong></div>
           <p className="calendar-context-description">{selected.description}</p>
@@ -200,7 +216,7 @@ export default function Calendar() {
           </div>
           <div className="calendar-sensitivity"><Sparkles size={15} /><div><strong>Lettura Spherix</strong><p>{selected.sensitivity}</p></div></div>
           <div className="calendar-exposed-list"><span>Esposizione attuale</span>{selected.exposed.length ? selected.exposed.map((symbol, index) => <div key={symbol}><i>{symbol.slice(0, 2)}</i><strong>{symbol}</strong><span>{index === 1 ? <ArrowDownRight size={13} /> : <ArrowUpRight size={13} />}{index === 1 ? "Rifugio / USD" : "Sensibilità diretta"}</span></div>) : <p>Nessuna posizione del conto è direttamente esposta.</p>}</div>
-          <button className="calendar-alert" type="button" aria-pressed={alertOn} onClick={() => setAlertOn((value) => !value)}><BellRing size={14} /> {alertOn ? "Avviso già attivo" : "Attiva avviso"} <span>{alertOn ? "15 min prima" : "per questo evento"}</span></button>
+          <button className="calendar-alert" type="button" onClick={() => exportCalendarEvent(selected)}><BellRing size={14} /> Scarica evento demo <span>{selected.state === "scheduled" ? "ICS · avviso 15 min prima" : "ICS"}</span></button>
         </aside>}
       </section>
     </div>

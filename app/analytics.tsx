@@ -4,6 +4,7 @@ import { useState, type CSSProperties } from "react";
 import { BarChart3, Clock3, Crosshair, ShieldCheck, Sparkles, TrendingUp } from "lucide-react";
 import { DEMO_ANALYTICS, DEMO_PERIOD_STATS, EXIT_OPPORTUNITY_PCT, TRADE_DNA, type DemoPeriod } from "./demo-data";
 import { valueSign } from "./value-sign";
+import MonthlyPerformance from "./monthly-performance";
 
 type Period = DemoPeriod;
 type HeatMetric = "Risultato" | "Profit factor";
@@ -59,6 +60,8 @@ export default function Analytics() {
 
       <aside className={`glass-card edge-detail ${selectedValue < 0 ? `negative-surface ${Math.abs(selectedValue) > 500 ? "negative-strong" : ""}` : ""}`} aria-live="polite"><span className="analytics-icon"><Clock3 size={18} /></span><p className="eyebrow">Dettaglio selezione</p><h2>{days[cell.day]} · {windows[cell.window]}</h2><strong data-sign={valueSign(selectedValue)}>{euro(selectedValue)}</strong><div className="edge-detail-grid"><div><span>Operazioni</span><b>{selectedTrades}</b></div><div><span>Profit factor</span><b>{selectedFactor}</b></div><div><span>Win rate</span><b>{selectedCell.win.toLocaleString("it-IT", { maximumFractionDigits: 1 })}%</b></div><div><span>Media trade</span><b data-sign={valueSign(selectedTrades ? selectedValue / selectedTrades : 0)}>{euro(selectedTrades ? selectedValue / selectedTrades : 0)}</b></div></div><div className="detail-insight"><Sparkles size={17} /><p>{selectedValue > 0 ? "Questa fascia contribuisce positivamente all’edge. Mantieni invariati criteri e rischio per validarla su più dati." : "Questa fascia riduce la qualità complessiva. Prima di escluderla, verifica setup e dimensione del campione."}</p></div></aside>
     </section>
+
+    <MonthlyPerformance />
 
     <section className="analytics-secondary">
       <article className="glass-card session-card"><div className="section-head"><div><p className="eyebrow">Sessioni</p><h2>Il tuo ritmo di mercato.</h2></div><span className="portfolio-caption">{period}</span></div><div className="session-tabs" role="tablist" aria-label="Sessioni di trading">{sessions.map(item => <button role="tab" aria-selected={sessionId === item.id} key={item.id} onClick={() => setSessionId(item.id)}><i style={{ background: item.color }} /><span>{item.name}<small>{item.time}</small></span><strong>{item.factor.toLocaleString("it-IT")} PF</strong></button>)}</div><div className="session-summary" aria-live="polite"><div className="session-score"><strong>{session.win.toLocaleString("it-IT", { maximumFractionDigits: 1 })}%</strong><span>win rate</span></div><div><h3>{session.name} · {session.trades} trade</h3><p>{session.note}</p><div className="session-metrics"><span>Netto <strong data-sign={valueSign(session.net)}>{euro(session.net)}</strong></span><span>Profit factor <strong>{session.factor.toLocaleString("it-IT")}</strong></span></div></div></div></article>

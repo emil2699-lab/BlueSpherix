@@ -38,6 +38,10 @@ The generated file is `public/data/demo-operations.csv`. Dashboard, Analytics, O
 - Dark visual system and installable web-app metadata
 - Deterministic 314-operation demo ledger with a downloadable CSV
 - Shared calculation layer used across all product sections
+- Monthly performance reports with date, symbol, and direction filters, plus CSV, HTML, and print/PDF export
+- Ten local trading calculators and demo calendar event export (ICS)
+
+See the [Myfxbook feature comparison](docs/myfxbook-comparison.md) for implemented workflows and dependencies for live features.
 
 ## Visual language
 

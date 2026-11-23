@@ -7,6 +7,7 @@ import {
   DEMO_PERIOD_STATS,
   DEMO_RECONCILIATION,
   OPEN_PNL,
+  tradesForPeriod,
 } from "../app/demo-data.ts";
 
 const cents = (value) => Math.round(value * 100);
@@ -15,13 +16,14 @@ const csvNet = csvLines.slice(1).reduce((total, line) => total + Number(line.spl
 
 const periodChecks = Object.entries(DEMO_PERIOD_STATS).every(([period, stats]) => {
   const analytics = DEMO_ANALYTICS[period];
+  const closed = tradesForPeriod(period).filter(trade => trade.status === "Chiusa");
   return cents(stats.flow.reduce((total, value) => total + value, 0)) === cents(stats.net)
     && analytics.sessions.reduce((total, item) => total + item.trades, 0) === stats.trades
     && cents(analytics.sessions.reduce((total, item) => total + item.net, 0)) === cents(stats.net)
     && analytics.instruments.reduce((total, item) => total + item.trades, 0) === stats.trades
     && cents(analytics.instruments.reduce((total, item) => total + item.net, 0)) === cents(stats.net)
-    && analytics.heat.flat().reduce((total, item) => total + item.trades, 0) === stats.trades
-    && cents(analytics.heat.flat().reduce((total, item) => total + item.net, 0)) === cents(stats.net);
+    && analytics.heat.flat().reduce((total, item) => total + item.trades, 0) === closed.length
+    && cents(analytics.heat.flat().reduce((total, item) => total + item.net, 0)) === cents(closed.reduce((total, trade) => total + trade.netPnl, 0));
 });
 
 const checks = {
