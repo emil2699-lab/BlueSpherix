@@ -7,11 +7,13 @@ import {
   DEMO_PERIOD_STATS,
   DEMO_RECONCILIATION,
   OPEN_PNL,
+  accountAnalytics,
+  realizedResults,
   tradesForPeriod,
 } from "../app/demo-data.ts";
 import { DEMO_AS_OF, LEDGER_TRADES } from "../app/demo-ledger.ts";
 import { buildPerformanceReport } from "../app/performance-report.ts";
-import { riskOfRuin } from "../app/trading-calculators.ts";
+import { calculate, calculators, riskOfRuin } from "../app/trading-calculators.ts";
 
 const cents = (value) => Math.round(value * 100);
 const csvLines = readFileSync(resolve("public/data/demo-operations.csv"), "utf8").trim().split("\n");
@@ -30,7 +32,25 @@ const periodChecks = Object.entries(DEMO_PERIOD_STATS).every(([period, stats]) =
 });
 const report = buildPerformanceReport(LEDGER_TRADES, DEMO_AS_OF, { symbol: "", side: "", month: "", from: "", to: "" });
 
+const closed = LEDGER_TRADES.filter(trade => trade.status === "Chiusa" && trade.closedAt >= "2026-10-01");
+const cutoff = "2026-10-15";
+const realized = realizedResults("1M", cutoff);
+const closedSince = closed.filter(trade => trade.closedAt >= cutoff);
+const tagged = buildPerformanceReport(LEDGER_TRADES, DEMO_AS_OF,
+  { symbol: "", side: "", month: "", from: "", to: "", start: "2026-10-01", tag: "setup" },
+  { [closed[0].id]: { tags: [" SETUP ", "setup", "review"] }, [closed[1].id]: { tags: ["setup"] } });
+const calculatorDefault = id => calculate(id, Object.fromEntries(calculators[id].fields.map(item => [item.key, String(item.initial)])))[0].value;
+
 const checks = {
+  "Report: durata, lotti e tag chiusi si riconciliano": report.holding.reduce((sum, row) => sum + row.count, 0) === report.total.count
+    && cents(report.holding.reduce((sum, row) => sum + row.volume, 0)) === cents(report.total.volume)
+    && tagged.total.count === 2 && tagged.byTag.length === 1 && tagged.byTag[0].count === 2,
+  "P&L realizzato e statistiche per data del conto": realized.values[0] === 0 && realized.values.at(-1) === realized.net
+    && realized.trades === closedSince.length && cents(realized.net) === cents(closedSince.reduce((sum, trade) => sum + trade.netPnl, 0))
+    && accountAnalytics("30G", cutoff).stats.net === realized.net,
+  "Calcolatori: leva, rebate e swap": calculatorDefault("leverage") === 54 && calculatorDefault("rebate") === 60
+    && cents(calculatorDefault("swap")) === -1800,
+
   "CSV: 314 operazioni": csvLines.length - 1 === 314,
   "CSV: totale uguale al ledger": cents(csvNet) === cents(DEMO_PERIOD_STATS["1A"].net),
   "Ledger: chiuse + aperte = 314": DEMO_RECONCILIATION.closedTrades + DEMO_RECONCILIATION.openTrades === 314,

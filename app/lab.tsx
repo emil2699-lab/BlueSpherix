@@ -5,6 +5,8 @@ import { Beaker, BookmarkCheck, Check, CircleGauge, FlaskConical, GitCompareArro
 import { DEMO_AS_OF, DEMO_OPENING_BALANCE } from "./demo-ledger";
 import { CLOSED_TRADES, type DemoTrade } from "./demo-data";
 import { valueSign } from "./value-sign";
+import BacktestArchive from "./backtest-archive";
+import { createLocalStore } from "./local-store";
 
 type ExperimentId = "session" | "discipline" | "exit";
 type Sample = "90G" | "1A";
@@ -14,6 +16,15 @@ type QualityGate = "plan" | "mae" | "both";
 type Capture = 10 | 22 | 35;
 type FrictionId = "normal" | "spread" | "slippage" | "delay" | "combined";
 type SavedExperiment = { id: number; title: string; parameter: string; net: number; factor: number; verdict: string };
+
+const experimentVault = createLocalStore<SavedExperiment[]>("bluespherix.lab.experiments.v1", [], value => {
+  const items = value as SavedExperiment[];
+  if (!Array.isArray(items) || !items.every(item => item && Number.isFinite(item.id) && Number.isFinite(item.net)
+    && Number.isFinite(item.factor) && [item.title, item.parameter, item.verdict].every(text => typeof text === "string"))) {
+    throw Error("Archivio esperimenti non valido.");
+  }
+  return items;
+});
 
 const experiments = [
   { id: "session" as const, icon: Layers3, title: "Session focus", caption: "Isola una sessione e misura il suo edge." },
@@ -104,7 +115,7 @@ export default function Lab() {
   const [qualityGate, setQualityGate] = useState<QualityGate>("plan");
   const [capture, setCapture] = useState<Capture>(22);
   const [friction, setFriction] = useState<FrictionId>("combined");
-  const [savedExperiments, setSavedExperiments] = useState<SavedExperiment[]>([]);
+  const { value: savedExperiments, error: vaultError } = experimentVault.useStore();
   const current = experiments.find(item => item.id === experiment) ?? experiments[2];
   const parameterLabel = experiment === "session" ? sessionFocus : experiment === "discipline" ? ({ plan: "Piano", mae: "MAE ≤ 0,75R", both: "Entrambi" } as const)[qualityGate] : `${capture}% MFE`;
   const rule = experiment === "session" ? `Mantieni soltanto le operazioni aperte durante la sessione ${sessionFocus}.` : experiment === "discipline" ? qualityGate === "plan" ? "Escludi i trade non coerenti con il piano dichiarato." : qualityGate === "mae" ? "Mantieni i trade con escursione avversa entro 0,75R." : "Richiedi rispetto del piano e MAE entro 0,75R." : `Simula la cattura del ${capture}% del MFE non monetizzato.`;
@@ -166,7 +177,7 @@ export default function Lab() {
   const frictionLoss = selectedFriction.stats.net - analysis.simulation.net;
   const breakEvenCost = analysis.simulation.trades ? analysis.simulation.net / analysis.simulation.trades : 0;
   const frictionPassed = selectedFriction.stats.factor >= 1.15 && selectedFriction.stats.net > 0;
-  const saveExperiment = () => setSavedExperiments(items => [{ id: Date.now(), title: current.title, parameter: `${parameterLabel} · ${sample} · rischio ${risk.toLocaleString("it-IT")}%`, net: analysis.simulation.net, factor: analysis.simulation.factor, verdict }, ...items].slice(0, 4));
+  const saveExperiment = () => experimentVault.save(items => [{ id: Date.now(), title: current.title, parameter: `${parameterLabel} · ${sample} · rischio ${risk.toLocaleString("it-IT")}%`, net: analysis.simulation.net, factor: analysis.simulation.factor, verdict }, ...items].slice(0, 4));
 
   return <div className="lab-view">
     <section className="welcome"><div><p className="date-line">Dall’intuizione alla prova</p><h1>Strategy Lab.</h1><p>Modifica una regola, confronta il risultato e verifica se regge fuori dal campione.</p></div><span className="lab-beta"><FlaskConical size={15} /> Beta · simulazione locale</span></section>
@@ -232,8 +243,10 @@ export default function Lab() {
     <section className="glass-card lab-next"><div><Play size={18} /><div><p className="eyebrow">Passo successivo</p><h2>Salva l’ipotesi come benchmark osservabile.</h2><p>Quando MT5 sarà collegato, il Lab confronterà i nuovi trade con questa regola senza modificarne l’esecuzione.</p></div></div><button onClick={saveExperiment}><Save size={15} /> Salva esperimento</button></section>
 
     <section className="lab-vault glass-card">
-      <div className="section-head"><div><p className="eyebrow">Experiment vault</p><h2>Benchmark salvati in questa sessione.</h2></div><BookmarkCheck size={18} /></div>
-      {savedExperiments.length === 0 ? <div className="lab-vault-empty"><FlaskConical size={20} /><strong>Nessun benchmark salvato</strong><p>Configura l’ipotesi e usa “Salva esperimento” per fissarne risultato e parametri.</p></div> : <div className="lab-vault-list">{savedExperiments.map(item => <article key={item.id}><div><span>{item.verdict}</span><strong>{item.title}</strong><small>{item.parameter}</small></div><dl><div><dt>Netto</dt><dd data-sign={valueSign(item.net)}>{money(item.net)}</dd></div><div><dt>PF</dt><dd>{item.factor.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd></div></dl><button aria-label={`Elimina ${item.title}`} onClick={() => setSavedExperiments(items => items.filter(saved => saved.id !== item.id))}><Trash2 size={14} /></button></article>)}</div>}
+      <div className="section-head"><div><p className="eyebrow">Experiment vault</p><h2>Benchmark salvati</h2></div><BookmarkCheck size={18} /></div>
+      {vaultError && <p role="alert">{vaultError}</p>}
+      {savedExperiments.length === 0 ? <div className="lab-vault-empty"><FlaskConical size={20} /><strong>Nessun benchmark salvato</strong><p>Configura l’ipotesi e usa “Salva esperimento” per fissarne risultato e parametri.</p></div> : <div className="lab-vault-list">{savedExperiments.map(item => <article key={item.id}><div><span>{item.verdict}</span><strong>{item.title}</strong><small>{item.parameter}</small></div><dl><div><dt>Netto</dt><dd data-sign={valueSign(item.net)}>{money(item.net)}</dd></div><div><dt>PF</dt><dd>{item.factor.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd></div></dl><button aria-label={`Elimina ${item.title}`} onClick={() => experimentVault.save(items => items.filter(saved => saved.id !== item.id))}><Trash2 size={14} /></button></article>)}</div>}
     </section>
+    <BacktestArchive />
   </div>;
 }

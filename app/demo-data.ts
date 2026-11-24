@@ -248,6 +248,29 @@ export const DASHBOARD_RANGE_STATS = Object.fromEntries((Object.keys(rangeDays) 
   return [range, { net, returnPct: round(net / startEquity * 100, 2), trades: trades.length, confidence: Math.round(clamp(45 + Math.sqrt(trades.length) * 3, 50, 98)) }];
 })) as Record<DashboardRange, { net: number; returnPct: number; trades: number; confidence: number }>;
 
+export function realizedResults(range: DashboardRange, accountStart = "") {
+  const end = asOf.getTime();
+  const start = Math.max(end - rangeDays[range] * dayMs, accountStart ? Date.parse(accountStart) : -Infinity);
+  const previous = CLOSED_TRADES.filter(trade => Date.parse(trade.closedAt) < start);
+  const closed = CLOSED_TRADES.filter(trade => {
+    const time = Date.parse(trade.closedAt);
+    return time >= start && time <= end;
+  }).sort((a, b) => a.closedAt.localeCompare(b.closedAt));
+  const opening = round(DEMO_OPENING_BALANCE + sum(previous.map(trade => trade.netPnl)));
+  let total = 0;
+  let tradeIndex = 0;
+  const points = DEMO_EQUITY_SERIES[range].length;
+  const values = Array.from({ length: points }, (_, index) => {
+    if (index === 0) return 0;
+    const timestamp = start + (end - start) * index / (points - 1);
+    while (tradeIndex < closed.length && Date.parse(closed[tradeIndex].closedAt) <= timestamp) {
+      total += Math.round(closed[tradeIndex++].netPnl * 100);
+    }
+    return total / 100;
+  });
+  return { values, opening, net: total / 100, trades: closed.length, returnPct: opening ? total / opening : 0 };
+}
+
 const alphaMonthSeries = DEMO_EQUITY_SERIES["1M"];
 const alphaReturns = Array.from({ length: 12 }, (_, index) => {
   const point = alphaMonthSeries[Math.round(index * (alphaMonthSeries.length - 1) / 11)];
@@ -287,8 +310,7 @@ function heatWindow(hour: number) {
   return 4;
 }
 
-function analyticsFor(period: DemoPeriod) {
-  const trades = tradesForPeriod(period);
+function analyticsForTrades(trades: DemoTrade[]) {
   const rawSessions = (Object.keys(sessionMeta) as LedgerTrade["session"][]).map((name) => ({
     ...groupStats(sessionMeta[name].id, name, trades.filter((trade) => trade.session === name)),
     ...sessionMeta[name],
@@ -321,7 +343,18 @@ function analyticsFor(period: DemoPeriod) {
   return { sessions, instruments, heat };
 }
 
+function analyticsFor(period: DemoPeriod) {
+  return analyticsForTrades(tradesForPeriod(period));
+}
+
 export const DEMO_ANALYTICS = Object.fromEntries((Object.keys(periodDays) as DemoPeriod[]).map((period) => [period, analyticsFor(period)])) as Record<DemoPeriod, ReturnType<typeof analyticsFor>>;
+
+export function accountAnalytics(period: DemoPeriod, start: string) {
+  if (!start) return { stats: DEMO_PERIOD_STATS[period], analytics: DEMO_ANALYTICS[period] };
+  const cutoff = Math.max(asOf.getTime() - periodDays[period] * dayMs, Date.parse(start));
+  const trades = CLOSED_TRADES.filter(trade => Date.parse(trade.closedAt) >= cutoff && trade.closedAt <= DEMO_AS_OF);
+  return { stats: calculateStats(trades), analytics: analyticsForTrades(trades) };
+}
 
 const annualClosed = tradesForPeriod("1A").filter((trade) => trade.status === "Chiusa");
 const annualWinners = annualClosed.filter((trade) => trade.netPnl > 0);

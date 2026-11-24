@@ -9,7 +9,11 @@ export function downloadReport(title: string, context: string, tables: ReportTab
 
 function csv(context: string, tables: ReportTable[]) {
   const rows = [[context], ...tables.flatMap(table => [[], [table.title], table.columns, ...table.rows])];
-  return "\uFEFF" + rows.map(row => row.map(cell => `"${cell.replaceAll('"', '""')}"`).join(";")).join("\r\n");
+  return "\uFEFF" + rows.map(row => row.map(cell => {
+    // Diary tags can begin with spreadsheet formula operators.
+    const safe = /^[\s\uFEFF]*[=+@-]/.test(cell) ? `'${cell}` : cell;
+    return `"${safe.replaceAll('"', '""')}"`;
+  }).join(";")).join("\r\n");
 }
 
 function html(title: string, context: string, tables: ReportTable[]) {

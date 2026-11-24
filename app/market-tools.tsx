@@ -11,6 +11,7 @@ const formats = {
   lots: new Intl.NumberFormat("it-IT", { maximumSignificantDigits: 8 }),
   percent: new Intl.NumberFormat("it-IT", { maximumFractionDigits: 4 }),
   price: new Intl.NumberFormat("it-IT", { maximumSignificantDigits: 10 }),
+  leverage: new Intl.NumberFormat("it-IT"),
 };
 
 export default function MarketTools() {
@@ -53,7 +54,7 @@ export default function MarketTools() {
           {typeof result === "string" ? <p>{result}</p> : <dl>
             {result.map(({ label, value, unit }) => <div key={label}>
               <dt>{label}</dt>
-              <dd data-sign={unit === "currency" ? valueSign(value) : undefined}>{value === Infinity ? "Impossibile" : `${formats[unit].format(value)}${unit === "percent" ? "%" : unit === "lots" ? " lotti" : ""}`}</dd>
+              <dd data-sign={unit === "currency" ? valueSign(value) : undefined}>{value === Infinity ? "Impossibile" : `${formats[unit].format(value)}${unit === "percent" ? "%" : unit === "lots" ? " lotti" : unit === "leverage" ? ":1" : ""}`}</dd>
             </div>)}
           </dl>}
           <p className="portfolio-caption">Calcoli locali con i valori inseriti. Nessuna quotazione in tempo reale.</p>

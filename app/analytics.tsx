@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { BarChart3, Clock3, Crosshair, ShieldCheck, Sparkles, TrendingUp } from "lucide-react";
-import { DEMO_ANALYTICS, DEMO_PERIOD_STATS, EXIT_OPPORTUNITY_PCT, TRADE_DNA, type DemoPeriod } from "./demo-data";
+import { accountAnalytics, EXIT_OPPORTUNITY_PCT, TRADE_DNA, type DemoPeriod } from "./demo-data";
 import { valueSign } from "./value-sign";
 import MonthlyPerformance from "./monthly-performance";
+import { alphaAnalysisStart, firstTradeDay, lastTradeDay, validStartDate } from "./analysis-preferences";
 
 type Period = DemoPeriod;
 type HeatMetric = "Risultato" | "Profit factor";
@@ -20,8 +21,8 @@ export default function Analytics() {
   const [metric, setMetric] = useState<HeatMetric>("Risultato");
   const [cell, setCell] = useState({ day: 1, window: 2 });
   const [sessionId, setSessionId] = useState("london");
-  const stats = DEMO_PERIOD_STATS[period];
-  const analytics = DEMO_ANALYTICS[period];
+  const { value: start, error } = alphaAnalysisStart.useStore();
+  const { stats, analytics } = useMemo(() => accountAnalytics(period, start), [period, start]);
   const sessions = analytics.sessions;
   const instruments = analytics.instruments;
   const strongestHeat = Math.max(...analytics.heat.flatMap(row => row.map(item => Math.abs(item.net))), 1);
@@ -43,11 +44,21 @@ export default function Analytics() {
     <section className="welcome"><div><p className="date-line">Dai risultati alle decisioni</p><h1>Analisi.</h1><p>Scopri quando il tuo metodo funziona e quanto è affidabile.</p></div><div className="range-switch analytics-period" aria-label="Periodo analisi">{(["30G", "90G", "1A"] as Period[]).map(item => <button key={item} aria-pressed={period === item} className={period === item ? "active" : ""} onClick={() => setPeriod(item)}>{item}</button>)}</div></section>
     <div className="demo-notice"><ShieldCheck size={16} /><span><strong>Analisi dimostrativa.</strong> Le statistiche sono simulate per mostrare il prodotto prima del collegamento MT5.</span></div>
 
+    <div className="market-fields account-start">
+      <label>Data d’inizio · Alpha Momentum
+        <input type="date" min={firstTradeDay} max={lastTradeDay} value={start} onChange={event => {
+          const date = event.target.value;
+          if (!date || validStartDate(date)) alphaAnalysisStart.save(() => date);
+        }} />
+      </label>
+      {start && <button type="button" className="portfolio-export" onClick={() => alphaAnalysisStart.save(() => "")}>Ripristina storico</button>}
+      {error && <p role="alert">{error}</p>}
+    </div>
     <section className="analytics-kpis" aria-label={`Metriche degli ultimi ${period}`}>
       <article className="glass-card"><span className="analytics-icon"><TrendingUp size={17} /></span><p className="eyebrow">Profitto netto</p><strong data-sign={valueSign(stats.net)}>{euro(stats.net)}</strong><small>{stats.trades} operazioni nel campione</small></article>
       <article className="glass-card"><span className="analytics-icon violet"><BarChart3 size={17} /></span><p className="eyebrow">Profit factor</p><strong>{stats.factor.toLocaleString("it-IT")}</strong><small>{stats.factor >= 1.7 ? "Edge robusto" : "Edge positivo"} sulle operazioni chiuse</small></article>
       <article className="glass-card"><span className="analytics-icon amber"><Crosshair size={17} /></span><p className="eyebrow">Expectancy</p><strong data-sign={valueSign(stats.expectancy)}>{euro(stats.expectancy)}</strong><small>Valore medio per operazione chiusa</small></article>
-      <article className="glass-card"><span className="analytics-icon"><ShieldCheck size={17} /></span><p className="eyebrow">Data confidence</p><strong>{stats.confidence}%</strong><small>{stats.confidence > 90 ? "Campione molto affidabile" : "Campione già significativo"}</small></article>
+      <article className="glass-card"><span className="analytics-icon"><ShieldCheck size={17} /></span><p className="eyebrow">Data confidence</p><strong>{stats.confidence}%</strong><small>{stats.trades ? (stats.confidence > 90 ? "Campione molto affidabile" : "Campione già significativo") : "Nessun trade nel periodo"}</small></article>
     </section>
 
     <section className="analytics-main">
@@ -61,7 +72,7 @@ export default function Analytics() {
       <aside className={`glass-card edge-detail ${selectedValue < 0 ? `negative-surface ${Math.abs(selectedValue) > 500 ? "negative-strong" : ""}` : ""}`} aria-live="polite"><span className="analytics-icon"><Clock3 size={18} /></span><p className="eyebrow">Dettaglio selezione</p><h2>{days[cell.day]} · {windows[cell.window]}</h2><strong data-sign={valueSign(selectedValue)}>{euro(selectedValue)}</strong><div className="edge-detail-grid"><div><span>Operazioni</span><b>{selectedTrades}</b></div><div><span>Profit factor</span><b>{selectedFactor}</b></div><div><span>Win rate</span><b>{selectedCell.win.toLocaleString("it-IT", { maximumFractionDigits: 1 })}%</b></div><div><span>Media trade</span><b data-sign={valueSign(selectedTrades ? selectedValue / selectedTrades : 0)}>{euro(selectedTrades ? selectedValue / selectedTrades : 0)}</b></div></div><div className="detail-insight"><Sparkles size={17} /><p>{selectedValue > 0 ? "Questa fascia contribuisce positivamente all’edge. Mantieni invariati criteri e rischio per validarla su più dati." : "Questa fascia riduce la qualità complessiva. Prima di escluderla, verifica setup e dimensione del campione."}</p></div></aside>
     </section>
 
-    <MonthlyPerformance />
+    <MonthlyPerformance start={start} />
 
     <section className="analytics-secondary">
       <article className="glass-card session-card"><div className="section-head"><div><p className="eyebrow">Sessioni</p><h2>Il tuo ritmo di mercato.</h2></div><span className="portfolio-caption">{period}</span></div><div className="session-tabs" role="tablist" aria-label="Sessioni di trading">{sessions.map(item => <button role="tab" aria-selected={sessionId === item.id} key={item.id} onClick={() => setSessionId(item.id)}><i style={{ background: item.color }} /><span>{item.name}<small>{item.time}</small></span><strong>{item.factor.toLocaleString("it-IT")} PF</strong></button>)}</div><div className="session-summary" aria-live="polite"><div className="session-score"><strong>{session.win.toLocaleString("it-IT", { maximumFractionDigits: 1 })}%</strong><span>win rate</span></div><div><h3>{session.name} · {session.trades} trade</h3><p>{session.note}</p><div className="session-metrics"><span>Netto <strong data-sign={valueSign(session.net)}>{euro(session.net)}</strong></span><span>Profit factor <strong>{session.factor.toLocaleString("it-IT")}</strong></span></div></div></div></article>
@@ -69,6 +80,6 @@ export default function Analytics() {
       <article className="glass-card instruments-card"><div className="section-head"><div><p className="eyebrow">Strumenti</p><h2>Contributo al profitto.</h2></div><span className="portfolio-caption">{stats.trades} trade</span></div><div className="instrument-list">{instruments.map(item => <div className={`instrument-row ${item.net < 0 ? "negative-row" : ""}`} key={item.name}><div><strong>{item.name}</strong><small>{item.trades} operazioni · {item.factor.toLocaleString("it-IT")} PF</small></div><div className="instrument-track"><i style={{ width: `${Math.min(100, Math.max(0, item.share))}%` }} /></div><span data-sign={valueSign(item.net)}>{euro(item.net)}</span></div>)}</div></article>
     </section>
 
-    <section className="glass-card dna-card"><div><p className="eyebrow">Trade DNA</p><h2>La firma del tuo processo.</h2><p>Quattro dimensioni calcolate sulle 314 operazioni del ledger.</p></div><div className="dna-list">{TRADE_DNA.map(item => <div className="dna-row" key={item.label}><span>{item.label}<small>{item.detail}</small></span><div><i style={{ width: `${item.score}%` }} /></div><strong>{item.score}</strong></div>)}</div><div className="dna-insight"><Sparkles size={19} /><div><strong>Opportunità principale</strong><p>Il margine medio non catturato rispetto al MFE è circa il {EXIT_OPPORTUNITY_PCT}%. Il prossimo Lab potrà simulare regole di uscita alternative.</p></div></div></section>
+    <section className="glass-card dna-card"><div><p className="eyebrow">Trade DNA</p><h2>La firma del tuo processo.</h2><p>Quattro dimensioni calcolate sull’intero storico dei trade chiusi.</p></div><div className="dna-list">{TRADE_DNA.map(item => <div className="dna-row" key={item.label}><span>{item.label}<small>{item.detail}</small></span><div><i style={{ width: `${item.score}%` }} /></div><strong>{item.score}</strong></div>)}</div><div className="dna-insight"><Sparkles size={19} /><div><strong>Opportunità principale</strong><p>Il margine medio non catturato rispetto al MFE è circa il {EXIT_OPPORTUNITY_PCT}%. Il prossimo Lab potrà simulare regole di uscita alternative.</p></div></div></section>
   </div>;
 }

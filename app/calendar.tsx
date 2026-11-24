@@ -21,6 +21,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import OfficialCalendar from "./official-calendar";
 import { calendarEventFile } from "./calendar-export";
 import { downloadFile } from "./download-file";
 
@@ -101,6 +102,7 @@ function ImpactDots({ impact }: { impact: Impact }) {
 }
 
 export default function Calendar() {
+  const [official, setOfficial] = useState(false);
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedDay, setSelectedDay] = useState(2);
   const [selectedId, setSelectedId] = useState("us-gdp");
@@ -135,13 +137,18 @@ export default function Calendar() {
           <h1>Calendario.</h1>
           <p>Eventi economici ordinati per rischio reale sul tuo portafoglio.</p>
         </div>
-        <div className="calendar-head-actions">
+        {!official && <div className="calendar-head-actions">
           <label className="calendar-timezone"><Globe2 size={14} /><span>Fuso orario</span><select aria-label="Fuso orario" value={timezoneOffset} onChange={(event) => setTimezoneOffset(Number(event.target.value))}><option value="1">Roma · UTC+1</option><option value="0">UTC</option><option value="-4">New York · UTC−4</option></select></label>
           <button className="calendar-today" type="button" onClick={resetToToday}><Target size={14} /> Oggi</button>
-        </div>
+        </div>}
       </section>
 
-      <div className="demo-notice calendar-notice"><CalendarClock size={16} /><span><strong>Calendario dimostrativo.</strong> Le pubblicazioni sono un set editoriale per il 26 ott – 1 nov; il feed economico live verrà collegato alla fonte dati.</span></div>
+      <div className="range-switch calendar-source" role="group" aria-label="Fonte calendario">
+        <button type="button" className={official ? "active" : ""} aria-pressed={official} onClick={() => setOfficial(true)}>Agenda ufficiale USA</button>
+        <button type="button" className={!official ? "active" : ""} aria-pressed={!official} onClick={() => setOfficial(false)}>Set dimostrativo</button>
+      </div>
+      {official ? <OfficialCalendar /> : <>
+      <div className="demo-notice calendar-notice"><CalendarClock size={16} /><span><strong>Calendario dimostrativo.</strong> Le pubblicazioni sono un set editoriale per il 26 ott – 1 nov; l’agenda ufficiale USA è disponibile nella vista dedicata.</span></div>
 
       <section className="calendar-risk-window glass-card">
         <div className="calendar-risk-copy">
@@ -219,6 +226,7 @@ export default function Calendar() {
           <button className="calendar-alert" type="button" onClick={() => exportCalendarEvent(selected)}><BellRing size={14} /> Scarica evento demo <span>{selected.state === "scheduled" ? "ICS · avviso 15 min prima" : "ICS"}</span></button>
         </aside>}
       </section>
+      </>}
     </div>
   );
 }

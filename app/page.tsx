@@ -36,7 +36,10 @@ import Lab from "./lab";
 import Journal from "./journal";
 import Calendar from "./calendar";
 import MarketTools from "./market-tools";
-import { ALPHA_ACCOUNT, BEST_RECENT_TRADE, BEST_SESSION_30D, DASHBOARD_RANGE_STATS, DEMO_BALANCE_SERIES, DEMO_EQUITY_SERIES, DEMO_PERIOD_STATS, OPEN_PNL, OPEN_TRADES, type DashboardRange } from "./demo-data";
+import MarketDashboard from "./market-dashboard";
+import Mt5Monitor from "./mt5-monitor";
+import { ALPHA_ACCOUNT, BEST_RECENT_TRADE, BEST_SESSION_30D, DASHBOARD_RANGE_STATS, DEMO_BALANCE_SERIES, DEMO_EQUITY_SERIES, DEMO_PERIOD_STATS, OPEN_PNL, OPEN_TRADES, realizedResults, type DashboardRange } from "./demo-data";
+import { alphaAnalysisStart } from "./analysis-preferences";
 import { valueSign } from "./value-sign";
 import { IceGlass } from "./ice-glass";
 import { positionUnderlight } from "./glass-underlight";
@@ -54,7 +57,7 @@ const navItems = [
   { label: "Rischio", icon: ShieldCheck, target: "risk" },
   { label: "Lab", icon: FlaskConical, target: "lab" },
 ];
-const fullViews = new Set([...navItems.map(item => item.target).filter(target => target !== "overview"), "journal", "calendar", "tools"]);
+const fullViews = new Set([...navItems.map(item => item.target).filter(target => target !== "overview"), "journal", "calendar", "tools", "markets", "mt5"]);
 
 const money = (value: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(value);
 const signedMoney = (value: number) => `${value > 0 ? "+" : ""}${money(value)}`;
@@ -97,25 +100,28 @@ function MiniChart({ values, color = "#56d9ca" }: { values: number[]; color?: st
   );
 }
 
-function EquityChart({ range }: { range: Range }) {
-  const equity = equitySeries[range];
-  const balance = balanceSeries[range];
-  const chartMin = Math.min(...equity, ...balance);
-  const chartMax = Math.max(...equity, ...balance);
+function EquityChart({ range, realized, pnl }: { range: Range; realized: boolean; pnl: ReturnType<typeof realizedResults> | null }) {
+  const realizedValues = pnl?.values ?? [];
+  const balance = pnl ? realizedValues.map(value => (pnl.opening + value) / 1000) : balanceSeries[range];
+  const equity = pnl ? balance.map((value, index) => value + (index === balance.length - 1 ? OPEN_PNL / 1000 : 0)) : equitySeries[range];
+  const primary = realized ? realizedValues : equity;
+  const secondary = realized ? realizedValues.map(() => 0) : balance;
+  const chartMin = Math.min(...primary, ...secondary);
+  const chartMax = Math.max(...primary, ...secondary);
   const chartSpan = chartMax - chartMin || 1;
   const chartPoints = (values: number[]) => values.map((value, index) => ({
     x: 14 + (index / Math.max(1, values.length - 1)) * 732,
     y: 241 - ((value - chartMin) / chartSpan) * 227,
   }));
-  const equityPoints = chartPoints(equity);
-  const balancePoints = chartPoints(balance);
+  const equityPoints = chartPoints(primary);
+  const balancePoints = chartPoints(secondary);
   const equityPath = pathFromPoints(equityPoints);
   const balancePath = pathFromPoints(balancePoints);
   const areaPath = `${equityPath} L746,241 L14,241 Z`;
   const equityEnd = equityPoints[equityPoints.length - 1];
   const sampledIndexes = equityPoints.map((_, index) => index).filter((index) => index % Math.max(1, Math.floor(equityPoints.length / 18)) === 0 || index === equityPoints.length - 1);
   return (
-    <div className="chart-wrap equity-chart" role="img" aria-label={`Andamento di equity e balance. Periodo ${range}.`}>
+    <div className="chart-wrap equity-chart" role="img" aria-label={realized ? `Profitto netto realizzato cumulato: ${money(pnl?.net ?? 0)}. Periodo ${range}.` : `Andamento di equity e balance. Periodo ${range}.`}>
       <svg viewBox="0 0 760 255" preserveAspectRatio="none" aria-hidden="true" focusable="false">
         <defs>
           <linearGradient id="equityArea" x1="0" y1="0" x2="0" y2="1">
@@ -173,8 +179,13 @@ export default function Home() {
   const [range, setRange] = useState<Range>("1M");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [privateMode, setPrivateMode] = useState(true);
-  const performance = useMemo(() => `${DASHBOARD_RANGE_STATS[range].returnPct >= 0 ? "+" : ""}${DASHBOARD_RANGE_STATS[range].returnPct.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`, [range]);
-  const rangeProfit = DASHBOARD_RANGE_STATS[range].net;
+  const [realized, setRealized] = useState(false);
+  const { value: accountStart } = alphaAnalysisStart.useStore();
+  const pnl = useMemo(() => realized || accountStart ? realizedResults(range, accountStart) : null, [range, accountStart, realized]);
+  const stats = DASHBOARD_RANGE_STATS[range];
+  const returnPct = pnl?.returnPct ?? stats.returnPct;
+  const performance = `${returnPct >= 0 ? "+" : ""}${returnPct.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+  const rangeProfit = pnl?.net ?? stats.net;
   const riskState = ALPHA_ACCOUNT.riskScore < 35 ? "Calmo" : ALPHA_ACCOUNT.riskScore < 65 ? "Moderato" : "Elevato";
   const riskUsed = ALPHA_ACCOUNT.activeRisk / ALPHA_ACCOUNT.riskLimit * 100;
   const marginPressure = ALPHA_ACCOUNT.marginUsage / 20;
@@ -192,7 +203,7 @@ export default function Home() {
       <div className="ambient ambient-one" /><div className="ambient ambient-two" />
       <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
         <div className="brand"><div className="brand-mark"><Orbit size={21} /></div><span>BlueSpherix</span><button className="mobile-close" onClick={() => setSidebarOpen(false)} aria-label="Chiudi menu"><X size={18} /></button></div>
-        <div className="account-pill"><div className="avatar">AM</div><div><strong>Alpha Momentum</strong><span><i /> Dati dimostrativi</span></div><ShieldCheck size={15} aria-label="Conto verificato" /></div>
+        <div className="account-pill"><div className="avatar">AM</div><div><strong>Alpha Momentum</strong><span><i /> Dati dimostrativi</span></div><ShieldCheck size={15} aria-hidden="true" /></div>
         <nav aria-label="Navigazione principale">
           <p className="nav-label">Workspace</p>
           {navItems.map(({ label, icon: Icon, target }) => (
@@ -201,10 +212,11 @@ export default function Home() {
           <p className="nav-label spaced">Strumenti</p>
           <button className={view === "journal" ? "active" : ""} aria-current={view === "journal" ? "page" : undefined} onClick={() => goTo("journal")}><BookOpen size={18} /><span>Diario</span></button>
           <button className={view === "calendar" ? "active" : ""} aria-current={view === "calendar" ? "page" : undefined} onClick={() => goTo("calendar")}><CalendarDays size={18} /><span>Calendario</span><b>3</b></button>
+          <button className={view === "markets" ? "active" : ""} aria-current={view === "markets" ? "page" : undefined} onClick={() => goTo("markets")}><TrendingUp size={18} /><span>Mercati</span></button>
           <button className={view === "tools" ? "active" : ""} aria-current={view === "tools" ? "page" : undefined} onClick={() => goTo("tools")}><Calculator size={18} /><span>Calcolatori</span></button>
         </nav>
         <div className="sidebar-bottom">
-          <button><Settings size={18} /><span>Impostazioni</span></button>
+          <button className={view === "mt5" ? "active" : ""} aria-current={view === "mt5" ? "page" : undefined} onClick={() => goTo("mt5")}><Settings size={18} /><span>Dati MT5</span></button>
           <div className="sync-status"><span><Zap size={13} /> Anteprima</span><small>MT5 non collegato</small></div>
         </div>
       </aside>
@@ -233,6 +245,8 @@ export default function Home() {
           {view === "journal" && <Journal />}
           {view === "calendar" && <Calendar />}
           {view === "tools" && <MarketTools />}
+          {view === "markets" && <MarketDashboard />}
+          {view === "mt5" && <Mt5Monitor />}
           <div className="today-dashboard" hidden={fullViews.has(view)}>
           <section className="welcome today-welcome" id="overview">
             <div><p className="date-line">Mercoledì, 28 ottobre</p><h1>Buongiorno, Luca.</h1><p>Il portafoglio è stabile. Il rischio è sotto controllo.</p></div>
@@ -247,9 +261,9 @@ export default function Home() {
               <div className="card-head today-chart-head equity-story" data-glass-label>
                 <div><p className="eyebrow">Equity totale</p><div className="equity-value"><strong>{money(ALPHA_ACCOUNT.equity)}</strong><span data-sign={valueSign(OPEN_PNL)}>{OPEN_PNL >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />} {signedMoney(OPEN_PNL)} oggi</span></div></div>
               </div>
-              <div className="today-chart-controls" data-glass-label><div className="range-switch" aria-label="Periodo grafico">{(["1W", "1M", "3M", "1Y"] as Range[]).map((item) => <button key={item} aria-pressed={range === item} className={range === item ? "active" : ""} onClick={() => setRange(item)}>{item}</button>)}</div><div className="legend"><span><i className="equity" /> Equity</span><span><i className="balance" /> Balance</span></div></div>
-              <EquityChart range={range} />
-              <div className="chart-summary" data-glass-label><div><span>Rendimento</span><strong data-sign={valueSign(DASHBOARD_RANGE_STATS[range].returnPct)}>{performance}</strong></div><div><span>Profitto netto</span><strong data-sign={valueSign(rangeProfit)}>{money(rangeProfit)}</strong></div><div><span>Data confidence</span><strong className="confidence"><ShieldCheck size={15} /> {DASHBOARD_RANGE_STATS[range].confidence}%</strong></div></div>
+              <div className="today-chart-controls" data-glass-label><div className="range-switch" aria-label="Periodo grafico">{(["1W", "1M", "3M", "1Y"] as Range[]).map((item) => <button key={item} aria-pressed={range === item} className={range === item ? "active" : ""} onClick={() => setRange(item)}>{item}</button>)}</div><div className="legend">{realized ? <span><i className="equity" /> Netto realizzato cumulato</span> : <><span><i className="equity" /> Equity</span><span><i className="balance" /> Balance</span></>}</div><button type="button" className="portfolio-export realized-toggle" aria-pressed={realized} onClick={() => setRealized(current => !current)}>P&amp;L realizzato</button>{accountStart && <small className="portfolio-caption">Storico dal {accountStart}</small>}</div>
+              <EquityChart range={range} realized={realized} pnl={pnl} />
+              <div className="chart-summary" data-glass-label><div><span>Rendimento</span><strong data-sign={valueSign(returnPct)}>{performance}</strong></div><div><span>{pnl ? "Netto realizzato" : "Profitto netto"}</span><strong data-sign={valueSign(rangeProfit)}>{money(rangeProfit)}</strong></div><div><span>{pnl ? "Trade chiusi" : "Data confidence"}</span><strong className="confidence">{pnl ? pnl.trades : <><ShieldCheck size={15} /> {stats.confidence}%</>}</strong></div></div>
               </div>
             </article>
 

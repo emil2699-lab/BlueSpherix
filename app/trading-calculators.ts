@@ -1,5 +1,5 @@
 type Field = { key: string; label: string; initial: number; min?: number; max?: number; integer?: boolean };
-type Unit = "currency" | "lots" | "percent" | "price";
+type Unit = "currency" | "lots" | "percent" | "price" | "leverage";
 type Result = { label: string; value: number; unit: Unit };
 type Calculator = {
   name: string;
@@ -68,6 +68,30 @@ export const calculators = {
       return [{ label: "Margine stimato", value: notional / v.leverage, unit: "currency" },
         { label: "Valore nozionale", value: notional, unit: "currency" }];
     },
+  },
+  leverage: {
+    name: "Leva minima richiesta",
+    note: "Stima la leva necessaria dato il margine che vuoi destinare alla posizione. Confronta il risultato con i livelli e gli scaglioni applicati dal broker.",
+    fields: [entry, units, lots, rate, { key: "budget", label: "Margine disponibile", initial: 2000, min: .01 }],
+    calculate: v => {
+      const notional = v.entry * v.units * v.lots * v.rate;
+      return [{ label: "Leva minima (intera)", value: Math.max(1, Math.ceil(notional / v.budget)), unit: "leverage" },
+        { label: "Valore nozionale", value: notional, unit: "currency" }];
+    },
+  },
+  rebate: {
+    name: "Rebate",
+    note: "Usa la tariffa effettiva del programma e il volume qualificato. Se la tariffa è per operazione completa, conta ogni operazione una sola volta.",
+    fields: [lots, { key: "rebate", label: "Rebate per lotto nella valuta del conto", initial: 3, min: 0 },
+      { key: "count", label: "Numero di operazioni con questo volume", initial: 20, min: 1, integer: true }],
+    calculate: v => [{ label: "Rebate stimato", value: v.lots * v.rebate * v.count, unit: "currency" }],
+  },
+  swap: {
+    name: "Swap e rollover",
+    note: "Usa la tariffa in pip per notte della direzione scelta. Un valore negativo è un addebito. Conta il rollover triplo come tre notti equivalenti.",
+    fields: [lots, units, pip, rate, { key: "swap", label: "Swap in pip per notte (con segno)", initial: -.6 },
+      { key: "nights", label: "Notti equivalenti", initial: 3, min: 0, integer: true }],
+    calculate: v => [{ label: "Rollover stimato", value: v.swap * v.pip * v.units * v.lots * v.rate * v.nights, unit: "currency" }],
   },
   profit: {
     name: "Profitto e perdita",

@@ -5,6 +5,7 @@ import { Download, Printer } from "lucide-react";
 import { DEMO_AS_OF, LEDGER_TRADES } from "./demo-ledger";
 import { buildPerformanceReport } from "./performance-report";
 import { downloadReport, type ReportTable } from "./report-download";
+import { useJournal } from "./journal-store";
 import { valueSign } from "./value-sign";
 
 const monthLabel = new Intl.DateTimeFormat("it-IT", { month: "long", year: "numeric", timeZone: "UTC" });
@@ -17,17 +18,21 @@ const factor = (result: number | null) => result === null ? "—" : number.forma
 const rate = (result: number | null) => result === null ? "—" : `${number.format(result)}%`;
 const hold = (minutes: number | null) => minutes === null ? "—" : `${Math.floor(Math.round(minutes) / 60)} h ${Math.round(minutes) % 60} min`;
 
-export default function MonthlyPerformance() {
+export default function MonthlyPerformance({ start = "" }: { start?: string }) {
+  const { entries, error: journalError } = useJournal();
+  const [tag, setTag] = useState("");
   const [symbol, setSymbol] = useState("");
   const [side, setSide] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [month, setMonth] = useState("");
-  const report = useMemo(() => buildPerformanceReport(LEDGER_TRADES, DEMO_AS_OF, { symbol, side, month, from, to }), [symbol, side, month, from, to]);
-  const earliest = `${report.monthly.at(-1)!.month}-01`;
+  const report = useMemo(() => buildPerformanceReport(LEDGER_TRADES, DEMO_AS_OF, { symbol, side, month, from, to, start, tag }, entries), [symbol, side, month, from, to, start, tag, entries]);
+  const firstMonth = `${report.monthly.at(-1)!.month}-01`;
+  const earliest = start > firstMonth ? start : firstMonth;
   const latest = DEMO_AS_OF.slice(0, 10);
-  const invalidDates = !!(from && to && from > to);
-  const context = `Alpha Momentum · Demo · Chiusure UTC dal ${day(from || earliest)} al ${day(to || latest)} · ${symbol || "Tutti gli strumenti"} · ${side || "Tutte le direzioni"} · Dettaglio: ${month ? months(month) : "intero periodo"}`;
+  const effectiveFrom = from > earliest ? from : earliest;
+  const invalidDates = !!(to && effectiveFrom > to);
+  const context = `Alpha Momentum · Demo · Chiusure UTC dal ${day(effectiveFrom)} al ${day(to || latest)} · ${symbol || "Tutti gli strumenti"} · ${side || "Tutte le direzioni"}${tag ? ` · Tag ${tag}` : ""} · Dettaglio: ${month ? months(month) : "intero periodo"}`;
   const monthly: ReportTable = {
     title: "Risultati mensili",
     columns: ["Mese", "Trade chiusi", "Netto", "Win rate", "Profit factor"],
@@ -43,7 +48,14 @@ export default function MonthlyPerformance() {
     columns: ["Strumento", "Trade chiusi", "Quota del campione", "Netto"],
     rows: report.activity.map(row => [row.symbol, String(row.count), rate(row.share), currency.format(row.net)]),
   };
-  const reset = () => { setSymbol(""); setSide(""); setFrom(""); setTo(""); setMonth(""); };
+  const breakdown = (title: string, label: string, items: typeof report.byTag): ReportTable => ({
+    title,
+    columns: [label, "Trade chiusi", "Netto", "Win rate", "Volume (lotti)"],
+    rows: items.map(row => [row.label, String(row.count), currency.format(row.net), rate(row.winRate), number.format(row.volume)]),
+  });
+  const tags = breakdown("Risultati per tag del Diario", "Tag", report.byTag);
+  const duration = breakdown("Durata delle operazioni", "Durata", report.holding);
+  const reset = () => { setSymbol(""); setSide(""); setFrom(""); setTo(""); setMonth(""); setTag(""); };
   const summary = [
     ["Trade chiusi", String(report.total.count)],
     ["Netto", currency.format(report.total.net)],
@@ -52,7 +64,7 @@ export default function MonthlyPerformance() {
     ["Durata media", hold(report.total.holdingMinutes)],
   ];
   const exportAs = (format: "csv" | "html") => downloadReport("Report di performance · BlueSpherix", context,
-    [{ title: "Riepilogo", columns: ["Metrica", "Valore"], rows: summary }, monthly, activity, directional], format);
+    [{ title: "Riepilogo", columns: ["Metrica", "Valore"], rows: summary }, monthly, activity, directional, duration, tags], format);
 
   return <section className="glass-card performance-report" aria-labelledby="performance-title">
     <div className="section-head">
@@ -67,10 +79,14 @@ export default function MonthlyPerformance() {
     <div className="market-fields performance-filters">
       <label>Strumento<select value={symbol} onChange={event => setSymbol(event.target.value)}><option value="">Tutti</option>{report.symbols.map(item => <option key={item}>{item}</option>)}</select></label>
       <label>Direzione<select value={side} onChange={event => setSide(event.target.value)}><option value="">Tutte</option><option>Long</option><option>Short</option></select></label>
+      <label>Tag del Diario<select value={tag} onChange={event => setTag(event.target.value)}>
+        <option value="">Tutti</option>{[...new Set([...report.tags, ...(tag ? [tag] : [])])].map(item => <option key={item}>{item}</option>)}
+      </select></label>
       <label>Da (chiusura)<input type="date" min={earliest} max={latest} value={from} onChange={event => setFrom(event.target.value)} /></label>
       <label>A (chiusura)<input type="date" min={earliest} max={latest} value={to} onChange={event => setTo(event.target.value)} /></label>
       <button type="button" className="portfolio-export" onClick={reset}>Azzera filtri</button>
     </div>
+    {journalError && <p role="status">{journalError}</p>}
     {invalidDates ? <p role="status">La data iniziale deve precedere o coincidere con la data finale.</p> : <>
       <p className="portfolio-caption performance-context">{context}</p>
       <div className="performance-table" tabIndex={0} role="region" aria-label={monthly.title}>
@@ -104,6 +120,12 @@ export default function MonthlyPerformance() {
             </tr>)}</tbody>
           </table>
         </div> : <p className="portfolio-caption">Nessun trade chiuso corrisponde ai filtri.</p>}
+        {[duration, tags].map(table => <div key={table.title} className="performance-table performance-breakdown" tabIndex={0} role="region" aria-label={table.title}>
+          <table><caption>{table.title}</caption><thead><tr>{table.columns.map(column => <th key={column} scope="col">{column}</th>)}</tr></thead>
+            <tbody>{table.rows.map(([label, ...cells]) => <tr key={label}><th scope="row">{label}</th>{cells.map((cell, index) => <td key={table.columns[index + 1]}>{cell}</td>)}</tr>)}</tbody>
+          </table>
+          {table === tags && <p className="portfolio-caption">{table.rows.length ? "Un trade con più tag compare in ciascun gruppo pertinente." : "Aggiungi tag ai trade nel Diario per confrontarne i risultati."}</p>}
+        </div>)}
       </div>
     </>}
   </section>;

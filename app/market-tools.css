@@ -54,14 +54,14 @@
 @media (max-width: 700px) { .market-workbench { grid-template-columns: minmax(0, 1fr); } }
 
 @media print {
-  html:has(.performance-report), html:has(.performance-report) body { background: #fff !important; color: #000 !important; }
-  .app-shell:has(.performance-report) { display: block; }
-  .app-shell:has(.performance-report) > :not(.workspace),
-  .workspace:has(.performance-report) > :not(.content),
-  .content:has(.performance-report) > :not(.analytics-view),
+  html:has(.analytics-view .performance-report), html:has(.analytics-view .performance-report) body { background: #fff !important; color: #000 !important; }
+  .app-shell:has(.analytics-view .performance-report) { display: block; }
+  .app-shell:has(.analytics-view .performance-report) > :not(.workspace),
+  .workspace:has(.analytics-view .performance-report) > :not(.content),
+  .content:has(.analytics-view .performance-report) > :not(.analytics-view),
   .analytics-view:has(.performance-report) > :not(.performance-report),
   .performance-report :is(.performance-actions,.performance-filters,.performance-detail .portfolio-export) { display: none !important; }
-  .app-shell:has(.performance-report) :is(.workspace,.content,.analytics-view,.performance-report) {
+  .app-shell:has(.analytics-view .performance-report) :is(.workspace,.content,.analytics-view,.performance-report) {
     display: block; position: static; margin: 0; padding: 0; max-width: none; width: auto;
     border: 0 !important; background: transparent !important; color: #000 !important;
     box-shadow: none !important; backdrop-filter: none !important;
@@ -73,3 +73,36 @@
   .performance-activity-track { background: #ddd; }
   .performance-activity-track i { background: #064f46; }
 }
+
+.performance-breakdown { margin-top: 20px; }
+.account-start { display: flex; flex-wrap: wrap; align-items: end; }
+.account-start label { min-width: min(100%, 210px); }
+.realized-toggle { margin: 8px 8px 0 0; }
+.realized-toggle[aria-pressed="true"] { color: var(--aqua); }
+
+.portfolio-groups { padding: 14px 18px; margin-bottom: 16px; }
+.portfolio-groups .market-fields { margin: 0; }
+.portfolio-groups button:disabled { opacity: .55; cursor: default; }
+.account-watch { display: inline-flex; align-items: center; justify-content: end; gap: 8px; flex-wrap: wrap; }
+.account-watch button[aria-pressed="true"] { color: var(--aqua); }
+
+.backtest-choices { list-style: none; padding: 0; margin: 12px 0 20px; }
+.backtest-choices li { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; gap: 10px; border-bottom: 1px solid var(--stroke); }
+.backtest-choices label { overflow-wrap: anywhere; }
+
+.market-fx-map { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 10px; }
+.market-fx-map article { display: grid; gap: 5px; padding: 10px; background: var(--panel); border: 1px solid var(--stroke); border-radius: 12px; }
+.market-fx-map article[data-sign="positive"] { background: color-mix(in srgb, var(--aqua) 12%, var(--panel)); }
+.market-fx-map article[data-sign="negative"] { background: color-mix(in srgb, var(--red) 12%, var(--panel)); }
+.market-fx-map article span { font-size: 13px; color: var(--text); }
+
+.market-sentiment-chart { display: block; width: 100%; max-height: 200px; background: var(--panel); border: 1px solid var(--stroke); border-radius: 12px; }
+
+.calendar-source { width: fit-content; margin-bottom: 16px; }
+
+.portfolio-groups > .market-fields:not(form) { margin-bottom: 12px; }
+.portfolio-embed { grid-template-columns: minmax(0, 1fr) auto; }
+.public-widget { padding: 12px; max-width: 620px; margin-inline: auto; }
+.public-widget article { padding: 18px; }
+.public-widget h1 { margin: 0; font-size: 23px; }
+.public-widget svg { display: block; width: 100%; max-height: 120px; }
