@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Check, ImagePlus, Save, Star, Trash2 } from "lucide-react";
+import type { DemoTrade } from "./demo-data";
 import { blankEntry, useJournal, type JournalEntry } from "./journal-store";
 import { FilterSelect } from "./trade-controls";
 
@@ -10,7 +11,7 @@ const tags = ["Piano rispettato", "Da rivedere", "Alta qualità", "News", "FOMO"
 const checks = ["Setup verificato", "Rischio definito", "Gestione rispettata", "Revisione completata"];
 const drafts = new Map<string, JournalEntry>();
 
-export function JournalEditor({ entryId, trade = false }: { entryId: string; trade?: boolean }) {
+export function JournalEditor({ entryId, trade }: { entryId: string; trade?: DemoTrade }) {
   const { entries, error, save } = useJournal();
   const [draft, setDraft] = useState<JournalEntry | null>(() => drafts.get(entryId) ?? null);
   useEffect(() => {
@@ -36,6 +37,7 @@ export function JournalEditor({ entryId, trade = false }: { entryId: string; tra
     if (fileRef.current) fileRef.current.value = "";
   };
   return <div className="diary-editor">
+    {trade && <div className="diary-context"><strong>{trade.setup}</strong><p>{trade.note}</p><span>{trade.planAligned ? "Piano rispettato nel ledger" : "Deviazione dal piano nel ledger"}</span></div>}
     <div className="diary-editor-top"><span>{draft ? "Bozza da salvare" : value.updatedAt ? "Salvato sul dispositivo" : "Inizia la tua revisione"}</span><button className={`advanced-filter-trigger diary-review ${value.reviewed ? "active" : ""}`} aria-pressed={value.reviewed} onClick={() => change({ reviewed: !value.reviewed })}><Check size={14} /> {value.reviewed ? "Revisionato" : "Da revisionare"}</button></div>
     <label className="diary-field">{trade ? "Tesi e piano prima dell’ingresso" : "Intenzione della giornata"}<textarea rows={2} maxLength={10000} value={value.thesis} onChange={e => change({ thesis: e.target.value })} placeholder="Cosa cercavo? Quale rischio ero disposto ad accettare?" /></label>
     <label className="diary-field">{trade ? "Esecuzione e osservazioni" : "Riepilogo della giornata"}<textarea rows={4} maxLength={20000} value={value.note} onChange={e => change({ note: e.target.value })} placeholder="Descrivi le tue decisioni, senza giudicare soltanto il risultato." /></label>

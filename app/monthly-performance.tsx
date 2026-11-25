@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Download, Printer } from "lucide-react";
-import type { PerformanceTrade } from "./performance-report";
+import { DEMO_AS_OF, LEDGER_TRADES } from "./demo-ledger";
 import { buildPerformanceReport } from "./performance-report";
 import { downloadReport, type ReportTable } from "./report-download";
 import { useJournal } from "./journal-store";
@@ -10,7 +10,7 @@ import { valueSign } from "./value-sign";
 
 const monthLabel = new Intl.DateTimeFormat("it-IT", { month: "long", year: "numeric", timeZone: "UTC" });
 const dayLabel = new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeZone: "UTC" });
-
+const currency = new Intl.NumberFormat("it-IT", { style: "currency", currency: "USD" });
 const number = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 2 });
 const months = (key: string) => monthLabel.format(new Date(`${key}-01T00:00:00Z`));
 const day = (key: string) => dayLabel.format(new Date(`${key}T00:00:00Z`));
@@ -18,10 +18,7 @@ const factor = (result: number | null) => result === null ? "—" : number.forma
 const rate = (result: number | null) => result === null ? "—" : `${number.format(result)}%`;
 const hold = (minutes: number | null) => minutes === null ? "—" : `${Math.floor(Math.round(minutes) / 60)} h ${Math.round(minutes) % 60} min`;
 
-export default function MonthlyPerformance({ account, currencyCode, asOf, trades, start, timeLabel = "UTC" }: {
-  account: string; currencyCode: string; asOf: string; trades: PerformanceTrade[]; start: string; timeLabel?: string;
-}) {
-  const formatMoney = (value: number) => `${number.format(value)} ${currencyCode}`;
+export default function MonthlyPerformance({ start = "" }: { start?: string }) {
   const { entries, error: journalError } = useJournal();
   const [tag, setTag] = useState("");
   const [symbol, setSymbol] = useState("");
@@ -29,41 +26,41 @@ export default function MonthlyPerformance({ account, currencyCode, asOf, trades
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [month, setMonth] = useState("");
-  const report = useMemo(() => buildPerformanceReport(trades, asOf, { symbol, side, month, from, to, start, tag }, entries), [trades, asOf, symbol, side, month, from, to, start, tag, entries]);
+  const report = useMemo(() => buildPerformanceReport(LEDGER_TRADES, DEMO_AS_OF, { symbol, side, month, from, to, start, tag }, entries), [symbol, side, month, from, to, start, tag, entries]);
   const firstMonth = `${report.monthly.at(-1)!.month}-01`;
   const earliest = start > firstMonth ? start : firstMonth;
-  const latest = asOf.slice(0, 10);
+  const latest = DEMO_AS_OF.slice(0, 10);
   const effectiveFrom = from > earliest ? from : earliest;
   const invalidDates = !!(to && effectiveFrom > to);
-  const context = `${account} · Chiusure (${timeLabel}) dal ${day(effectiveFrom)} al ${day(to || latest)} · ${symbol || "Tutti gli strumenti"} · ${side || "Tutte le direzioni"}${tag ? ` · Tag ${tag}` : ""} · Dettaglio: ${month ? months(month) : "intero periodo"}`;
+  const context = `Alpha Momentum · Demo · Chiusure UTC dal ${day(effectiveFrom)} al ${day(to || latest)} · ${symbol || "Tutti gli strumenti"} · ${side || "Tutte le direzioni"}${tag ? ` · Tag ${tag}` : ""} · Dettaglio: ${month ? months(month) : "intero periodo"}`;
   const monthly: ReportTable = {
     title: "Risultati mensili",
     columns: ["Mese", "Trade chiusi", "Netto", "Win rate", "Profit factor"],
-    rows: report.monthly.map(row => [months(row.month), String(row.count), row.count ? formatMoney(row.net) : "—", rate(row.winRate), factor(row.factor)]),
+    rows: report.monthly.map(row => [months(row.month), String(row.count), currency.format(row.net), rate(row.winRate), factor(row.factor)]),
   };
   const directional: ReportTable = {
     title: "Direzione e strumento",
     columns: ["Strumento", "Direzione", "Trade chiusi", "Netto", "Win rate", "Profit factor", "Durata media"],
-    rows: report.direction.map(row => [row.symbol, row.side, String(row.count), formatMoney(row.net), rate(row.winRate), factor(row.factor), hold(row.holdingMinutes)]),
+    rows: report.direction.map(row => [row.symbol, row.side, String(row.count), currency.format(row.net), rate(row.winRate), factor(row.factor), hold(row.holdingMinutes)]),
   };
   const activity: ReportTable = {
     title: "Frequenza per strumento",
     columns: ["Strumento", "Trade chiusi", "Quota del campione", "Netto"],
-    rows: report.activity.map(row => [row.symbol, String(row.count), rate(row.share), formatMoney(row.net)]),
+    rows: report.activity.map(row => [row.symbol, String(row.count), rate(row.share), currency.format(row.net)]),
   };
   const breakdown = (title: string, label: string, items: typeof report.byTag): ReportTable => ({
     title,
     columns: [label, "Trade chiusi", "Netto", "Win rate", "Volume (lotti)"],
-    rows: items.map(row => [row.label, String(row.count), formatMoney(row.net), rate(row.winRate), number.format(row.volume)]),
+    rows: items.map(row => [row.label, String(row.count), currency.format(row.net), rate(row.winRate), number.format(row.volume)]),
   });
   const tags = breakdown("Risultati per tag del Diario", "Tag", report.byTag);
   const duration = breakdown("Durata delle operazioni", "Durata", report.holding);
   const reset = () => { setSymbol(""); setSide(""); setFrom(""); setTo(""); setMonth(""); setTag(""); };
   const summary = [
     ["Trade chiusi", String(report.total.count)],
-    ["Netto", formatMoney(report.total.net)],
+    ["Netto", currency.format(report.total.net)],
     ["Vincenti / perdenti / pari", `${report.total.wins} / ${report.total.losses} / ${report.total.flat}`],
-    ["Expectancy", report.total.expectancy === null ? "—" : formatMoney(report.total.expectancy)],
+    ["Expectancy", report.total.expectancy === null ? "—" : currency.format(report.total.expectancy)],
     ["Durata media", hold(report.total.holdingMinutes)],
   ];
   const exportAs = (format: "csv" | "html") => downloadReport("Report di performance · BlueSpherix", context,
@@ -71,7 +68,7 @@ export default function MonthlyPerformance({ account, currencyCode, asOf, trades
 
   return <section className="glass-card performance-report" aria-labelledby="performance-title">
     <div className="section-head">
-      <div><p className="eyebrow">{account} · {currencyCode}</p><h2 id="performance-title">Report di performance</h2></div>
+      <div><p className="eyebrow">Alpha Momentum · Demo</p><h2 id="performance-title">Report di performance</h2></div>
       <div className="performance-actions">
         <button type="button" className="portfolio-export" onClick={() => exportAs("csv")} disabled={invalidDates}><Download size={14} /> CSV</button>
         <button type="button" className="portfolio-export" onClick={() => exportAs("html")} disabled={invalidDates}><Download size={14} /> HTML</button>
@@ -113,7 +110,7 @@ export default function MonthlyPerformance({ account, currencyCode, asOf, trades
             <strong>{row.symbol}</strong>
             <div className="performance-activity-track" role="img" aria-label={`${rate(row.share)} delle operazioni`}><i style={{ width: `${row.share}%` }} /></div>
             <span>{row.count} trade · {rate(row.share)}</span>
-            <b data-sign={valueSign(row.net)}>{formatMoney(row.net)}</b>
+            <b data-sign={valueSign(row.net)}>{currency.format(row.net)}</b>
           </div>)}</div>
         </div>}
         {directional.rows.length ? <div className="performance-table" tabIndex={0} role="region" aria-label={directional.title}>

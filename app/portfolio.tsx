@@ -1,0 +1,112 @@
+"use client";
+
+import { useState, type CSSProperties } from "react";
+import { ArrowUpRight, Download, ShieldCheck, Star } from "lucide-react";
+import { DEMO_ACCOUNTS } from "./demo-data";
+import { portfolioWatch } from "./portfolio-watch";
+import { valueSign } from "./value-sign";
+import PortfolioChart from "./portfolio-chart";
+import PortfolioTradeDialog from "./portfolio-trade-dialog";
+import { portfolioDate, type PortfolioTrade } from "./portfolio-trades";
+
+const accounts = DEMO_ACCOUNTS;
+const money = (value: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "USD" }).format(value);
+const percent = (value: number) => `${value > 0 ? "+" : ""}${value.toLocaleString("it-IT", { maximumFractionDigits: 2 })}%`;
+
+export default function Portfolio({ onMt5 }: { onMt5: () => void }) {
+  const [filter, setFilter] = useState("Tutti");
+  const [selected, setSelected] = useState(accounts.map(account => account.id));
+  const [detail, setDetail] = useState<string | null>(null);
+  const [point, setPoint] = useState(11);
+  const [tradeFocus, setTradeFocus] = useState<PortfolioTrade | null>(null);
+  const { value: watch, error } = portfolioWatch.useStore();
+  const [groupId, setGroupId] = useState("");
+  const [groupName, setGroupName] = useState("");
+  const [query, setQuery] = useState("");
+  const [embed, setEmbed] = useState("");
+  const group = watch.groups.find(item => item.id === groupId);
+  const visible = accounts.filter(account =>
+    (filter === "Tutti" || account.type === filter || (filter === "Watchlist" && watch.favorites.includes(account.id)))
+    && (!group || group.accounts.includes(account.id))
+    && `${account.name} ${account.strategy}`.toLocaleLowerCase("it").includes(query.trim().toLocaleLowerCase("it")));
+  const compared = visible.filter(account => selected.includes(account.id));
+  const total = visible.reduce((sum, account) => sum + account.equity, 0);
+  const floating = visible.reduce((sum, account) => sum + account.equity - account.balance, 0);
+  const toggle = (id: string) => setSelected(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
+  const toggleWatch = (id: string) => portfolioWatch.save(current => ({
+    ...current,
+    favorites: current.favorites.includes(id) ? current.favorites.filter(item => item !== id) : [...current.favorites, id],
+  }));
+  const saveGroup = () => {
+    const name = groupName.trim();
+    const members = compared.map(account => account.id);
+    if (!name || !members.length) return;
+    const id = crypto.randomUUID();
+    const ok = portfolioWatch.save(current => ({
+      ...current,
+      groups: [...current.groups, { id, name, accounts: members }],
+    }));
+    if (ok) { setGroupName(""); setGroupId(id); setFilter("Tutti"); }
+  };
+  const download = () => {
+    const rows = [["Dati dimostrativi — nessun conto collegato"], ["Conto", "Tipo simulato", "Equity USD", "Balance USD", "Rendimento mese %", "Drawdown %"], ...visible.map(a => [a.name, a.type, a.equity, a.balance, a.returns[11], a.drawdown])];
+    const blob = new Blob(["\uFEFF" + rows.map(row => row.join(";")).join("\r\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a"); link.href = url; link.download = "bluespherix-portafoglio-demo.csv"; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  return <div className="portfolio-view">
+    <section className="welcome"><div><p className="date-line">Il tuo capitale, una visione unica</p><h1>Portafoglio.</h1><p>Confronta le strategie. Capisci dove nasce il rendimento.</p></div><button className="portfolio-export" onClick={download}><Download size={15} /> Esporta CSV</button></section>
+    <div className="demo-notice"><ShieldCheck size={16} /><span><strong>Ambiente dimostrativo.</strong> Tutti i conti e i risultati sono simulati. Puoi aprire i conti MT5 in una vista dedicata.</span><button type="button" className="portfolio-export" onClick={onMt5}>Conti collegati</button></div>
+    <div className="portfolio-toolbar"><div className="range-switch" aria-label="Filtra conti">{["Tutti", "Reale", "Demo", "Watchlist"].map(item => <button key={item} aria-pressed={filter === item} className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>{item === "Reale" ? "Reali" : item}</button>)}</div><span>{visible.length} conti · Valuta USD · Ottobre 2026</span></div>
+    <section className="glass-card portfolio-groups" aria-label="Gruppi di conti">
+      <div className="market-fields"><label>Cerca conti demo<input type="search" value={query} onChange={event => setQuery(event.target.value)} /></label></div>
+      <form className="market-fields" onSubmit={event => { event.preventDefault(); saveGroup(); }}>
+        <label>Gruppo di conti<select value={group?.id ?? ""} onChange={event => {
+          setGroupId(event.target.value);
+          setFilter("Tutti");
+          const next = watch.groups.find(item => item.id === event.target.value);
+          setSelected(next?.accounts ?? accounts.map(account => account.id));
+        }}><option value="">Tutti i gruppi</option>{watch.groups.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <label>Nome del nuovo gruppo<input value={groupName} maxLength={50} onChange={event => setGroupName(event.target.value)} /></label>
+        <button type="submit" className="portfolio-export" disabled={!compared.length || !groupName.trim()}>Salva i conti confrontati</button>
+        {group && <button type="button" className="portfolio-export" onClick={() => {
+          if (portfolioWatch.save(current => ({ ...current, groups: current.groups.filter(item => item.id !== group.id) }))) {
+            setGroupId(""); setSelected(accounts.map(account => account.id));
+          }
+        }}>Elimina gruppo</button>}
+      </form>
+      {error && <p role="alert">{error}</p>}
+    </section>
+    <p className="portfolio-caption"><a href="./api/v1/demo/accounts.json">Scarica dati dei conti demo (API JSON)</a></p>
+    {embed && <div className="market-fields portfolio-embed">
+      <label>Codice per incorporare il profilo dimostrativo<input aria-label="Codice widget" readOnly value={embed} onFocus={event => event.target.select()} /></label>
+      <button type="button" className="portfolio-export" onClick={() => setEmbed("")}>Chiudi codice</button>
+    </div>}
+    {!visible.length && <p role="status">Nessun conto corrisponde ai filtri. Puoi aggiungere conti alla watchlist dalla vista Tutti.</p>}
+    <section className="portfolio-totals" aria-label="Riepilogo conti filtrati"><article className="glass-card"><p className="eyebrow">Equity dei conti visualizzati</p><strong data-sign={valueSign(total)}>{money(total)}</strong><p>{group ? group.name : filter === "Watchlist" ? "Conti nella watchlist" : filter === "Tutti" ? "Include capitale reale e demo simulato" : `Solo conti di tipo ${filter.toLowerCase()} simulati`}</p></article><article className={`glass-card ${floating < 0 ? "negative-surface" : ""}`}><p className="eyebrow">Profitto / perdita aperta</p><strong data-sign={valueSign(floating)}>{money(floating)}</strong><p>Differenza tra equity e balance</p></article><article className="glass-card"><p className="eyebrow">Operazioni del mese</p><strong>{visible.reduce((sum, a) => sum + a.trades, 0)}</strong><p>Su {visible.length} strategie visualizzate</p></article></section>
+    <section className="portfolio-main"><article className="glass-card comparison-card"><div className="section-head"><div><p className="eyebrow">Confronto strategie</p><h2>Stesso punto di partenza.</h2></div><span className="portfolio-caption">Rendimento % · 1 mese</span></div><p className="portfolio-caption">Confronta i conti selezionati. Ogni curva parte da 0%.</p>
+      <div className="comparison-workspace">
+        <div className="comparison-plot">{compared.length ? <>
+          <PortfolioChart key={compared.map(account => account.id).join(",")} accounts={compared} point={point} onTrade={setTradeFocus} />
+          <label className="chart-slider" style={{ "--timeline-progress": `${point / 11 * 100}%` } as CSSProperties}>
+            <span className="chart-slider-caption"><span>Esplora il mese</span><output>{portfolioDate(point / 11)}</output></span>
+            <input type="range" aria-label="Esplora il mese" aria-valuetext={portfolioDate(point / 11)} min="0" max="11" step="1" value={point} onChange={event => setPoint(Number(event.target.value))} />
+          </label>
+        </> : <div className="comparison-empty">Seleziona almeno un conto per visualizzare il confronto.</div>}</div>
+        <div className="comparison-choices" aria-label="Strategie da confrontare">{visible.map(a => <label className="comparison-choice" key={`${a.id}:${valueSign(a.returns[point])}`} data-result={valueSign(a.returns[point])}>
+          <input type="checkbox" aria-label={a.name} checked={selected.includes(a.id)} onChange={() => toggle(a.id)} />
+          <span className="comparison-choice-copy"><span className="comparison-choice-name" style={{ color: a.color }}><i style={{ background: a.color }} />{a.name}</span><strong data-sign={valueSign(a.returns[point])}>{percent(a.returns[point])}</strong></span>
+        </label>)}</div>
+      </div>
+    </article><article className="glass-card allocation-card"><p className="eyebrow">Distribuzione capitale</p><h2>Il peso di ogni strategia.</h2><div className="allocation-bar" aria-label="Allocazione per equity">{visible.map(a => <span key={a.id} style={{ width: `${a.equity / total * 100}%`, background: a.color }} />)}</div>{visible.map(a => <div className="allocation-row" key={a.id}><span><i style={{ background: a.color }} />{a.name}</span><strong>{(a.equity / total * 100).toFixed(1)}%</strong></div>)}<p className="allocation-note">Il peso è calcolato sull’equity dei conti filtrati. Capitale demo e reale sono separabili con i filtri.</p><div className="connection-note"><ShieldCheck size={22} /><div><strong>MT5 · In preparazione</strong><p>Il collegamento in sola lettura sarà disponibile nella prossima fase. Non servono credenziali per esplorare la demo.</p></div></div></article></section>
+    <section className="account-grid" aria-label="Conti dimostrativi">{visible.map(a => <article className={`glass-card account-card ${a.returns[11] < 0 ? "negative-surface" : ""}`} key={a.id}><div className="section-head"><div className="account-identity"><span style={{ color: a.color }}>{a.name.split(" ").map(word => word[0]).join("")}</span><div><h2>{a.name}</h2><p>{a.strategy}</p></div></div><div className="account-watch"><span className="account-type">{a.type} simulato</span><button type="button" className="portfolio-export" aria-label={`Watchlist: ${a.name}`} aria-pressed={watch.favorites.includes(a.id)} onClick={() => toggleWatch(a.id)}><Star size={15} fill={watch.favorites.includes(a.id) ? "currentColor" : "none"} /></button></div></div><div className="account-equity"><strong data-sign={valueSign(a.equity)}>{money(a.equity)}</strong><span data-sign={valueSign(a.returns[11])}>{percent(a.returns[11])} nel mese</span></div><dl><div><dt>Drawdown massimo</dt><dd>{a.drawdown}%</dd></div><div><dt>Operazioni</dt><dd>{a.trades}</dd></div></dl><button className="text-action" aria-expanded={detail === a.id} onClick={() => setDetail(detail === a.id ? null : a.id)}>{detail === a.id ? "Chiudi dettagli" : "Dettagli del conto"}<ArrowUpRight size={15} /></button>{detail === a.id && <div className="account-details"><dl><div><dt>Balance</dt><dd data-sign={valueSign(a.balance)}>{money(a.balance)}</dd></div><div><dt>P&amp;L aperto</dt><dd data-sign={valueSign(a.equity - a.balance)}>{money(a.equity - a.balance)}</dd></div><div><dt>Piattaforma prevista</dt><dd>MetaTrader 5</dd></div></dl><p>Dati di esempio · Nessuna sincronizzazione attiva</p><div className="performance-actions">
+        <a className="portfolio-export" href={`./widget/?conto=${a.id}`} target="_blank" rel="noreferrer">Profilo demo pubblico</a>
+        <button type="button" className="portfolio-export" onClick={() => {
+          const address = new URL(`./widget/?conto=${a.id}`, window.location.href).href;
+          setEmbed(`<iframe src="${address}" title="BlueSpherix demo" width="400" height="360" loading="lazy"></iframe>`);
+        }}>Codice widget</button></div></div>}</article>)}</section>
+    {tradeFocus && <PortfolioTradeDialog event={tradeFocus} onChange={setTradeFocus} onClose={() => setTradeFocus(null)} />}
+  </div>;
+}

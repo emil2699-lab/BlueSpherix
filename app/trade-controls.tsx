@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
+import { DEMO_TRADES } from "./demo-data";
+const latestTradeDate = DEMO_TRADES[0].openedAt.slice(0, 10);
 
 export function FilterSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
   const [open, setOpen] = useState(false);
@@ -60,7 +62,7 @@ const dateFromIso = (value: string) => {
 export function DateFilterPicker({ label, value, min, max, onChange }: { label: string; value: string; min?: string; max?: string; onChange: (value: string) => void }) {
   const [open, setOpen] = useState(false);
   const [viewMonth, setViewMonth] = useState(() => {
-    const anchor = dateFromIso(value || max || dateToIso(new Date()));
+    const anchor = dateFromIso(value || latestTradeDate);
     return new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), 1));
   });
   const rootRef = useRef<HTMLDivElement>(null);
@@ -112,7 +114,7 @@ export function DateFilterPicker({ label, value, min, max, onChange }: { label: 
   };
   const toggleCalendar = () => {
     if (!open) {
-      const anchor = dateFromIso(value || max || dateToIso(new Date()));
+      const anchor = dateFromIso(value || latestTradeDate);
       setViewMonth(new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), 1)));
     }
     setOpen((current) => !current);

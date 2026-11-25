@@ -1,14 +1,6 @@
-export type PerformanceTrade = {
-  id: string;
-  symbol: string;
-  side: "Long" | "Short";
-  openedAt: string;
-  closedAt: string;
-  volume: number;
-  net: number;
-};
+import type { LedgerTrade } from "./demo-ledger";
 
-export function tradeSummary(trades: readonly PerformanceTrade[]) {
+export function tradeSummary(trades: readonly LedgerTrade[]) {
   let wins = 0;
   let losses = 0;
   let profit = 0;
@@ -17,19 +9,19 @@ export function tradeSummary(trades: readonly PerformanceTrade[]) {
   let volume = 0;
 
   for (const trade of trades) {
-    if (trade.net > 0) {
+    if (trade.netPnl > 0) {
       wins++;
-      profit += trade.net;
-    } else if (trade.net < 0) {
+      profit += trade.netPnl;
+    } else if (trade.netPnl < 0) {
       losses++;
-      loss -= trade.net;
+      loss -= trade.netPnl;
     }
     holding += Date.parse(trade.closedAt) - Date.parse(trade.openedAt);
     volume += trade.volume;
   }
 
   const count = trades.length;
-  const net = profit - loss;
+  const net = Math.round((profit - loss) * 100) / 100;
   return {
     count, wins, losses, flat: count - wins - losses, net, volume,
     winRate: count ? wins / count * 100 : null,
@@ -46,15 +38,14 @@ export function monthKeys(asOf: string, count: number) {
 }
 
 export function buildPerformanceReport(
-  ledger: readonly PerformanceTrade[],
+  ledger: readonly LedgerTrade[],
   asOf: string,
   filters: { symbol: string; side: string; month: string; from: string; to: string; tag?: string; start?: string },
   journal: Readonly<Record<string, { tags: readonly string[] }>> = {},
 ) {
   const keys = monthKeys(asOf, 12);
-  const end = Date.parse(asOf);
   const available = ledger.filter(trade =>
-    trade.closedAt >= keys.at(-1)! && Date.parse(trade.closedAt) <= end
+    trade.status === "Chiusa" && trade.closedAt >= keys.at(-1)! && trade.closedAt <= asOf
     && (!filters.start || trade.closedAt.slice(0, 10) >= filters.start));
   const tradeTags = new Map(available.map(trade => [trade.id, new Set(
     (journal[trade.id]?.tags ?? []).map(tag => tag.trim().toLocaleLowerCase("it")).filter(Boolean),

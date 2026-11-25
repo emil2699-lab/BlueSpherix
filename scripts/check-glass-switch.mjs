@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
-import { importTestAccount } from './mt5-test-fixture.mjs';
 import ts from 'typescript';
 const motionSource = ts.transpileModule(await fs.readFile(new URL('../app/glass-switch-motion.ts', import.meta.url), 'utf8'),
   { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText;
@@ -30,7 +29,6 @@ try {
   });
   const url=process.env.GLASS_SELECTION_URL||'http://127.0.0.1:3001/';
   await page.addInitScript(()=>localStorage.setItem('bluespherix-theme','light'));
-  await importTestAccount(page, url);
   await page.goto(`${url}#overview`);await page.locator('.content[data-ice-glass=ready]').waitFor();
   await page.clock.install();await page.clock.pauseAt(new Date(Date.now()+100));
   const advance=async ms=>{await page.clock.runFor(2);await page.clock.fastForward(ms);await page.clock.runFor(2);};
@@ -56,23 +54,48 @@ try {
   await page.locator('.welcome h1:visible').click({force:true});await advance(240);
   assert.equal(await destination.getAttribute('data-glass-selection'),'selected','exclusive switch keeps glass after outside click');
   assert.notEqual(await destination.getAttribute('data-glass-persistent'),null);
-  await page.clock.resume();
-  await page.emulateMedia({reducedMotion:'reduce'});
-  await page.setViewportSize({width:390,height:844});
-  await page.getByRole('button',{name:'3M',exact:true}).focus();
-  await page.keyboard.press('Space');
-  assert.equal(await page.getByRole('button',{name:'3M',exact:true}).getAttribute('aria-pressed'),'true');
+  await page.getByRole('button',{name:'Attiva modalità scura'}).click();await advance(700);
+  await page.evaluate(()=>{location.hash='risk';});await advance(800);
+  const toggle=page.locator('.protection-switch').first(),thumb=toggle.locator('.glass-switch-thumb');
+  assert.equal(await page.locator('.glass-switch-thumb').count(),4);
+  await toggle.click({force:true});await advance(10);
+  assert.equal(await toggle.getAttribute('aria-pressed'),'false');
+  const mid=await thumb.evaluate(el=>{const a=el.getAnimations()[0];if(!a)return null;a.pause();a.currentTime=145;const r=el.getBoundingClientRect();return {width:r.width,height:r.height};});
+  assert(mid&&mid.width>22,'on/off thumb stretches in its travel direction');
+  await advance(20);await page.screenshot({path:`${dir}/switch-stretched.png`});
+  await thumb.evaluate(el=>{for(const a of el.getAnimations())a.finish();});await advance(700);
+  assert(Math.abs((await thumb.boundingBox()).width-18)<.1);
+  await toggle.focus();await page.keyboard.press('Space');await advance(10);assert.equal(await toggle.getAttribute('aria-pressed'),'true');
+  assert(await thumb.evaluate(el=>el.getAnimations().length)>0,'keyboard starts the same motion');
+  await page.clock.resume();await page.emulateMedia({reducedMotion:'reduce'});
+  await page.waitForFunction(()=>matchMedia('(prefers-reduced-motion: reduce)').matches && document.querySelector('.protection-switch .glass-switch-thumb').getAnimations().length===0);
+  await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now()+100)));
+  await page.locator('.welcome h1:visible').click({force:true});await page.keyboard.press('Escape');await advance(20);
+  assert.equal(await page.locator('.protection-switch[data-glass-persistent]').count(),4,'independent on switches keep glass');
+  await page.setViewportSize({width:390,height:844});await page.evaluate(()=>{location.hash='lab';});await advance(800);
+  const sampleGroup=page.locator('.lab-controls .range-switch').first();
+  if(await sampleGroup.getAttribute('data-glass-multiple')!==null) {
+    const optionName=await sampleGroup.locator('button[aria-pressed="false"]').first().textContent();
+    const option=sampleGroup.getByRole('button',{name:optionName,exact:true});
+    await option.click({force:true});await advance(120);
+    assert.equal(await sampleGroup.locator('[data-glass-selection]').count(),1,'persistent selector transfers one glass surface');
+    await advance(600);await page.locator('.welcome h1:visible').click({force:true});await page.keyboard.press('Escape');await advance(20);
+    assert.equal(await option.getAttribute('data-glass-selection'),'selected','Lab active choices retain glass after outside and Escape');
+  }
+  const costs=page.locator('.lab-cost-toggle'),input=costs.locator('input'),costThumb=costs.locator('.glass-switch-thumb');
+  const before=await input.isChecked();await input.focus();await page.keyboard.press('Space');await advance(20);assert.equal(await input.isChecked(),!before);
+  assert.equal(await costThumb.evaluate(el=>el.getAnimations().length),0,'reduced motion is immediate');
+  await page.clock.resume();await page.emulateMedia({reducedMotion:'no-preference'});await page.waitForFunction(()=>!matchMedia('(prefers-reduced-motion: reduce)').matches);
+  await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now()+100)));await input.focus();await page.keyboard.press('Space');await advance(10);
+  assert(await costThumb.evaluate(el=>el.getAnimations().length)>0,'Lab keyboard switch has the same elastic animation');
+  await costThumb.evaluate(el=>{for(const a of el.getAnimations())a.finish();});await advance(800);
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
   assert.equal(await page.locator('canvas').count(),1);assert.deepEqual(errors,[]);
   await page.screenshot({path:`${dir}/mobile-switch.png`});
   const fallback=await browser.newPage({viewport:{width:1024,height:820},reducedMotion:'reduce'});
   await fallback.addInitScript(()=>{const get=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(t,...args){return t==='webgl2'?null:get.call(this,t,...args);};});
-  await importTestAccount(fallback, url);
-  await fallback.goto(`${url}#overview`);
-  const selector=fallback.getByRole('button',{name:'1Y',exact:true});
-  await selector.focus();await fallback.keyboard.press('Space');
-  assert.equal(await selector.getAttribute('aria-pressed'),'true');
-  assert.equal(await fallback.locator('.content').getAttribute('data-ice-glass'),'fallback');
-  const report={pass:true,errors,frameCount:frames.length,checks:'directional stretch, recoil, exact rest, stable labels, outside, keyboard, reduced motion, mobile, no WebGL, single canvas'};
+  await fallback.goto(`${url}#lab`);const f=fallback.locator('.lab-cost-toggle input');await f.focus();const checked=await f.isChecked();await fallback.keyboard.press('Space');assert.equal(await f.isChecked(),!checked);
+  assert.notEqual(await fallback.locator('.glass-switch-thumb').evaluate(el=>getComputedStyle(el).backgroundColor),'rgba(0, 0, 0, 0)');
+  const report={pass:true,errors,frameCount:frames.length,checks:'directional stretch, recoil, exact rest, stable labels, outside, on/off, keyboard, independent switches, reduced motion, mobile, no WebGL, single canvas'};
   await fs.writeFile(`${dir}/result.json`,JSON.stringify(report,null,2));console.log(JSON.stringify(report));
 } finally {await browser.close();}

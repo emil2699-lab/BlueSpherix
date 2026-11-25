@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
-import { importTestAccount } from './mt5-test-fixture.mjs';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const dir = process.env.GLASS_SELECTION_ARTIFACTS || '/tmp/bluespherix-glass-multiselect';
 await fs.mkdir(dir,{ recursive: true });
@@ -12,7 +11,21 @@ const selected = control => control.locator('xpath=self::*[@data-glass-selection
 const uncoated = async control => { await control.locator('xpath=self::*[not(@data-glass-selection)]').waitFor(); return true; };
 const nav = name => page.locator('nav').getByRole('button',{name,exact:true}).click();
 
-await importTestAccount(page, url);
+await page.goto(`${url}#risk`); await page.locator('.content[data-ice-glass=ready]').waitFor();
+const switches = page.locator('.protection-switch');
+assert.equal(await switches.count(),4);
+for (const control of await switches.all()) await selected(control);
+await switches.nth(0).click(); await switches.nth(1).click();
+assert(await uncoated(switches.nth(0))); assert(await uncoated(switches.nth(1)));
+await selected(switches.nth(2)); await selected(switches.nth(3));
+await switches.nth(0).click(); await switches.nth(1).click();
+await page.getByRole('heading',{name:'Rischio.',exact:true}).click(); await page.keyboard.press('Escape');
+for (const control of await switches.all()) await selected(control);
+assert.equal(await page.locator('.protection-switch[data-glass-persistent]').count(),4);
+await page.locator('.protection-list').screenshot({path:`${dir}/risk-multiple.png`});
+const divider = await page.locator('.exposure-share').first().evaluate(el=>getComputedStyle(el,'::before').content);
+assert.equal(divider,'""','wide exposure rows have a vertical divider');
+
 await nav('Diario'); await page.getByRole('heading',{name:'Diario di trading.'}).waitFor();
 const tags = page.locator('.diary-chips button'), checks = page.locator('.diary-checks label');
 for (const tag of await tags.all()) if (await tag.getAttribute('aria-pressed')==='true') await tag.click();
@@ -22,7 +35,7 @@ await page.locator('.diary-field textarea').first().click(); await page.keyboard
 for (const control of [tags.nth(0),tags.nth(1),checks.nth(0),checks.nth(1)]) await selected(control);
 const period = page.getByRole('button',{name:'90G',exact:true}); await period.click(); await selected(period);
 await page.getByRole('heading',{name:'Diario di trading.'}).click();
-await selected(period);
+assert(await uncoated(period),'exclusive selections still clear outside');
 await selected(tags.nth(0)); await selected(tags.nth(1));
 await tags.nth(0).click(); assert(await uncoated(tags.nth(0))); await selected(tags.nth(1));
 await checks.nth(0).click(); assert(await uncoated(checks.nth(0))); await selected(checks.nth(1));
@@ -35,13 +48,27 @@ await page.waitForTimeout(200);
 assert(await page.locator('.diary-chips button[data-glass-persistent]').evaluateAll(nodes=>nodes.every(el=>el.getAttribute('aria-pressed')==='true')));
 assert(await page.locator('.diary-checks label[data-glass-persistent]').evaluateAll(nodes=>nodes.every(el=>el.querySelector('input').checked)));
 
+await nav('Portafoglio');
+const accounts = page.locator('.comparison-choices label');
+for (const label of await accounts.all()) await selected(label);
+await accounts.first().click(); assert(await uncoated(accounts.first()));
+await selected(accounts.nth(1)); await selected(accounts.nth(2));
+await page.getByRole('heading',{name:'Portafoglio.',exact:true}).click(); await page.keyboard.press('Escape');
+await selected(accounts.nth(1)); await selected(accounts.nth(2));
+await page.getByRole('button',{name:'Reali',exact:true}).click();
+assert.equal(await accounts.count(),2);
+await page.getByRole('button',{name:'Tutti',exact:true}).click();
+assert.equal(await accounts.count(),3); assert(await uncoated(accounts.first()));
+await selected(accounts.nth(1)); await selected(accounts.nth(2));
 await page.setViewportSize({width:390,height:844});
-assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+await selected(accounts.nth(1)); assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+await page.locator('nav').getByRole('button',{name:'Rischio',exact:true}).evaluate(button=>button.click());
+await page.getByRole('heading',{name:'Rischio.',exact:true}).waitFor();
+assert.equal(await page.locator('.exposure-share').first().evaluate(el=>getComputedStyle(el,'::before').content),'none','vertical row dividers disappear on mobile');
 assert.equal(await page.locator('canvas').count(),1);
 
 const fallback = await browser.newPage({viewport:{width:1024,height:820},reducedMotion:'reduce'});
 await fallback.addInitScript(()=>{const get=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(type,...args){return type==='webgl2'?null:get.call(this,type,...args);};});
-await importTestAccount(fallback, url);
 await fallback.goto(`${url}#journal`);
 const f=fallback.locator('.diary-chips button').first();
 if(await f.getAttribute('aria-pressed')!=='true') await f.click();
@@ -50,5 +77,5 @@ await selected(f); assert.notEqual(await f.evaluate(el=>getComputedStyle(el).bac
 await f.click(); assert(await uncoated(f));
 await fallback.close();
 assert.deepEqual(errors,[]);
-await fs.writeFile(`${dir}/multiple.json`,JSON.stringify({pass:true,errors,checks:'independent toggles, tags, checklist, click outside, Escape, single selections, editor replacement, mobile, fallback, one canvas'},null,2));
+await fs.writeFile(`${dir}/multiple.json`,JSON.stringify({pass:true,errors,checks:'independent toggles, tags, checklist, click outside, Escape, single selections, editor replacement, portfolio filters, mobile, fallback, one canvas'},null,2));
 console.log(JSON.stringify({pass:true,errors})); await browser.close();

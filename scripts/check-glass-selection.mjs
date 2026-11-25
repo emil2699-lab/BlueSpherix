@@ -1,13 +1,10 @@
 // Run against a local static preview; optionally set PLAYWRIGHT_MODULE and CHROMIUM_PATH.
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || "playwright");
 import assert from 'node:assert/strict';import fs from 'node:fs/promises';
-import { importTestAccount } from './mt5-test-fixture.mjs';
 const dir=process.env.GLASS_SELECTION_ARTIFACTS || '/tmp/bluespherix-glass-selection';await fs.mkdir(dir,{recursive:true});
 const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH || '/usr/bin/chromium',args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const page=await browser.newPage({viewport:{width:1440,height:1000}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
-const base = process.env.GLASS_SELECTION_URL || 'http://127.0.0.1:3001/';
-await importTestAccount(page, base);
-await page.goto(`${base}#journal`);await page.locator('.content[data-ice-glass=ready]').waitFor();
+await page.goto(`${process.env.GLASS_SELECTION_URL || 'http://127.0.0.1:3001/'}#journal`);await page.locator('.content[data-ice-glass=ready]').waitFor();
 const settled=loc=>loc.locator('xpath=self::*[@data-glass-selection="selected"]').waitFor({timeout:5000});
 const cleared=()=>page.waitForFunction(()=>!document.querySelector('[data-glass-selection]:not([data-glass-persistent])'));
 const period=page.getByRole('button',{name:'90G',exact:true});await period.click();
@@ -51,8 +48,7 @@ await p.addInitScript(()=>{
   proto.getUniformLocation=function(pr,name){const l=get.call(this,pr,name);if(l)locations.set(l,name);return l;};
   proto.uniform4f=function(l,...values){if(locations.get(l)==='uCoating'&&values[1])window.glassFrames.push({time:performance.now(),values});return original.call(this,l,...values);};
 });
-await importTestAccount(p, base);
-await p.goto(`${base}#journal`);await p.locator('.content[data-ice-glass=ready]').waitFor();await p.waitForTimeout(1200);
+await p.goto(`${process.env.GLASS_SELECTION_URL || 'http://127.0.0.1:3001/'}#journal`);await p.locator('.content[data-ice-glass=ready]').waitFor();await p.waitForTimeout(1200);
 await p.clock.install();await p.clock.pauseAt(new Date(Date.now()+100));
 const period=p.locator('.diary-trade:not(.diary-loss)').first();const box=await period.boundingBox();
 await period.click({position:{x:box.width*.2,y:box.height*.25}});await p.clock.runFor(120);
@@ -67,7 +63,8 @@ const frames=await p.evaluate(()=>window.glassFrames);assert(frames.some(f=>f.va
 await p.getByRole('heading',{name:'Diario di trading.'}).click();await p.clock.runFor(300);
 const neg=p.locator('.diary-loss').first();await neg.click();await p.clock.runFor(2);await p.clock.fastForward(800);const negative=await neg.evaluate(el=>({tint:el.style.getPropertyValue('--glass-control-tint'),border:getComputedStyle(el).borderColor,shadow:getComputedStyle(el).boxShadow}));assert(negative.tint.split(' ').map(Number)[0]>negative.tint.split(' ').map(Number)[1]*1.5);assert.equal(negative.shadow,'none');await p.screenshot({path:`${dir}/04-red-glass.png`});
 const check=p.locator('.diary-checks label').first();await check.click();await p.clock.runFor(120);assert.equal(await check.getAttribute('data-glass-selection'),'entering');await p.clock.runFor(200);assert.equal(await check.getAttribute('data-glass-selection'),'lifting');await p.clock.fastForward(600);assert.equal(await check.getAttribute('data-glass-selection'),'selected');await check.click();await p.clock.runFor(300);assert.equal(await check.getAttribute('data-glass-selection'),null);
+await p.locator('nav').getByRole('button',{name:/^Lab/}).click();await p.clock.fastForward(1000);const lab=p.locator('.lab-experiments button').nth(1);await lab.click();await p.clock.runFor(2);await p.clock.fastForward(800);const violet=await lab.evaluate(el=>el.style.getPropertyValue('--glass-control-tint'));const rgb=violet.split(' ').map(Number);assert(rgb[2]>rgb[1]*1.4);await p.screenshot({path:`${dir}/05-violet-glass.png`});
 assert.equal(await p.locator('canvas').count(),1);assert.deepEqual(errors,[]);
-await fs.writeFile(`${dir}/phases.json`,JSON.stringify({state,negative,frames,errors},null,2));await p.close();
+await fs.writeFile(`${dir}/phases.json`,JSON.stringify({state,negative,violet,frames,errors},null,2));await p.close();
 
 }

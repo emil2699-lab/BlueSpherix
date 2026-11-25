@@ -3,31 +3,18 @@
 import { useMemo, useState } from "react";
 import type { Mt5Accounts } from "./mt5-accounts";
 import { Mt5Operations } from "./mt5-monitor";
-import { completedPositions, mt5AccountKey, mt5AccountKind, positionJournalId, type Mt5Snapshot } from "./mt5-snapshot";
+import { completedPositions, mt5AccountKey, mt5AccountKind, type Mt5Snapshot } from "./mt5-snapshot";
 import { valueSign } from "./value-sign";
-import { EdgeMap } from "./analytics";
-import MonthlyPerformance from "./monthly-performance";
-import { tradeSummary } from "./performance-report";
-import { portfolioWatch } from "./portfolio-watch";
-import { positionUnderlight } from "./glass-underlight";
-import { downloadReport } from "./report-download";
-import { RealizedPnl } from "./realized-pnl";
 
 const number = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 2 });
 const date = new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeStyle: "short", timeZone: "UTC" });
 const money = (value: number, currency: string) => `${number.format(value)} ${currency}`;
-const titles = {
+const titles: Record<string, { title: string; caption: string }> = {
   overview: { title: "Oggi.", caption: "Saldo, equity e posizioni dell’ultima rilevazione." },
   analytics: { title: "Analisi.", caption: "Risultati delle posizioni chiuse riconciliate dallo storico MT5." },
   positions: { title: "Operazioni.", caption: "Posizioni, ordini e movimenti letti dal terminale." },
   risk: { title: "Rischio.", caption: "Margine ed esposizione rilevati sul conto." },
 };
-
-type AccountView = keyof typeof titles;
-
-export function isMt5AccountView(view: string): view is AccountView {
-  return Object.hasOwn(titles, view);
-}
 
 function captureDate(account: Mt5Snapshot) {
   return `${date.format(new Date(account.capturedAt))} UTC`;
@@ -39,39 +26,12 @@ function Summary({ rows }: { rows: { label: string; value: string | number; sign
   </div>)}</dl>;
 }
 
-export function Mt5Portfolio({ mt5, goTo }: { mt5: Mt5Accounts; goTo: (view: string) => void }) {
-  const [filter, setFilter] = useState<"all" | "real" | "demo" | "watch">("all");
-  const [query, setQuery] = useState("");
-  const [groupId, setGroupId] = useState("");
-  const [groupName, setGroupName] = useState("");
-  const { value: watch, error } = portfolioWatch.useStore();
-  const storedKeys = new Set(mt5.accounts.map(mt5AccountKey));
-  const groups = watch.groups.filter(group => group.accounts.some(id => storedKeys.has(id)));
-  const group = groups.find(item => item.id === groupId);
+export function Mt5Portfolio({ mt5, goTo, onDemo }: { mt5: Mt5Accounts; goTo: (view: string) => void; onDemo: () => void }) {
+  const [filter, setFilter] = useState<"all" | "real" | "demo">("all");
   const accounts = mt5.accounts.filter(account => {
-    const id = mt5AccountKey(account);
-    const kindMatches = filter === "all" || (filter === "watch" ? watch.favorites.includes(id) : account.version === 2 && account.kind === filter);
-    return kindMatches && (!group || group.accounts.includes(id))
-      && `${account.account} ${account.currency}`.toLocaleLowerCase("it").includes(query.trim().toLocaleLowerCase("it"));
+    if (filter === "all") return true;
+    return account.version === 2 && account.kind === filter;
   });
-
-  function toggleWatch(id: string) {
-    portfolioWatch.save(current => ({
-      ...current,
-      favorites: current.favorites.includes(id) ? current.favorites.filter(item => item !== id) : [...current.favorites, id],
-    }));
-  }
-
-  function saveGroup() {
-    const name = groupName.trim();
-    if (!name || !accounts.length) return;
-    const id = crypto.randomUUID();
-    const members = accounts.map(mt5AccountKey);
-    if (portfolioWatch.save(current => ({ ...current, groups: [...current.groups, { id, name, accounts: members }] }))) {
-      setGroupId(id);
-      setGroupName("");
-    }
-  }
   const totals = new Map<string, { balance: number; equity: number; accounts: number }>();
   for (const account of accounts) {
     const group = totals.get(account.currency) ?? { balance: 0, equity: 0, accounts: 0 };
@@ -85,30 +45,11 @@ export function Mt5Portfolio({ mt5, goTo }: { mt5: Mt5Accounts; goTo: (view: str
       <button type="button" className="portfolio-export" onClick={() => goTo("mt5")}>Conti e sincronizzazione</button>
     </section>
     <div className="portfolio-toolbar">
-      <div className="range-switch" aria-label="Filtra conti MT5">{(["all", "real", "demo", "watch"] as const).map(kind => <button type="button" key={kind} className={filter === kind ? "active" : ""} aria-pressed={filter === kind} onClick={() => setFilter(kind)}>
-        {{ all: "Tutti", real: "Reali", demo: "Demo MT5", watch: "Watchlist" }[kind]}
+      <div className="range-switch" aria-label="Filtra conti MT5">{(["all", "real", "demo"] as const).map(kind => <button type="button" key={kind} className={filter === kind ? "active" : ""} aria-pressed={filter === kind} onClick={() => setFilter(kind)}>
+        {{ all: "Tutti", real: "Reali", demo: "Demo MT5" }[kind]}
       </button>)}</div>
-      <button type="button" className="portfolio-export" disabled={!accounts.length} onClick={() => downloadReport("Portafoglio MT5", "Conti visualizzati", [{
-        title: "Conti", columns: ["Conto", "Tipo", "Valuta", "Saldo", "Equity", "Rilevazione UTC"],
-        rows: accounts.map(account => [account.account, mt5AccountKind(account), account.currency, String(account.balance), String(account.equity), account.capturedAt]),
-      }], "csv", "bluespherix-portafoglio-mt5")}>Esporta CSV</button>
-      <button type="button" className="portfolio-export" onClick={() => goTo("public-trades")}>Storico pubblico</button>
+      <button type="button" className="portfolio-export" onClick={onDemo}>Portafoglio demo</button>
     </div>
-    {mt5.accounts.length > 0 && <section className="glass-card portfolio-groups" aria-label="Gruppi di conti">
-      <div className="market-fields"><label>Cerca conti<input type="search" value={query} onChange={event => setQuery(event.target.value)} /></label></div>
-      <form className="market-fields" onSubmit={event => { event.preventDefault(); saveGroup(); }}>
-        <label>Gruppo di conti<select value={group?.id ?? ""} onChange={event => {
-          setGroupId(event.target.value);
-          setFilter("all");
-        }}><option value="">Tutti i gruppi</option>{groups.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-        <label>Nome del nuovo gruppo<input value={groupName} maxLength={50} onChange={event => setGroupName(event.target.value)} /></label>
-        <button type="submit" className="portfolio-export" disabled={!accounts.length || !groupName.trim()}>Salva i conti visualizzati</button>
-        {group && <button type="button" className="portfolio-export" onClick={() => {
-          if (portfolioWatch.save(current => ({ ...current, groups: current.groups.filter(item => item.id !== group.id) }))) setGroupId("");
-        }}>Elimina gruppo</button>}
-      </form>
-      {error && <p role="alert">{error}</p>}
-    </section>}
     {accounts.length ? <>
       <section className="glass-card performance-report" aria-label="Totali per valuta">
         <div className="section-head"><h2>Totali per valuta</h2></div>
@@ -129,15 +70,12 @@ export function Mt5Portfolio({ mt5, goTo }: { mt5: Mt5Accounts; goTo: (view: str
               <div><dt>Posizioni aperte</dt><dd>{account.positions.length}</dd></div>
               <div><dt>Aggiornamento</dt><dd>{mt5.sync.state === "live" && mt5.sync.account === id ? "Sincronizzazione attiva" : "Ultimo snapshot"}</dd></div>
             </dl>
-            <div className="account-watch">
-              <button type="button" className="text-action" onClick={() => { mt5.select(id); goTo("overview"); }}>{active ? "Apri riepilogo" : "Usa questo conto"}</button>
-              <button type="button" className="portfolio-export" aria-pressed={watch.favorites.includes(id)} onClick={() => toggleWatch(id)}>Watchlist</button>
-            </div>
+            <button type="button" className="text-action" onClick={() => { mt5.select(id); goTo("overview"); }}>{active ? "Apri riepilogo" : "Usa questo conto"}</button>
           </article>;
         })}
       </section>
     </> : <section className="glass-card performance-report">
-      <p role="status">{mt5.ready ? mt5.accounts.length ? "Nessun conto MT5 corrisponde al filtro." : "Nessun conto MT5 collegato." : "Caricamento conti…"}</p>
+      <p role="status">{mt5.ready ? "Nessun conto MT5 corrisponde al filtro." : "Caricamento conti…"}</p>
       {mt5.ready && <button type="button" className="text-action" onClick={() => goTo("mt5")}>Collega o importa un conto</button>}
     </section>}
   </div>;
@@ -145,66 +83,44 @@ export function Mt5Portfolio({ mt5, goTo }: { mt5: Mt5Accounts; goTo: (view: str
 
 function Mt5Analytics({ snapshot }: { snapshot: Mt5Snapshot }) {
   const [days, setDays] = useState(30);
-  const completed = useMemo(() => completedPositions(snapshot).map(trade => ({
-    ...trade, id: positionJournalId(snapshot, trade.id),
-  })), [snapshot]);
+  const completed = useMemo(() => completedPositions(snapshot), [snapshot]);
   const end = Date.parse(snapshot.capturedAt);
   const requestedStart = end - days * 86400000;
   const start = Math.max(requestedStart, Date.parse(snapshot.historyFrom));
-  const closed = useMemo(() => completed.filter(position => Date.parse(position.closedAt) >= start), [completed, start]);
-  const summary = tradeSummary(closed);
-  return <>
-    <section className="glass-card performance-report">
-      <div className="section-head"><h2>Posizioni chiuse</h2><div className="range-switch" aria-label="Periodo MT5">
-        {[7, 30, 90].map(period => <button type="button" key={period} className={days === period ? "active" : ""} aria-pressed={days === period} onClick={() => setDays(period)}>{period}G</button>)}
-      </div></div>
-      <p className="portfolio-caption">Copertura dal {date.format(new Date(start))} UTC al {captureDate(snapshot)}{start > requestedStart ? " · storico parziale" : ""}.</p>
-      <Summary rows={[
-        { label: "Posizioni riconciliate", value: summary.count },
-        { label: "Netto realizzato", value: summary.count ? money(summary.net, snapshot.currency) : "—", sign: summary.count ? summary.net : undefined },
-        { label: "Win rate", value: summary.winRate === null ? "—" : `${number.format(summary.winRate)}%` },
-        { label: "Profit factor", value: summary.factor === null ? "—" : number.format(summary.factor) },
-      ]} />
-    </section>
-    <EdgeMap trades={closed} currency={snapshot.currency} />
-    <MonthlyPerformance account={snapshot.account} currencyCode={snapshot.currency} asOf={snapshot.capturedAt} trades={completed} start={snapshot.historyFrom.slice(0, 10)} />
-  </>;
+  const closed = completed.filter(position => Date.parse(position.closedAt) >= start);
+  const wins = closed.filter(position => position.net > 0);
+  const gross = wins.reduce((sum, position) => sum + position.net, 0);
+  const losses = closed.reduce((sum, position) => sum + Math.min(0, position.net), 0);
+  return <section className="glass-card performance-report">
+    <div className="section-head"><h2>Posizioni chiuse</h2><div className="range-switch" aria-label="Periodo MT5">
+      {[7, 30, 90].map(period => <button type="button" key={period} className={days === period ? "active" : ""} aria-pressed={days === period} onClick={() => setDays(period)}>{period}G</button>)}
+    </div></div>
+    <p className="portfolio-caption">Copertura dal {date.format(new Date(start))} UTC al {captureDate(snapshot)}{start > requestedStart ? " · storico parziale" : ""}.</p>
+    <Summary rows={[
+      { label: "Posizioni riconciliate", value: closed.length },
+      { label: "Netto realizzato", value: closed.length ? money(gross + losses, snapshot.currency) : "—", sign: closed.length ? gross + losses : undefined },
+      { label: "Win rate", value: closed.length ? `${number.format(wins.length / closed.length * 100)}%` : "—" },
+      { label: "Profit factor", value: losses < 0 ? number.format(gross / -losses) : "—" },
+    ]} />
+    <p className="portfolio-caption">Il calcolo include le posizioni di cui lo snapshot contiene l’intero ciclo. Tutte le esecuzioni sono consultabili in Operazioni.</p>
+  </section>;
 }
 
-function Mt5Overview({ snapshot }: { snapshot: Mt5Snapshot }) {
-  const closed = useMemo(() => completedPositions(snapshot), [snapshot]);
-  return <>
-    <RealizedPnl closed={closed} capturedAt={snapshot.capturedAt} historyFrom={snapshot.historyFrom} currency={snapshot.currency} />
-    {snapshot.positions.length > 0 && <section className="glass-card performance-report positions-card">
-      <div className="section-head"><h2>Posizioni aperte</h2></div>
-      <div className="position-table mt5-positions"><div className="table-row table-header" aria-hidden="true"><span>Strumento</span><span>Direzione</span><span>Volume</span><span>P&amp;L</span></div>{snapshot.positions.slice(0, 20).map(position => <button type="button" className={`table-row${position.profit < 0 ? " negative-row" : ""}`} key={position.id} data-glass-underlight={positionUnderlight(position.profit, snapshot.balance)}>
-        <span data-glass-label>{position.symbol}</span><span data-glass-label>{position.side === "buy" ? "Long" : "Short"}</span><span data-glass-label>{number.format(position.volume)} lotti</span><strong data-glass-label className={position.profit < 0 ? "down" : "up"} data-sign={valueSign(position.profit)}>{money(position.profit, snapshot.currency)}</strong>
-      </button>)}</div>
-      {snapshot.positions.length > 20 && <p className="portfolio-caption">Prime 20 posizioni. L’elenco è in Operazioni.</p>}
-    </section>}
-  </>;
-}
-
-export function Mt5AccountView({ view, mt5, goTo }: { view: AccountView; mt5: Mt5Accounts; goTo: (view: string) => void }) {
+export function Mt5AccountView({ view, mt5, goTo }: { view: string; mt5: Mt5Accounts; goTo: (view: string) => void }) {
   const account = mt5.active;
-  const page = titles[view];
-  if (!account) return <div className="market-tools-view">
-    <section className="welcome"><div><p className="date-line">MetaTrader 5</p><h1>{page.title}</h1><p>{page.caption}</p></div></section>
-    <section className="glass-card performance-report">
-      <p role="status">{mt5.ready ? "Nessun conto MT5 collegato." : "Caricamento conti…"}</p>
-      {mt5.ready && <button type="button" className="portfolio-export" onClick={() => goTo("mt5")}>Collega o importa un conto</button>}
-    </section>
-  </div>;
+  if (!account) return null;
   const id = mt5AccountKey(account);
+  const page = titles[view];
   const synced = mt5.sync.state === "live" && mt5.sync.account === id;
   const floating = account.equity - account.balance;
   return <div id={view === "overview" ? "overview" : undefined} className="market-tools-view">
-    <section className={view === "overview" ? "welcome today-welcome" : "welcome"}><div><p className="date-line">MetaTrader 5 · {mt5AccountKind(account)}</p><h1>{page.title}</h1><p>{page.caption}</p></div>
+    <section className="welcome"><div><p className="date-line">MetaTrader 5 · {mt5AccountKind(account)}</p><h1>{page.title}</h1><p>{page.caption}</p></div>
       <button type="button" className="portfolio-export" onClick={() => goTo("mt5")}>Conti e sincronizzazione</button>
     </section>
     <section className="glass-card performance-report" aria-label="Conto attivo">
       <div className="market-fields">
         <label>Conto attivo<select value={id} onChange={event => mt5.select(event.target.value)}>
+          <option value="">Workspace demo</option>
           {mt5.accounts.map(item => <option key={mt5AccountKey(item)} value={mt5AccountKey(item)}>{item.account} · {item.currency}</option>)}
         </select></label>
       </div>
@@ -227,6 +143,6 @@ export function Mt5AccountView({ view, mt5, goTo }: { view: AccountView; mt5: Mt
     </section>
     {view === "analytics" && <Mt5Analytics key={id} snapshot={account} />}
     {view === "positions" && <Mt5Operations key={id} snapshot={account} />}
-    {view === "overview" && <><Mt5Overview key={id} snapshot={account} /><button type="button" className="text-action" onClick={() => goTo("positions")}>Vedi posizioni e movimenti MT5</button></>}
+    {view === "overview" && <button type="button" className="text-action" onClick={() => goTo("positions")}>Vedi posizioni e movimenti MT5</button>}
   </div>;
 }

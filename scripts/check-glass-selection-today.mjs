@@ -1,7 +1,6 @@
 // Oggi keeps its compact layout while sharing the same selection material.
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
-import { importTestAccount } from './mt5-test-fixture.mjs';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const dir = process.env.GLASS_SELECTION_ARTIFACTS || '/tmp/bluespherix-glass-selection-today';
 await fs.mkdir(dir, { recursive: true });
@@ -9,10 +8,8 @@ const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PAT
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 const errors = []; page.on('pageerror', e => errors.push(e.message));
 const selected = loc => loc.locator('xpath=self::*[@data-glass-selection="selected"]').waitFor();
-const cleared = () => page.waitForFunction(() => !document.querySelector('[data-glass-selection]:not([data-glass-persistent])'));
-const base = process.env.GLASS_SELECTION_URL || 'http://127.0.0.1:3001/';
-await importTestAccount(page, base);
-await page.goto(`${base}#overview`);
+const cleared = () => page.waitForFunction(() => !document.querySelector('[data-glass-selection]'));
+await page.goto(`${process.env.GLASS_SELECTION_URL || 'http://127.0.0.1:3001/'}#overview`);
 await page.locator('.content[data-ice-glass=ready]').waitFor();
 const period = page.getByRole('button', { name: '3M', exact: true });
 await period.click(); await selected(period);

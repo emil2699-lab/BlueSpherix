@@ -2,9 +2,9 @@ import { downloadFile } from "./download-file";
 
 export type ReportTable = { title: string; columns: string[]; rows: string[][] };
 
-export function downloadReport(title: string, context: string, tables: ReportTable[], format: "csv" | "html", filename = "bluespherix-performance") {
+export function downloadReport(title: string, context: string, tables: ReportTable[], format: "csv" | "html") {
   const file = format === "csv" ? csv(context, tables) : html(title, context, tables);
-  downloadFile(file, format === "csv" ? "text/csv;charset=utf-8" : "text/html;charset=utf-8", `${filename}.${format}`);
+  downloadFile(file, format === "csv" ? "text/csv;charset=utf-8" : "text/html;charset=utf-8", `bluespherix-performance-demo.${format}`);
 }
 
 function csv(context: string, tables: ReportTable[]) {

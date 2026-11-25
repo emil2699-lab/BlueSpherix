@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
-import { importTestAccount } from "./mt5-test-fixture.mjs";
 
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || "playwright");
 const url = process.env.GLASS_GLOBAL_URL || "http://127.0.0.1:3000/";
@@ -44,7 +43,6 @@ try {
     };
   });
   await page.addInitScript(() => localStorage.setItem("bluespherix-theme", "light"));
-  await importTestAccount(page, url);
   await page.goto(`${url}#overview`);
   await page.locator(".content[data-ice-glass=ready]").waitFor();
 
@@ -99,6 +97,21 @@ try {
   await page.waitForFunction(() => window.globalGlassFrames.some(frame => frame.projection > 1.015));
   assert(await page.evaluate(() => window.globalGlassFrames.some(frame => frame.projection > 1.015)),
     "a nested selected control follows its host card label plane");
+
+  await page.evaluate(() => { location.hash = "analytics"; });
+  await page.waitForTimeout(850);
+  const dataCard = page.locator(".instruments-card");
+  const dataLabel = dataCard.locator(".instrument-row").first().locator(":scope > div").first();
+  const dataTrack = dataCard.locator(".instrument-track").first();
+  await dataCard.scrollIntoViewIfNeeded();
+  const trackBefore = await dataTrack.boundingBox();
+  await dataCard.hover();
+  await page.waitForFunction(element => Number.parseFloat(getComputedStyle(element).scale) > 1.015,
+    await dataLabel.elementHandle(), { timeout: 6000 });
+  const trackAfter = await dataTrack.boundingBox();
+  assert(Math.abs(trackAfter.x-trackBefore.x) < .5 && Math.abs(trackAfter.y-trackBefore.y) < .5
+    && Math.abs(trackAfter.width-trackBefore.width) < .5 && Math.abs(trackAfter.height-trackBefore.height) < .5,
+  "data bars remain fixed on the dashboard plane while their labels lift");
 
   assert.equal(await page.locator(".ice-glass-canvas").count(), 1, "all views share one WebGL canvas");
   assert.deepEqual(errors, []);
