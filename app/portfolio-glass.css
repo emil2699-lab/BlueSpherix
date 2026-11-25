@@ -1,0 +1,151 @@
+html[data-theme="dark"] .portfolio-view {
+  --portfolio-glass-reflection: 155 201 222;
+  --portfolio-glass-bevel:
+    inset 0 1px 0 rgb(211 235 249 / .23),
+    inset 1px 0 0 rgb(140 188 213 / .13),
+    inset -1px -1px 0 rgb(140 188 213 / .13),
+    inset 0 -5px 9px -7px rgb(158 215 236 / .30);
+  --portfolio-glass-control:
+    linear-gradient(105deg, rgb(var(--portfolio-glass-reflection) / .12), transparent 54%),
+    linear-gradient(180deg, rgb(59 76 92 / .54), rgb(21 31 43 / .72) 70%, rgb(38 57 72 / .60));
+}
+
+html[data-theme="dark"] .content .portfolio-view :is(.glass-card, .demo-notice) {
+  background:
+    radial-gradient(ellipse 75% 55px at 18% 0%, rgb(var(--portfolio-glass-reflection) / .14), transparent 90%),
+    radial-gradient(ellipse 62% 32px at 76% 100%, rgb(var(--portfolio-glass-reflection) / .08), transparent 90%),
+    linear-gradient(158deg, rgb(34 48 63 / .62), rgb(14 22 33 / .82) 48%, rgb(20 32 45 / .74));
+  box-shadow: var(--portfolio-glass-bevel), 0 14px 34px -18px rgb(0 0 0 / .72);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html[data-theme="dark"] .portfolio-view .negative-surface {
+  --portfolio-glass-reflection: 207 125 145;
+}
+
+html[data-theme="dark"] .content .portfolio-view .portfolio-trade-sheet {
+  background-color: rgb(19 28 41 / .70);
+  backdrop-filter: blur(18px) saturate(120%);
+  -webkit-backdrop-filter: blur(18px) saturate(120%);
+}
+
+html[data-theme="dark"] .portfolio-view :is(
+  .range-switch, .portfolio-export, .comparison-choice, .account-type,
+  .comparison-scale-controls button:enabled, .portfolio-dialog-close,
+  .market-fields input, .portfolio-group-trigger
+) {
+  background: var(--portfolio-glass-control);
+  box-shadow: var(--portfolio-glass-bevel);
+}
+
+html[data-theme="dark"] .portfolio-view .portfolio-toolbar .range-switch button {
+  color: #a6b5c3;
+}
+
+html[data-theme="dark"] .portfolio-view .range-switch button[aria-pressed="true"],
+html[data-theme="dark"] .portfolio-view .portfolio-export[aria-pressed="true"] {
+  color: #e4f5f9;
+  background: linear-gradient(165deg, rgb(121 170 185 / .27), rgb(62 100 118 / .40) 65%, rgb(101 152 162 / .22));
+  box-shadow: var(--portfolio-glass-bevel);
+}
+
+html[data-theme="dark"] .portfolio-view .comparison-choice:has(:checked) {
+  background: var(--portfolio-glass-control);
+}
+
+html[data-theme="dark"] .portfolio-view .comparison-choice[data-result="positive"]:has(:checked) {
+  --portfolio-glass-reflection: 112 206 191;
+}
+
+html[data-theme="dark"] .portfolio-view .comparison-choice[data-result="negative"]:has(:checked) {
+  --portfolio-glass-reflection: 207 125 145;
+}
+
+html[data-theme="dark"] .portfolio-view .portfolio-groups:has(.portfolio-group-picker[data-open="true"]) {
+  z-index: 3;
+}
+
+html[data-theme="dark"] .portfolio-view .portfolio-group-picker {
+  position: relative;
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+html[data-theme="dark"] .portfolio-view .portfolio-group-trigger,
+html[data-theme="dark"] .portfolio-view .portfolio-group-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+html[data-theme="dark"] .portfolio-view :is(.portfolio-group-trigger, .portfolio-group-menu button) span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html[data-theme="dark"] .portfolio-view :is(.portfolio-group-trigger, .portfolio-group-menu button) svg {
+  flex: none;
+  color: #bbd8e7;
+}
+
+html[data-theme="dark"] .portfolio-view .portfolio-group-trigger[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+html[data-theme="dark"] .portfolio-view .portfolio-group-menu {
+  position: absolute;
+  z-index: 4;
+  inset: calc(100% + 6px) 0 auto;
+  max-height: min(225px, 42dvh);
+  padding: 5px;
+  overflow: auto;
+  scrollbar-width: thin;
+  border-radius: 14px;
+  background:
+    radial-gradient(ellipse at 20% 0%, rgb(177 222 245 / .21), transparent 74%),
+    linear-gradient(152deg, rgb(48 63 79 / .87), rgb(22 33 46 / .89) 85%),
+    rgb(26 38 50 / .42);
+  box-shadow: var(--portfolio-glass-bevel), 0 12px 30px rgb(0 0 0 / .44);
+  backdrop-filter: blur(17px) saturate(125%);
+  -webkit-backdrop-filter: blur(17px) saturate(125%);
+}
+
+html[data-theme="dark"] .portfolio-view .portfolio-group-menu button {
+  background: transparent;
+}
+
+html[data-theme="dark"] .portfolio-view .portfolio-group-menu button[aria-selected="true"] {
+  background: linear-gradient(158deg, rgb(146 191 214 / .20), rgb(88 126 148 / .23));
+  box-shadow: var(--portfolio-glass-bevel);
+}
+
+html[data-theme="dark"] .portfolio-view .portfolio-group-menu button:hover {
+  background-color: rgb(164 210 233 / .14);
+}
+
+html[data-theme="dark"] .portfolio-view .portfolio-group-menu button:focus-visible {
+  outline-offset: -2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  html[data-theme="dark"] .content .portfolio-view :is(.glass-card, .demo-notice):hover {
+    box-shadow: var(--portfolio-glass-bevel), inset 0 8px 15px -15px rgb(var(--portfolio-glass-reflection) / .64),
+      0 16px 36px -17px rgb(0 0 0 / .70);
+  }
+}

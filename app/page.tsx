@@ -27,7 +27,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import Portfolio from "./portfolio";
 import Analytics from "./analytics";
 import Operations from "./operations";
@@ -58,6 +58,11 @@ const navItems = [
   { label: "Lab", icon: FlaskConical, target: "lab" },
 ];
 const fullViews = new Set([...navItems.map(item => item.target).filter(target => target !== "overview"), "journal", "calendar", "tools", "markets", "mt5"]);
+
+function subscribeToTheme(listener: () => void) {
+  window.addEventListener("bluespherix:theme", listener);
+  return () => window.removeEventListener("bluespherix:theme", listener);
+}
 
 const money = (value: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(value);
 const signedMoney = (value: number) => `${value > 0 ? "+" : ""}${money(value)}`;
@@ -157,6 +162,11 @@ function MetricCard({ label, value, detail, values, tone = "aqua", signValue, ic
 
 export default function Home() {
   const [view, setView] = useState("overview");
+  const portfolioGlass = useSyncExternalStore(
+    subscribeToTheme,
+    () => view === "portfolio" && document.documentElement.dataset.theme === "dark",
+    () => false,
+  );
   const contentRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const applyHash = (behavior: ScrollBehavior) => {
@@ -236,8 +246,8 @@ export default function Home() {
         </header>
 
         <div className="content" ref={contentRef}>
-          <IceGlass rootRef={contentRef} />
-          {view === "portfolio" && <Portfolio />}
+          {!portfolioGlass && <IceGlass rootRef={contentRef} />}
+          {view === "portfolio" && <Portfolio darkGlass={portfolioGlass} />}
           {view === "analytics" && <Analytics />}
           {view === "positions" && <Operations />}
           {view === "risk" && <Risk />}
