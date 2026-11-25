@@ -6,7 +6,6 @@ import { DEMO_ACCOUNTS } from "./demo-data";
 import { portfolioWatch } from "./portfolio-watch";
 import { valueSign } from "./value-sign";
 import PortfolioChart from "./portfolio-chart";
-import PortfolioGroupPicker from "./portfolio-group-picker";
 import PortfolioTradeDialog from "./portfolio-trade-dialog";
 import { portfolioDate, type PortfolioTrade } from "./portfolio-trades";
 
@@ -14,7 +13,7 @@ const accounts = DEMO_ACCOUNTS;
 const money = (value: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "USD" }).format(value);
 const percent = (value: number) => `${value > 0 ? "+" : ""}${value.toLocaleString("it-IT", { maximumFractionDigits: 2 })}%`;
 
-export default function Portfolio({ darkGlass }: { darkGlass: boolean }) {
+export default function Portfolio() {
   const [filter, setFilter] = useState("Tutti");
   const [selected, setSelected] = useState(accounts.map(account => account.id));
   const [detail, setDetail] = useState<string | null>(null);
@@ -34,12 +33,6 @@ export default function Portfolio({ darkGlass }: { darkGlass: boolean }) {
   const total = visible.reduce((sum, account) => sum + account.equity, 0);
   const floating = visible.reduce((sum, account) => sum + account.equity - account.balance, 0);
   const toggle = (id: string) => setSelected(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
-  const selectGroup = (id: string) => {
-    setGroupId(id);
-    setFilter("Tutti");
-    const next = watch.groups.find(item => item.id === id);
-    setSelected(next?.accounts ?? accounts.map(account => account.id));
-  };
   const toggleWatch = (id: string) => portfolioWatch.save(current => ({
     ...current,
     favorites: current.favorites.includes(id) ? current.favorites.filter(item => item !== id) : [...current.favorites, id],
@@ -70,11 +63,12 @@ export default function Portfolio({ darkGlass }: { darkGlass: boolean }) {
     <section className="glass-card portfolio-groups" aria-label="Gruppi di conti">
       <div className="market-fields"><label>Cerca conti demo<input type="search" value={query} onChange={event => setQuery(event.target.value)} /></label></div>
       <form className="market-fields" onSubmit={event => { event.preventDefault(); saveGroup(); }}>
-        {darkGlass
-          ? <PortfolioGroupPicker value={group?.id ?? ""} groups={watch.groups} onChange={selectGroup} />
-          : <label>Gruppo di conti<select value={group?.id ?? ""} onChange={event => selectGroup(event.target.value)}>
-            <option value="">Tutti i gruppi</option>{watch.groups.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </select></label>}
+        <label>Gruppo di conti<select value={group?.id ?? ""} onChange={event => {
+          setGroupId(event.target.value);
+          setFilter("Tutti");
+          const next = watch.groups.find(item => item.id === event.target.value);
+          setSelected(next?.accounts ?? accounts.map(account => account.id));
+        }}><option value="">Tutti i gruppi</option>{watch.groups.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
         <label>Nome del nuovo gruppo<input value={groupName} maxLength={50} onChange={event => setGroupName(event.target.value)} /></label>
         <button type="submit" className="portfolio-export" disabled={!compared.length || !groupName.trim()}>Salva i conti confrontati</button>
         {group && <button type="button" className="portfolio-export" onClick={() => {
