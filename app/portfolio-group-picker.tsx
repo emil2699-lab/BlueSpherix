@@ -73,7 +73,7 @@ export default function PortfolioGroupPicker({ value, groups, onChange }: {
     </button>
     {open && <div className="portfolio-group-menu" ref={menu} id={`${id}-list`} role="listbox" aria-labelledby={`${id}-label`} onKeyDown={moveFocus}>
       {options.map(option => <button key={option.id} type="button" role="option" tabIndex={-1} aria-selected={value === option.id} onClick={() => {
-        onChange(option.id);
+        if (option.id !== value) onChange(option.id);
         close();
       }}><span>{option.name}</span>{value === option.id && <Check size={15} aria-hidden="true" />}</button>)}
     </div>}
