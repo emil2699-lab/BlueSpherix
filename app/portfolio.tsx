@@ -13,7 +13,7 @@ const accounts = DEMO_ACCOUNTS;
 const money = (value: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "USD" }).format(value);
 const percent = (value: number) => `${value > 0 ? "+" : ""}${value.toLocaleString("it-IT", { maximumFractionDigits: 2 })}%`;
 
-export default function Portfolio() {
+export default function Portfolio({ onMt5 }: { onMt5: () => void }) {
   const [filter, setFilter] = useState("Tutti");
   const [selected, setSelected] = useState(accounts.map(account => account.id));
   const [detail, setDetail] = useState<string | null>(null);
@@ -58,7 +58,7 @@ export default function Portfolio() {
 
   return <div className="portfolio-view">
     <section className="welcome"><div><p className="date-line">Il tuo capitale, una visione unica</p><h1>Portafoglio.</h1><p>Confronta le strategie. Capisci dove nasce il rendimento.</p></div><button className="portfolio-export" onClick={download}><Download size={15} /> Esporta CSV</button></section>
-    <div className="demo-notice"><ShieldCheck size={16} /><span><strong>Ambiente dimostrativo.</strong> Tutti i conti e i risultati sono simulati. Nessun conto MT5 è collegato.</span></div>
+    <div className="demo-notice"><ShieldCheck size={16} /><span><strong>Ambiente dimostrativo.</strong> Tutti i conti e i risultati sono simulati. Puoi aprire i conti MT5 in una vista dedicata.</span><button type="button" className="portfolio-export" onClick={onMt5}>Conti collegati</button></div>
     <div className="portfolio-toolbar"><div className="range-switch" aria-label="Filtra conti">{["Tutti", "Reale", "Demo", "Watchlist"].map(item => <button key={item} aria-pressed={filter === item} className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>{item === "Reale" ? "Reali" : item}</button>)}</div><span>{visible.length} conti · Valuta USD · Ottobre 2026</span></div>
     <section className="glass-card portfolio-groups" aria-label="Gruppi di conti">
       <div className="market-fields"><label>Cerca conti demo<input type="search" value={query} onChange={event => setQuery(event.target.value)} /></label></div>

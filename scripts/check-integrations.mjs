@@ -52,3 +52,19 @@ assert.equal(completed.magic, "123");
 assert.ok(Math.abs(completed.pips - 20) < 1e-10);
 assert.equal(completedPositions({ ...snapshot, deals: [...snapshot.deals, { ...deal, id: "3", entry: "out" }] }).length, 0);
 process.stdout.write("✓ Import Strategy Tester, feed mercato, cambi e sessioni, calendario ICS, storico MT5\n");
+
+const modern = {
+  ...snapshot, version: 2, accountId: "a".repeat(64), kind: "real", margin: 100, freeMargin: 9916,
+  orders: [{ id: "7", symbol: "EURUSD", type: "Buy Stop", magic: "123", time: then, volume: 0.5, price: 1.095 }],
+};
+assert.equal(readMt5Snapshot(JSON.stringify(modern)).orders[0].id, "7");
+assert.throws(() => readMt5Snapshot(JSON.stringify({ ...modern, kind: "premium" })), /Dati del conto/);
+assert.throws(() => readMt5Snapshot(JSON.stringify({ ...modern, orders: [...modern.orders, ...modern.orders] })), /Ordine MT5/);
+const fill = { ...snapshot.deals[1], volume: .25, profit: 9 };
+const partial = { ...modern, deals: [snapshot.deals[0], fill, { ...fill, id: "3", price: 1.094 }] };
+const partialResult = completedPositions(partial)[0];
+assert.equal(partialResult.net, 15);
+assert.ok(Math.abs(partialResult.pips - 30) < 1e-10);
+assert.equal(completedPositions({ ...partial, deals: partial.deals.slice(0, 2) }).length, 0);
+assert.equal(completedPositions({ ...partial, deals: [...partial.deals, { ...fill, id: "4", entry: "other" }] }).length, 0);
+process.stdout.write("✓ Snapshot MT5 v2, ordini e riconciliazione delle uscite parziali\n");

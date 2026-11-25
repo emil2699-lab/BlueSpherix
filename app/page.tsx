@@ -38,6 +38,9 @@ import Calendar from "./calendar";
 import MarketTools from "./market-tools";
 import MarketDashboard from "./market-dashboard";
 import Mt5Monitor from "./mt5-monitor";
+import { Mt5AccountView, Mt5Portfolio } from "./mt5-dashboard";
+import { useMt5Accounts } from "./mt5-accounts";
+import { mt5AccountKey, mt5AccountKind } from "./mt5-snapshot";
 import { ALPHA_ACCOUNT, BEST_RECENT_TRADE, BEST_SESSION_30D, DASHBOARD_RANGE_STATS, DEMO_BALANCE_SERIES, DEMO_EQUITY_SERIES, DEMO_PERIOD_STATS, OPEN_PNL, OPEN_TRADES, realizedResults, type DashboardRange } from "./demo-data";
 import { alphaAnalysisStart } from "./analysis-preferences";
 import { valueSign } from "./value-sign";
@@ -57,7 +60,7 @@ const navItems = [
   { label: "Rischio", icon: ShieldCheck, target: "risk" },
   { label: "Lab", icon: FlaskConical, target: "lab" },
 ];
-const fullViews = new Set([...navItems.map(item => item.target).filter(target => target !== "overview"), "journal", "calendar", "tools", "markets", "mt5"]);
+const fullViews = new Set([...navItems.map(item => item.target).filter(target => target !== "overview"), "journal", "calendar", "tools", "markets", "mt5", "portfolio-accounts"]);
 
 const money = (value: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(value);
 const signedMoney = (value: number) => `${value > 0 ? "+" : ""}${money(value)}`;
@@ -157,6 +160,11 @@ function MetricCard({ label, value, detail, values, tone = "aqua", signValue, ic
 
 export default function Home() {
   const [view, setView] = useState("overview");
+  const mt5 = useMt5Accounts();
+  const account = mt5.active;
+  const activeAccountSynced = account && mt5.sync.state === "live" && mt5.sync.account === mt5AccountKey(account);
+  const connectedPortfolio = view === "portfolio-accounts" || view === "portfolio" && account;
+  const connectedView = account && ["overview", "analytics", "positions", "risk"].includes(view);
   const contentRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const applyHash = (behavior: ScrollBehavior) => {
@@ -203,12 +211,13 @@ export default function Home() {
       <div className="ambient ambient-one" /><div className="ambient ambient-two" />
       <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
         <div className="brand"><div className="brand-mark"><Orbit size={21} /></div><span>BlueSpherix</span><button className="mobile-close" onClick={() => setSidebarOpen(false)} aria-label="Chiudi menu"><X size={18} /></button></div>
-        <div className="account-pill"><div className="avatar">AM</div><div><strong>Alpha Momentum</strong><span><i /> Dati dimostrativi</span></div><ShieldCheck size={15} aria-hidden="true" /></div>
+        <div className="account-pill"><div className="avatar">{account ? "MT" : "AM"}</div><div><strong>{account?.account ?? "Alpha Momentum"}</strong><span><i /> {account ? mt5AccountKind(account) : "Dati dimostrativi"}</span></div><ShieldCheck size={15} aria-hidden="true" /></div>
         <nav aria-label="Navigazione principale">
           <p className="nav-label">Workspace</p>
-          {navItems.map(({ label, icon: Icon, target }) => (
-            <button className={view === target ? "active" : ""} aria-current={view === target ? "page" : undefined} key={label} onClick={() => goTo(target)}><Icon size={18} /><span>{label}</span>{label === "Lab" && <em>Beta</em>}</button>
-          ))}
+          {navItems.map(({ label, icon: Icon, target }) => {
+            const current = view === target || target === "portfolio" && view === "portfolio-accounts";
+            return <button className={current ? "active" : ""} aria-current={current ? "page" : undefined} key={label} onClick={() => goTo(target)}><Icon size={18} /><span>{label}</span>{label === "Lab" && <em>Beta</em>}</button>;
+          })}
           <p className="nav-label spaced">Strumenti</p>
           <button className={view === "journal" ? "active" : ""} aria-current={view === "journal" ? "page" : undefined} onClick={() => goTo("journal")}><BookOpen size={18} /><span>Diario</span></button>
           <button className={view === "calendar" ? "active" : ""} aria-current={view === "calendar" ? "page" : undefined} onClick={() => goTo("calendar")}><CalendarDays size={18} /><span>Calendario</span><b>3</b></button>
@@ -216,8 +225,8 @@ export default function Home() {
           <button className={view === "tools" ? "active" : ""} aria-current={view === "tools" ? "page" : undefined} onClick={() => goTo("tools")}><Calculator size={18} /><span>Calcolatori</span></button>
         </nav>
         <div className="sidebar-bottom">
-          <button className={view === "mt5" ? "active" : ""} aria-current={view === "mt5" ? "page" : undefined} onClick={() => goTo("mt5")}><Settings size={18} /><span>Dati MT5</span></button>
-          <div className="sync-status"><span><Zap size={13} /> Anteprima</span><small>MT5 non collegato</small></div>
+          <button className={view === "mt5" ? "active" : ""} aria-current={view === "mt5" ? "page" : undefined} onClick={() => goTo("mt5")}><Settings size={18} /><span>Conti MT5</span></button>
+          <div className="sync-status"><span><Zap size={13} /> Anteprima</span><small>{activeAccountSynced ? "MT5 in sincronizzazione" : account ? "MT5 · ultimo snapshot" : "MT5 non collegato"}</small></div>
         </div>
       </aside>
 
@@ -229,7 +238,7 @@ export default function Home() {
           <button className="command-search"><Search size={17} /><span>Cerca metriche, trade o strumenti…</span><kbd><Command size={12} /> K</kbd></button>
           <div className="top-actions">
             <ThemeToggle />
-            <button className={`privacy ${privateMode ? "on" : ""}`} onClick={() => setPrivateMode(!privateMode)}><LockKeyhole size={15} /><span>{privateMode ? "Privato" : "Condiviso"}</span></button>
+            <button className={`privacy ${account || connectedPortfolio || privateMode ? "on" : ""}`} disabled={!!(account || connectedPortfolio)} onClick={() => setPrivateMode(!privateMode)}><LockKeyhole size={15} /><span>{account || connectedPortfolio || privateMode ? "Privato" : "Condiviso"}</span></button>
             <button className="icon-button" aria-label="Notifiche"><Bell size={18} /><i /></button>
             <div className="user-avatar">LS</div>
           </div>
@@ -237,23 +246,25 @@ export default function Home() {
 
         <div className="content" ref={contentRef}>
           <IceGlass rootRef={contentRef} />
-          {view === "portfolio" && <Portfolio />}
-          {view === "analytics" && <Analytics />}
-          {view === "positions" && <Operations />}
-          {view === "risk" && <Risk />}
+          {connectedPortfolio && <Mt5Portfolio mt5={mt5} goTo={goTo} onDemo={() => { mt5.select(""); goTo("portfolio"); }} />}
+          {view === "portfolio" && !connectedPortfolio && <Portfolio onMt5={() => goTo("portfolio-accounts")} />}
+          {connectedView && <Mt5AccountView view={view} mt5={mt5} goTo={goTo} />}
+          {!connectedView && view === "analytics" && <Analytics />}
+          {!connectedView && view === "positions" && <Operations />}
+          {!connectedView && view === "risk" && <Risk />}
           {view === "lab" && <Lab />}
           {view === "journal" && <Journal />}
           {view === "calendar" && <Calendar />}
           {view === "tools" && <MarketTools />}
           {view === "markets" && <MarketDashboard />}
-          {view === "mt5" && <Mt5Monitor />}
-          <div className="today-dashboard" hidden={fullViews.has(view)}>
-          <section className="welcome today-welcome" id="overview">
+          {view === "mt5" && <Mt5Monitor mt5={mt5} onPortfolio={() => goTo("portfolio-accounts")} />}
+          <div className="today-dashboard" hidden={fullViews.has(view) || !!connectedView}>
+          <section className="welcome today-welcome" id={connectedView ? undefined : "overview"}>
             <div><p className="date-line">Mercoledì, 28 ottobre</p><h1>Buongiorno, Luca.</h1><p>Il portafoglio è stabile. Il rischio è sotto controllo.</p></div>
             <span className={`risk-live-status ${riskUsed < 80 ? "calm" : riskUsed < 100 ? "warning" : "critical"}`}><i /> Dati aggiornati · 28 ott, 18:42</span>
           </section>
 
-          <div className="demo-notice today-notice"><ShieldCheck size={16} data-glass-label /><span data-glass-label><strong>Riepilogo dimostrativo.</strong> Metriche, posizioni e segnali usano il ledger simulato; il collegamento MT5 aggiornerà questa vista in tempo reale.</span></div>
+          <div className="demo-notice today-notice"><ShieldCheck size={16} data-glass-label /><span data-glass-label><strong>Riepilogo dimostrativo.</strong> Metriche, posizioni e segnali usano il ledger simulato. Puoi attivare un conto da Conti MT5.</span></div>
 
           <section className="hero-grid today-hero">
             <article className="equity-card glass-card">

@@ -1,6 +1,6 @@
 # BlueSpherix
 
-BlueSpherix is a modern trading intelligence workspace designed around clear performance analysis, live risk awareness, and explainable insights. The current application is the first interactive dashboard slice and uses realistic demo data while the MT5 read-only data layer is being designed.
+BlueSpherix is a modern trading intelligence workspace designed around clear performance analysis, live risk awareness, and explainable insights. The dashboard includes an interactive demo and a separate workspace for MetaTrader 5 accounts.
 
 Public preview: `https://emil2699-lab.github.io/BlueSpherix/`
 
@@ -48,6 +48,6 @@ See the [Myfxbook feature comparison](docs/myfxbook-comparison.md) for implement
 - Negative financial results tint their entire containing surface red. The tint grows with severity, while positive results use aqua.
 - Risk measures stay neutral until a threshold is breached, so risk and realized loss are not confused.
 
-## Product direction
+## MetaTrader 5
 
-The first backend milestone will ingest account snapshots, positions, orders, and deal history from a read-only MT5 bridge. It will not expose trade execution or position-modification commands.
+The local read-only connector syncs balances, equity, margin, open positions, pending orders and deal history. See the [Windows setup and browser instructions](docs/mt5-connection.md).

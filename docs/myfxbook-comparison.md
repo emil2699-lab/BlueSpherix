@@ -11,20 +11,14 @@ Il confronto copre la documentazione pubblica delle funzioni standard e le offer
 | Backtest | Il Lab salva i benchmark nel browser e importa report HTML di Strategy Tester con metriche confrontabili. Supporto per etichette inglesi e per le etichette italiane riconosciute. | La valuta è indicata quando presente nel file. Compatibilità con altre lingue e formati da convalidare con report del terminale. |
 | Calcolatori Forex | Size, pip, margine, leva minima, P&L, cambio manuale, interesse composto, drawdown, rischio di rovina, consistenza, pivot, Fibonacci, rebate e rollover. | I valori di margine, conversione e costi dipendono dai parametri inseriti e dal broker. |
 | Calendario e avvisi | Vista ufficiale USA dal calendario BEA, scelta del fuso, ricerca e download ICS con promemoria per le pubblicazioni future. Il calendario editoriale demo rimane selezionabile. | Copertura internazionale, consenso e valori effettivi richiedono un feed macro autorizzato. La consegna email e push in background richiede un servizio di invio. |
-| Conto MT5 | L’esportatore locale in sola lettura alimenta la vista Dati MT5. Posizioni aperte, movimenti, Magic Number, data iniziale per conto, calcolo dei pip per posizioni semplici con dimensione pip specificata. I file aggiornati si possono seguire nei browser compatibili, con avviso in caso di errore e indicazione di dati obsoleti. | La verifica indipendente del conto e la sincronizzazione continua con il broker richiedono accesso a un conto e a un terminale. Esecuzioni parziali o inversioni restano consultabili come movimenti. |
+| Conto MT5 | Connettore locale in sola lettura con aggiornamento ogni 15 secondi, archivio privato nel browser e conti separati per valuta. Portafoglio, Oggi, Analisi, Operazioni e Rischio leggono il conto selezionato. Include saldo, equity, margine, ordini, posizioni, movimenti, Magic Number e statistiche delle posizioni riconciliate. | Restano la verifica indipendente, gli aggiornamenti cloud a terminale locale spento, la condivisione autenticata e i connettori per altre piattaforme. Le inversioni e i cicli incompleti si consultano come movimenti. |
 | Mercati | Sessioni nei fusi dei centri finanziari e variazioni, cambi incrociati e correlazioni da tassi di riferimento giornalieri BCE via Frankfurter. Quotazioni bid/ask e spread sono disponibili da un feed broker fornito dall’utente. | I tassi BCE sono giornalieri. Quote di mercato in tempo reale, bid/ask e spread di più broker richiedono un feed di quotazioni. |
 | Sentiment Data | Import e collegamento a feed HTTPS. Serie fino a 10.000 punti per strumento e intervallo, incluse risoluzioni settimanali e mensili. Quota, posizioni e lotti, storico esportabile e polling con pausa quando la pagina è nascosta. | Disporre dei dati Myfxbook, dell’Outlook Indicator in MT4/MT5 e della quota API premium richiede un abbonamento o un fornitore autorizzato e l’integrazione nel terminale. |
 | Community e abbonamento Ad-Free | La preview è già priva di annunci. | La community richiede identità, persistenza e moderazione. Il piano web a pagamento non ha un equivalente necessario nella preview. |
 
-## Esportazione MT5
+## Collegamento MT5
 
-`scripts/export-mt5-snapshot.py` si esegue sul computer compatibile con il pacchetto Python MetaTrader5, con il terminale già connesso. Usa esclusivamente API di lettura. Il nome passato a `--account` è l’etichetta locale. `--days` sceglie la profondità dello storico e `--pip` permette di specificare la dimensione effettiva del broker per ogni strumento. [Integrazione Python di MetaTrader 5](https://www.mql5.com/en/docs/python_metatrader5)
-
-```sh
-python scripts/export-mt5-snapshot.py --account "Conto MT5" --output conto.json --days 90 --pip EURUSD=0.0001
-```
-
-Il file è importabile in Dati MT5. Nei browser che supportano l’accesso ai file locali, “Segui file locale” controlla il file ogni 15 secondi mentre la pagina è visibile. L’esportatore va rieseguito sul computer del terminale per produrre un nuovo snapshot. Le credenziali rimangono nel terminale.
+Usa la [guida al connettore locale e all’importazione JSON](mt5-connection.md). [Integrazione Python di MetaTrader 5](https://www.mql5.com/en/docs/python_metatrader5)
 
 ## Contratto del feed di mercato
 
