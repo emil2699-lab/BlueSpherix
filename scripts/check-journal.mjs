@@ -3,12 +3,15 @@
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || "playwright");
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
+import { importTestAccount } from './mt5-test-fixture.mjs';
 const browser = await chromium.launch({executablePath:process.env.CHROMIUM_PATH || '/usr/bin/chromium',args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const page = await browser.newPage({viewport:{width:1440,height:1000},acceptDownloads:true});
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
 const artifactDir = process.env.JOURNAL_ARTIFACTS || '/tmp/bluespherix-journal-check';
 await fs.mkdir(artifactDir, { recursive: true });
-await page.goto(`${process.env.JOURNAL_URL || 'http://127.0.0.1:3001/'}#journal`);
+const base = process.env.JOURNAL_URL || 'http://127.0.0.1:3001/';
+const snapshot = await importTestAccount(page, base);
+await page.locator('nav').getByRole('button',{name:'Diario',exact:true}).click();
 await page.getByRole('heading',{name:'Diario di trading.'}).waitFor();
 const editor=page.locator('.diary-editor');
 await editor.getByLabel('Esecuzione e osservazioni').fill('Test revisione: esecuzione disciplinata');
@@ -33,8 +36,7 @@ await page.locator('.diary-trade').nth(1).click();await page.locator('.diary-tra
 assert.equal(await editor.getByLabel('Esecuzione e osservazioni').inputValue(),'Bozza preservata');
 await editor.getByRole('button',{name:'Salva revisione'}).click();
 await page.locator('nav').getByRole('button',{name:'Operazioni',exact:true}).click();
-await page.getByRole('tab',{name:'Diario',exact:true}).click();
-await page.locator('.timeline-trade').filter({hasText:id}).click();
+await page.getByRole('button',{name:`Revisione posizione ${id.split(':').at(-1)}`,exact:true}).click();
 assert.equal(await editor.getByLabel('Esecuzione e osservazioni').inputValue(),'Bozza preservata');
 await editor.getByLabel('Esecuzione e osservazioni').fill('Nota condivisa da Operazioni');await editor.getByRole('button',{name:'Salva revisione'}).click();
 await page.locator('nav').getByRole('button',{name:'Diario',exact:true}).click();
@@ -48,7 +50,7 @@ await page.getByRole('button',{name:'Giornate',exact:true}).click();
 await editor.getByLabel('Riepilogo della giornata').fill('Riflessione della giornata');await editor.getByRole('button',{name:'Salva revisione'}).click();
 assert.equal(await page.locator('.diary-days button').count(),1);
 const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'Esporta diario'}).click();const download=await downloadPromise;
-const content=JSON.parse(await fs.readFile(await download.path(),'utf8')); assert.equal(content.entries['day:2026-10-28'].note,'Riflessione della giornata');
+const content=JSON.parse(await fs.readFile(await download.path(),'utf8')); assert.equal(content.entries[`day:${snapshot.capturedAt.slice(0, 10)}`].note,'Riflessione della giornata');
 await page.getByRole('button',{name:'Trade',exact:true}).click();await page.getByRole('button',{name:'30G',exact:true}).click();
 for (const width of [1440,1024,768,390]) {
  await page.setViewportSize({width,height:1000});await page.waitForTimeout(350);

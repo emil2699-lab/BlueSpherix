@@ -1,6 +1,6 @@
 # BlueSpherix
 
-BlueSpherix is a modern trading intelligence workspace designed around clear performance analysis, live risk awareness, and explainable insights. The dashboard includes an interactive demo and a separate workspace for MetaTrader 5 accounts.
+BlueSpherix is a modern trading intelligence workspace designed around clear performance analysis, live risk awareness, and explainable insights. The dashboard reads trading activity from imported or synchronized MetaTrader 5 accounts.
 
 Public preview: `https://emil2699-lab.github.io/BlueSpherix/`
 
@@ -21,25 +21,16 @@ npm run build
 npm run start
 ```
 
-The demo ledger is deterministic and contains 314 operations. Regenerate its downloadable CSV with:
-
-```bash
-npm run data:csv
-npm run data:check
-```
-
-The generated file is `public/data/demo-operations.csv`. Dashboard, Analytics, Operations, and the Alpha Momentum account in Portfolio calculate their totals from the same ledger: balance, equity, open P&L, win rate, profit factor, expectancy, average R, drawdown, sessions, instruments, heatmaps, and period curves are not maintained as independent display values.
+Run the trading data, report, and calculator checks with `npm run data:check`.
 
 ## Current scope
 
 - Responsive macOS/Safari-first dashboard
-- Equity and balance timeline with period controls
-- Risk Weather, performance metrics, open positions, insights, and Equity Story
+- Current equity, balance and margin, plus cumulative realized P&L by period
+- Open positions, pending orders, deal history and portfolio totals per currency
 - Dark visual system and installable web-app metadata
-- Deterministic 314-operation demo ledger with a downloadable CSV
-- Shared calculation layer used across all product sections
 - Monthly performance reports with date, symbol, and direction filters, plus CSV, HTML, and print/PDF export
-- Ten local trading calculators and demo calendar event export (ICS)
+- Trade journal, Strategy Tester archive, trading calculators and calendar event export (ICS)
 
 See the [Myfxbook feature comparison](docs/myfxbook-comparison.md) for implemented workflows and dependencies for live features.
 

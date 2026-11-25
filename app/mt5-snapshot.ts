@@ -137,11 +137,19 @@ export function completedPositions(snapshot: Mt5Snapshot) {
     if (Math.abs(remaining) > tolerance || !Number.isFinite(net)) return [];
     const pip = Object.hasOwn(snapshot.pipSizes, first.symbol) ? snapshot.pipSizes[first.symbol] : 0;
     const pips = pip > 0 ? (exitValue - entryValue) / opened / pip * (first.side === "buy" ? 1 : -1) : NaN;
-    return [{ id, symbol: first.symbol, magic: first.magic, closedAt: last.time, net, pips: Number.isFinite(pips) ? pips : null }];
+    return [{
+      id, symbol: first.symbol, magic: first.magic, openedAt: first.time, closedAt: last.time,
+      side: first.side === "buy" ? "Long" as const : "Short" as const, volume: opened,
+      net, pips: Number.isFinite(pips) ? pips : null,
+    }];
   }).sort((a, b) => Date.parse(b.closedAt) - Date.parse(a.closedAt));
 }
 
 export function mt5AccountKind(snapshot: Mt5Snapshot) {
   if (snapshot.version === 1 || snapshot.kind === "unknown") return "Tipo non disponibile";
   return { real: "Reale", demo: "Demo MT5", contest: "Contest MT5" }[snapshot.kind];
+}
+
+export function positionJournalId(account: Mt5Snapshot, positionId: string) {
+  return `mt5:${mt5AccountKey(account)}:${positionId}`;
 }

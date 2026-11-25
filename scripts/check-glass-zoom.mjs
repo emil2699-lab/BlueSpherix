@@ -1,6 +1,7 @@
 // Regression checks for zoom, constrained WebGL buffers and flat pseudo layers.
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
+import { importTestAccount } from './mt5-test-fixture.mjs';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const dir = process.env.GLASS_SELECTION_ARTIFACTS || '/tmp/bluespherix-glass-zoom';
 await fs.mkdir(dir, { recursive: true });
@@ -35,15 +36,16 @@ await page.addInitScript(() => {
   };
 });
 const url = process.env.GLASS_SELECTION_URL || 'http://127.0.0.1:3001/';
-await page.goto(`${url}#risk`);
+await importTestAccount(page, url);
+await page.goto(`${url}#analytics`);
 await page.locator('.content[data-ice-glass=ready]').waitFor();
-const cell = page.locator('button.correlation-cell').first();
+const cell = page.locator('button.heat-negative').first();
 await cell.click(); await cell.locator('xpath=self::*[@data-glass-selection="selected"]').waitFor();
 const material = await cell.evaluate(el => ({ background: getComputedStyle(el).backgroundImage, pseudo: getComputedStyle(el, '::before').backgroundImage, tint: el.style.getPropertyValue('--glass-control-tint') }));
 assert.equal(material.background, 'none'); assert.equal(material.pseudo, 'none');
 const tint = material.tint.split(' ').map(Number);
 assert(tint[0] > tint[1] * 1.5, 'the red pseudo-layer palette transfers to the glass');
-await cell.screenshot({ path: `${dir}/correlation-glass.png` });
+await cell.screenshot({ path: `${dir}/edge-map-glass.png` });
 const samples = [];
 async function sample(label) {
   await cell.scrollIntoViewIfNeeded();

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
+import { importTestAccount } from './mt5-test-fixture.mjs';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const dir = process.env.GLASS_SELECTION_ARTIFACTS || '/tmp/bluespherix-underlight';
 await fs.mkdir(dir, { recursive: true });
@@ -18,6 +19,7 @@ const instrument = () => {
 };
 await page.addInitScript(instrument); page.on('pageerror', e => errors.push(e.message));
 const url = process.env.GLASS_SELECTION_URL || 'http://127.0.0.1:3001/';
+await importTestAccount(page, url);
 await page.goto(`${url}#overview`); await page.locator('.content[data-ice-glass=ready]').waitFor();
 // Freeze unrelated CSS hover/layout transitions for comparable light-only frames.
 await page.addStyleTag({ content: '*,*::before,*::after{transition:none!important;animation:none!important;scroll-behavior:auto!important;}' });
@@ -60,11 +62,8 @@ await page.keyboard.press('Escape'); await step(1000); await step(1000);
 await page.evaluate(() => { window.underlightFrames = []; }); await page.clock.runFor(200);
 assert.equal(await page.evaluate(() => window.underlightFrames.length), 0, 'no idle animation after deselection');
 const sections = [
-  ['Portafoglio', '[aria-label="Filtra conti"] button'],
-  ['Analisi', '.analytics-period button'],
-  ['Operazioni', '[aria-label="Periodo operazioni"] button'],
-  ['Rischio', '.stress-tabs button'],
-  ['Lab', '.lab-experiments button'],
+  ['Portafoglio', '[aria-label="Filtra conti MT5"] button'],
+  ['Analisi', '[aria-label="Periodo MT5"] button'],
   ['Diario', '[aria-label="Periodo diario"] button'],
 ];
 for (const [name, selector] of sections) {
@@ -105,6 +104,7 @@ for (const [name, selector] of sections) {
 assert.equal(await page.locator('canvas').count(), 1);
 const reduced = await browser.newPage({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
 await reduced.addInitScript(instrument); reduced.on('pageerror', e => errors.push(e.message));
+await importTestAccount(reduced, url);
 await reduced.goto(`${url}#overview`); await reduced.locator('.content[data-ice-glass=ready]').waitFor();
 await reduced.getByRole('button', { name: '3M', exact: true }).click(); await reduced.waitForTimeout(1000);
 assert(await reduced.evaluate(() => window.underlightFrames.some(f => f.values[0] === 1)));
@@ -117,5 +117,5 @@ assert(await reduced.evaluate(() => window.underlightFrames.some(f => f.values[0
 assert(await reduced.evaluate(() => window.underlightFrames.every(f => f.values[1] === 0)), 'all sections respect reduced motion');
 await reduced.screenshot({ path: `${dir}/mobile-journal-reduced.png` });
 assert.deepEqual(errors, []);
-await fs.writeFile(`${dir}/browser.json`, JSON.stringify({ pass: true, errors, active, checks: 'slow time evolution, red glass, stops on deselection, all seven sections, navigation reset, P&L ceiling across views, reduced motion, mobile, single canvas' }, null, 2));
+await fs.writeFile(`${dir}/browser.json`, JSON.stringify({ pass: true, errors, active, checks: 'slow time evolution, red glass, stops on deselection, persistent controls across account views, navigation reset, P&L ceiling across views, reduced motion, mobile, single canvas' }, null, 2));
 console.log(JSON.stringify({ pass: true, errors, samples: active.length })); await browser.close();

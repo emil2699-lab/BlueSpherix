@@ -241,6 +241,13 @@ button.table-row { border-right: 0; border-bottom: 0; border-left: 0; background
   .position-table .table-row:not(.table-header) > :nth-child(n+4)::before { color: #687582;color: light-dark(#555c64,#687582); font-size: 6px; font-weight: 500; letter-spacing: .45px; text-transform: uppercase; }
   .position-table .table-row:not(.table-header) > :last-child { text-align: left; }
 }
+.mt5-positions .table-row { grid-template-columns: minmax(0, 1.1fr) minmax(0, .8fr) minmax(0, .9fr) minmax(0, 1fr); }
+.mt5-positions .table-header { padding-inline: 10px; }
+@container (max-width: 720px) {
+  .mt5-positions .table-row:not(.table-header) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mt5-positions .table-row:not(.table-header) > :nth-child(3) { grid-row: 2; }
+  .mt5-positions .table-row:not(.table-header) > :nth-child(4)::before { content: "P&L"; }
+}
 .insight-card { padding: 20px; position: relative; overflow: hidden; background: radial-gradient(circle at 138% 138%,transparent 0 104px,rgba(157,139,255,.1) 105px 106px,transparent 107px 130px,rgba(157,139,255,.025) 131px 132px,transparent 133px),radial-gradient(circle at 100% 0%,rgba(157,139,255,.17),transparent 43%),linear-gradient(145deg,rgba(22,25,40,.9),rgba(13,17,25,.75)); }
 .insight-icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; color: #c3b9ff;color: light-dark(#3a2a9d,#c3b9ff); background: rgba(157,139,255,.11); border: 1px solid transparent; margin-bottom: 16px; }
 .insight-card h2 { font-size: 16px; line-height: 1.35; font-weight: 590; margin: 0 0 9px; letter-spacing: -.3px; }

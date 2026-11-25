@@ -7,7 +7,6 @@ import { MAX_MT5_SNAPSHOT, mt5AccountKey, readMt5Snapshot, type Mt5Snapshot } fr
 const snapshotUrl = "http://127.0.0.1:8765/api/mt5/snapshot";
 const storeName = "snapshots";
 const pollMs = 15000;
-const demoKey = "demo";
 const accountChoice = createLocalStore("bluespherix.mt5.active.v1", "", value => {
   if (typeof value !== "string" || value.length > 250) throw Error("Conto selezionato non valido.");
   return value;
@@ -104,7 +103,7 @@ export function useMt5Accounts() {
   const [session, setSession] = useState<{ source: Source; controller: AbortController } | null>(null);
   const activeController = useRef<AbortController | null>(null);
   const { value: activeKey, error: selectionError } = accountChoice.useStore();
-  const active = accounts.find(account => mt5AccountKey(account) === (localChoice ?? activeKey)) ?? null;
+  const active = accounts.find(account => mt5AccountKey(account) === (localChoice ?? activeKey)) ?? accounts[0] ?? null;
 
   useEffect(() => {
     let active = true;
@@ -119,8 +118,7 @@ export function useMt5Accounts() {
   }, []);
 
   function select(id: string) {
-    const choice = id || demoKey;
-    setLocalChoice(accountChoice.save(() => choice) ? null : choice);
+    setLocalChoice(accountChoice.save(() => id) ? null : id);
   }
 
   async function save(snapshot: Mt5Snapshot, signal?: AbortSignal) {
@@ -184,7 +182,7 @@ export function useMt5Accounts() {
           if (signal.aborted) return;
           if (!expectedAccount) {
             // Keep the current account selection if the user has already chosen one.
-            if (!accountChoice.save(current => current || id)) setLocalChoice(current => current ?? id);
+            if (!accountChoice.save(current => !current || current === "demo" ? id : current)) setLocalChoice(current => current ?? id);
           }
           expectedAccount = id;
           revision = nextRevision;
@@ -279,7 +277,7 @@ export function useMt5Accounts() {
     }
     setAccounts(current => current.filter(account => mt5AccountKey(account) !== id));
     setLocalChoice(current => current === id ? null : current);
-    accountChoice.save(current => current === id ? demoKey : current);
+    accountChoice.save(current => current === id ? "" : current);
   }
 
   return {
