@@ -18,8 +18,8 @@ const factor = (result: number | null) => result === null ? "—" : number.forma
 const rate = (result: number | null) => result === null ? "—" : `${number.format(result)}%`;
 const hold = (minutes: number | null) => minutes === null ? "—" : `${Math.floor(Math.round(minutes) / 60)} h ${Math.round(minutes) % 60} min`;
 
-export default function MonthlyPerformance({ account, currencyCode, asOf, trades, start }: {
-  account: string; currencyCode: string; asOf: string; trades: PerformanceTrade[]; start: string;
+export default function MonthlyPerformance({ account, currencyCode, asOf, trades, start, timeLabel = "UTC" }: {
+  account: string; currencyCode: string; asOf: string; trades: PerformanceTrade[]; start: string; timeLabel?: string;
 }) {
   const formatMoney = (value: number) => `${number.format(value)} ${currencyCode}`;
   const { entries, error: journalError } = useJournal();
@@ -35,7 +35,7 @@ export default function MonthlyPerformance({ account, currencyCode, asOf, trades
   const latest = asOf.slice(0, 10);
   const effectiveFrom = from > earliest ? from : earliest;
   const invalidDates = !!(to && effectiveFrom > to);
-  const context = `${account} · Chiusure UTC dal ${day(effectiveFrom)} al ${day(to || latest)} · ${symbol || "Tutti gli strumenti"} · ${side || "Tutte le direzioni"}${tag ? ` · Tag ${tag}` : ""} · Dettaglio: ${month ? months(month) : "intero periodo"}`;
+  const context = `${account} · Chiusure (${timeLabel}) dal ${day(effectiveFrom)} al ${day(to || latest)} · ${symbol || "Tutti gli strumenti"} · ${side || "Tutte le direzioni"}${tag ? ` · Tag ${tag}` : ""} · Dettaglio: ${month ? months(month) : "intero periodo"}`;
   const monthly: ReportTable = {
     title: "Risultati mensili",
     columns: ["Mese", "Trade chiusi", "Netto", "Win rate", "Profit factor"],

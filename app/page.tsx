@@ -7,6 +7,7 @@ import {
   Calculator,
   CalendarDays,
   Command,
+  Globe,
   FlaskConical,
   LayoutDashboard,
   LineChart,
@@ -33,6 +34,7 @@ import { useMt5Accounts } from "./mt5-accounts";
 import { mt5AccountKey, mt5AccountKind } from "./mt5-snapshot";
 import { IceGlass } from "./ice-glass";
 import { ThemeToggle } from "./theme-toggle";
+import { PublishedTradeView } from "./published-trades";
 
 const navItems = [
   { label: "Oggi", icon: LayoutDashboard, target: "overview" },
@@ -42,12 +44,14 @@ const navItems = [
   { label: "Rischio", icon: ShieldCheck, target: "risk" },
   { label: "Lab", icon: FlaskConical, target: "lab" },
 ];
-const views = new Set([...navItems.map(item => item.target), "journal", "calendar", "tools", "markets", "mt5"]);
+const views = new Set([...navItems.map(item => item.target), "journal", "calendar", "tools", "markets", "mt5", "public-trades"]);
 
 export default function Home() {
   const [view, setView] = useState("overview");
   const mt5 = useMt5Accounts();
   const account = mt5.active;
+  const publishedView = view === "public-trades" ? "positions"
+    : !account && mt5.ready && (view === "overview" || view === "analytics" || view === "positions") ? view : null;
   const activeAccountSynced = account && mt5.sync.state === "live" && mt5.sync.account === mt5AccountKey(account);
   const contentRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -78,11 +82,11 @@ export default function Home() {
       <div className="ambient ambient-one" /><div className="ambient ambient-two" />
       <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
         <div className="brand"><div className="brand-mark"><Orbit size={21} /></div><span>BlueSpherix</span><button className="mobile-close" onClick={() => setSidebarOpen(false)} aria-label="Chiudi menu"><X size={18} /></button></div>
-        <div className="account-pill"><div className="avatar">MT</div><div><strong>{account?.account ?? "Nessun conto"}</strong><span>{account && <i />} {account ? mt5AccountKind(account) : "MetaTrader 5"}</span></div><ShieldCheck size={15} aria-hidden="true" /></div>
+        <div className="account-pill"><div className="avatar">MT</div><div><strong>{publishedView ? "Storico pubblico" : account?.account ?? "Nessun conto"}</strong><span>{account && !publishedView && <i />} {publishedView ? "Operazioni chiuse" : account ? mt5AccountKind(account) : "MetaTrader 5"}</span></div><ShieldCheck size={15} aria-hidden="true" /></div>
         <nav aria-label="Navigazione principale">
           <p className="nav-label">Workspace</p>
           {navItems.map(({ label, icon: Icon, target }) => {
-            const current = view === target;
+            const current = view === target || (view === "public-trades" && target === "positions");
             return <button className={current ? "active" : ""} aria-current={current ? "page" : undefined} key={label} onClick={() => goTo(target)}><Icon size={18} /><span>{label}</span>{label === "Lab" && <em>Beta</em>}</button>;
           })}
           <p className="nav-label spaced">Strumenti</p>
@@ -93,7 +97,7 @@ export default function Home() {
         </nav>
         <div className="sidebar-bottom">
           <button className={view === "mt5" ? "active" : ""} aria-current={view === "mt5" ? "page" : undefined} onClick={() => goTo("mt5")}><Settings size={18} /><span>Conti MT5</span></button>
-          <div className="sync-status"><span><Zap size={13} /> Anteprima</span><small>{activeAccountSynced ? "MT5 in sincronizzazione" : account ? "MT5 · ultimo snapshot" : "MT5 non collegato"}</small></div>
+          <div className="sync-status"><span><Zap size={13} /> Anteprima</span><small>{publishedView ? "Storico operativo" : activeAccountSynced ? "MT5 in sincronizzazione" : account ? "MT5 · ultimo snapshot" : "MT5 non collegato"}</small></div>
         </div>
       </aside>
 
@@ -105,16 +109,17 @@ export default function Home() {
           <button className="command-search"><Search size={17} /><span>Cerca metriche, trade o strumenti…</span><kbd><Command size={12} /> K</kbd></button>
           <div className="top-actions">
             <ThemeToggle />
-            <span className="privacy on"><LockKeyhole size={15} /><span>Privato</span></span>
+            <span className="privacy on">{publishedView ? <Globe size={15} /> : <LockKeyhole size={15} />}<span>{publishedView ? "Storico pubblico" : "Privato"}</span></span>
             <button className="icon-button" aria-label="Notifiche"><Bell size={18} /><i /></button>
-            <div className="user-avatar">LS</div>
+            <div className="user-avatar">BS</div>
           </div>
         </header>
 
         <div className="content" ref={contentRef}>
           <IceGlass rootRef={contentRef} />
           {view === "portfolio" && <Mt5Portfolio mt5={mt5} goTo={goTo} />}
-          {isMt5AccountView(view) && <Mt5AccountView view={view} mt5={mt5} goTo={goTo} />}
+          {publishedView ? <PublishedTradeView key={publishedView} view={publishedView} goTo={goTo} />
+            : isMt5AccountView(view) && <Mt5AccountView view={view} mt5={mt5} goTo={goTo} />}
           {view === "lab" && <Lab />}
           {view === "journal" && <Journal key={account ? mt5AccountKey(account) : ""} snapshot={account} />}
           {view === "calendar" && <Calendar />}

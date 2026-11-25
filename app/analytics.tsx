@@ -14,7 +14,7 @@ const number = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 2 });
 const stat = (value: number | null, suffix = "") => value === null ? "—" : `${number.format(value)}${suffix}`;
 const heatRgb = (value: number) => value > 0 ? "86 217 202" : value < 0 ? "255 111 125" : "157 169 184";
 
-export function EdgeMap({ trades, currency }: { trades: PerformanceTrade[]; currency: string }) {
+export function EdgeMap({ trades, currency, timeLabel = "UTC" }: { trades: PerformanceTrade[]; currency: string; timeLabel?: string }) {
   const [metric, setMetric] = useState<HeatMetric>("Risultato");
   const [cell, setCell] = useState<{ day: number; window: number } | null>(null);
   const heat = useMemo(() => {
@@ -36,7 +36,7 @@ export function EdgeMap({ trades, currency }: { trades: PerformanceTrade[]; curr
       <div className="section-head"><div><p className="eyebrow">Edge map</p><h2>Dove nasce il risultato.</h2></div>
         <div className="range-switch edge-toggle" aria-label="Metrica mappa">{(["Risultato", "Profit factor"] as const).map(item => <button key={item} type="button" aria-pressed={metric === item} className={metric === item ? "active" : ""} onClick={() => setMetric(item)}>{item}</button>)}</div>
       </div>
-      <p className="portfolio-caption">Posizioni chiuse raggruppate per giorno e ora di apertura in UTC.</p>
+      <p className="portfolio-caption">Posizioni chiuse raggruppate per giorno e ora di apertura ({timeLabel}).</p>
       {trades.length > 0 ? <div className="heatmap" role="grid" aria-label={`${metric} per giorno e fascia oraria`}>
         <span />{windows.map(window => <span className="heat-label" key={window}>{window}</span>)}
         {visibleDays.flatMap(day => [<span className="heat-label" key={`day-${day}`}>{days[day]}</span>, ...windows.map((window, index) => {
