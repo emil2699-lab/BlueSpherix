@@ -92,7 +92,7 @@ export default function PortfolioChart({ accounts, point, onTrade }: { accounts:
         {accounts.map(a => <circle key={a.id} cx={45 + point * plotWidth / 11} cy={chartY(a.returns[point])} r="4" fill={a.color} />)}
         {markers.map(trade => {
           const account = accounts.find(account => account.id === trade.accountId)!;
-          const name = `${account.id === "alpha" ? "Trade" : "Trade dimostrativo"} ${trade.id} · ${portfolioDate(trade.progress)} · ${trade.netPnl.toLocaleString("it-IT", { maximumFractionDigits: 2 })} USD`;
+          const name = `Trade ${trade.id.slice(0, 8)} · ${portfolioDate(trade.progress)} · ${trade.netPnl.toLocaleString("it-IT", { maximumFractionDigits: 2 })} USD`;
           return <g key={`${trade.accountId}:${trade.id}`} className="comparison-trade-point" role="button" tabIndex={0} aria-label={name} data-account={trade.accountId} data-trade={trade.id}
             onClick={click => {
               // Overlapping hit areas choose the closest visible dot, rather than the last SVG element.

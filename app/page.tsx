@@ -41,6 +41,7 @@ import Mt5Monitor from "./mt5-monitor";
 import { Mt5AccountView, Mt5Portfolio } from "./mt5-dashboard";
 import { useMt5Accounts } from "./mt5-accounts";
 import { mt5AccountKey, mt5AccountKind } from "./mt5-snapshot";
+import { DEMO_ACCOUNT_NAME, DEMO_AS_OF, statementTime } from "./demo-ledger";
 import { ALPHA_ACCOUNT, BEST_RECENT_TRADE, BEST_SESSION_30D, DASHBOARD_RANGE_STATS, DEMO_BALANCE_SERIES, DEMO_EQUITY_SERIES, DEMO_PERIOD_STATS, OPEN_PNL, OPEN_TRADES, realizedResults, type DashboardRange } from "./demo-data";
 import { alphaAnalysisStart } from "./analysis-preferences";
 import { valueSign } from "./value-sign";
@@ -211,7 +212,7 @@ export default function Home() {
       <div className="ambient ambient-one" /><div className="ambient ambient-two" />
       <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
         <div className="brand"><div className="brand-mark"><Orbit size={21} /></div><span>BlueSpherix</span><button className="mobile-close" onClick={() => setSidebarOpen(false)} aria-label="Chiudi menu"><X size={18} /></button></div>
-        <div className="account-pill"><div className="avatar">{account ? "MT" : "AM"}</div><div><strong>{account?.account ?? "Alpha Momentum"}</strong><span><i /> {account ? mt5AccountKind(account) : "Dati dimostrativi"}</span></div><ShieldCheck size={15} aria-hidden="true" /></div>
+        <div className="account-pill"><div className="avatar">{account ? "MT" : "BS"}</div><div><strong>{account?.account ?? DEMO_ACCOUNT_NAME}</strong><span><i /> {account ? mt5AccountKind(account) : "Dati dimostrativi"}</span></div><ShieldCheck size={15} aria-hidden="true" /></div>
         <nav aria-label="Navigazione principale">
           <p className="nav-label">Workspace</p>
           {navItems.map(({ label, icon: Icon, target }) => {
@@ -240,7 +241,7 @@ export default function Home() {
             <ThemeToggle />
             <button className={`privacy ${account || connectedPortfolio || privateMode ? "on" : ""}`} disabled={!!(account || connectedPortfolio)} onClick={() => setPrivateMode(!privateMode)}><LockKeyhole size={15} /><span>{account || connectedPortfolio || privateMode ? "Privato" : "Condiviso"}</span></button>
             <button className="icon-button" aria-label="Notifiche"><Bell size={18} /><i /></button>
-            <div className="user-avatar">LS</div>
+            <div className="user-avatar">BS</div>
           </div>
         </header>
 
@@ -260,26 +261,26 @@ export default function Home() {
           {view === "mt5" && <Mt5Monitor mt5={mt5} onPortfolio={() => goTo("portfolio-accounts")} />}
           <div className="today-dashboard" hidden={fullViews.has(view) || !!connectedView}>
           <section className="welcome today-welcome" id={connectedView ? undefined : "overview"}>
-            <div><p className="date-line">Mercoledì, 28 ottobre</p><h1>Buongiorno, Luca.</h1><p>Il portafoglio è stabile. Il rischio è sotto controllo.</p></div>
-            <span className={`risk-live-status ${riskUsed < 80 ? "calm" : riskUsed < 100 ? "warning" : "critical"}`}><i /> Dati aggiornati · 28 ott, 18:42</span>
+            <div><p className="date-line">Storico del rendiconto</p><h1>Panoramica.</h1><p>Risultati delle posizioni chiuse importate da Notion.</p></div>
+            <span className={`risk-live-status ${riskUsed < 80 ? "calm" : riskUsed < 100 ? "warning" : "critical"}`}><i /> Ultima chiusura · {statementTime(DEMO_AS_OF)}</span>
           </section>
 
-          <div className="demo-notice today-notice"><ShieldCheck size={16} data-glass-label /><span data-glass-label><strong>Riepilogo dimostrativo.</strong> Metriche, posizioni e segnali usano il ledger simulato. Puoi attivare un conto da Conti MT5.</span></div>
+          <div className="demo-notice today-notice"><ShieldCheck size={16} data-glass-label /><span data-glass-label><strong>Riepilogo dimostrativo.</strong> Trade chiusi da Notion, con gli orari del rendiconto. L’equity e i rendimenti percentuali partono da un capitale demo di 100.000 USD.</span></div>
 
           <section className="hero-grid today-hero">
             <article className="equity-card glass-card">
               <div className="equity-composition">
               <div className="card-head today-chart-head equity-story" data-glass-label>
-                <div><p className="eyebrow">Equity totale</p><div className="equity-value"><strong>{money(ALPHA_ACCOUNT.equity)}</strong><span data-sign={valueSign(OPEN_PNL)}>{OPEN_PNL >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />} {signedMoney(OPEN_PNL)} oggi</span></div></div>
+                <div><p className="eyebrow">Equity dimostrativa</p><div className="equity-value"><strong>{money(ALPHA_ACCOUNT.equity)}</strong><span data-sign={valueSign(OPEN_PNL)}>{OPEN_PNL >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />} {signedMoney(OPEN_PNL)} aperto nel demo</span></div></div>
               </div>
               <div className="today-chart-controls" data-glass-label><div className="range-switch" aria-label="Periodo grafico">{(["1W", "1M", "3M", "1Y"] as Range[]).map((item) => <button key={item} aria-pressed={range === item} className={range === item ? "active" : ""} onClick={() => setRange(item)}>{item}</button>)}</div><div className="legend">{realized ? <span><i className="equity" /> Netto realizzato cumulato</span> : <><span><i className="equity" /> Equity</span><span><i className="balance" /> Balance</span></>}</div><button type="button" className="portfolio-export realized-toggle" aria-pressed={realized} onClick={() => setRealized(current => !current)}>P&amp;L realizzato</button>{accountStart && <small className="portfolio-caption">Storico dal {accountStart}</small>}</div>
               <EquityChart range={range} realized={realized} pnl={pnl} />
-              <div className="chart-summary" data-glass-label><div><span>Rendimento</span><strong data-sign={valueSign(returnPct)}>{performance}</strong></div><div><span>{pnl ? "Netto realizzato" : "Profitto netto"}</span><strong data-sign={valueSign(rangeProfit)}>{money(rangeProfit)}</strong></div><div><span>{pnl ? "Trade chiusi" : "Data confidence"}</span><strong className="confidence">{pnl ? pnl.trades : <><ShieldCheck size={15} /> {stats.confidence}%</>}</strong></div></div>
+              <div className="chart-summary" data-glass-label><div><span>Rendimento</span><strong data-sign={valueSign(returnPct)}>{performance}</strong></div><div><span>{pnl ? "Netto realizzato" : "Profitto netto"}</span><strong data-sign={valueSign(rangeProfit)}>{money(rangeProfit)}</strong></div><div><span>Trade chiusi</span><strong className="confidence">{pnl?.trades ?? stats.trades}</strong></div></div>
               </div>
             </article>
 
             <article className="today-risk-card glass-card">
-              <div className="section-head" data-glass-label><div><p className="eyebrow">Stato del rischio</p><h2>{riskState}</h2></div><span className={`status-badge ${riskUsed >= 80 ? "warning" : ""}`}><i /> {riskUsed >= 80 ? "Budget quasi pieno" : "Sotto controllo"}</span></div>
+              <div className="section-head" data-glass-label><div><p className="eyebrow">Stato del rischio demo</p><h2>{riskState}</h2></div><span className={`status-badge ${riskUsed >= 80 ? "warning" : ""}`}><i /> {riskUsed >= 80 ? "Budget quasi pieno" : "Sotto controllo"}</span></div>
               <div className="today-risk-sphere" aria-label={`Indice di rischio ${ALPHA_ACCOUNT.riskScore} su 100`}>
                 <div className="today-risk-orbit orbit-outer" /><div className="today-risk-orbit orbit-middle" /><div className="today-risk-orbit orbit-inner" />
                 <div className="today-risk-core"><div data-glass-label><strong>{ALPHA_ACCOUNT.riskScore}</strong><span>su 100</span></div></div>
@@ -292,7 +293,7 @@ export default function Home() {
                 <div className="open-risk"><dt><i /> Rischio aperto</dt><dd>{ALPHA_ACCOUNT.activeRisk.toLocaleString("it-IT")}% <span>su {ALPHA_ACCOUNT.riskLimit.toLocaleString("it-IT")}%</span></dd></div>
                 <div className="drawdown"><dt><i /> Drawdown</dt><dd>{ALPHA_ACCOUNT.currentDrawdown.toLocaleString("it-IT")}% <span>su 8%</span></dd></div>
               </dl>
-              <p className="today-risk-copy" data-glass-label>I punti avanzano lungo la propria orbita mentre il dato si avvicina alla soglia.</p>
+              <p className="today-risk-copy" data-glass-label>Scenario demo senza esposizione aperta. Il drawdown è calcolato sul capitale dimostrativo.</p>
               <button className="text-action" data-glass-label onClick={() => goTo("risk")}>Apri Risk Center <ArrowRight size={15} /></button>
             </article>
           </section>
@@ -305,21 +306,22 @@ export default function Home() {
 
           <section className="lower-grid">
             <article className="positions-card glass-card" id="positions">
-              <div className="section-head" data-glass-label><div><p className="eyebrow">Posizioni aperte</p><h2>{positions.length} posizioni · <span data-sign={valueSign(OPEN_PNL)}>{signedMoney(OPEN_PNL)}</span></h2></div><button className="quiet-button">Vedi tutte <ArrowRight size={14} /></button></div>
+              <div className="section-head" data-glass-label><div><p className="eyebrow">Posizioni aperte</p><h2>{positions.length} posizioni · <span data-sign={valueSign(OPEN_PNL)}>{signedMoney(OPEN_PNL)}</span></h2></div><button className="quiet-button" onClick={() => goTo("positions")}>Vedi tutte <ArrowRight size={14} /></button></div>
               <div className="position-table">
                 <div className="table-row table-header" data-glass-label><span>Strumento</span><span>Direzione</span><span>Volume</span><span>Apertura</span><span>Corrente</span><span>P&amp;L</span></div>
                 {positions.map((position) => <button type="button" className={`table-row ${position.trend === "down" ? "negative-row" : ""}`} key={position.symbol} data-glass-underlight={positionUnderlight(position.result, ALPHA_ACCOUNT.balance)}><span className="symbol" data-glass-label><i>{position.symbol.slice(0, 2)}</i><strong>{position.symbol}</strong></span><span data-glass-label className={position.side === "Long" ? "long" : "short"}>{position.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{position.side}</span><span data-glass-label>{position.volumeLabel}</span><span data-glass-label>{position.open}</span><span data-glass-label>{position.currentPrice}</span><strong data-glass-label className={position.trend}>{position.pnl}</strong></button>)}
+                {!positions.length && <p className="ledger-empty" data-glass-label>Lo storico Notion contiene operazioni chiuse.</p>}
               </div>
             </article>
 
             <article className="insight-card glass-card">
-              <div className="insight-icon" data-glass-label><BrainCircuit size={20} /></div><p className="eyebrow" data-glass-label>Spherix insight</p><h2 data-glass-label>La sessione {BEST_SESSION_30D.name} genera il {BEST_SESSION_30D.share.toLocaleString("it-IT")}% del risultato.</h2><p data-glass-label>Negli ultimi 30 giorni questa sessione ha un profit factor di {BEST_SESSION_30D.factor.toLocaleString("it-IT")} e un win rate del {BEST_SESSION_30D.win.toLocaleString("it-IT")}%.</p><button data-glass-label>Esplora il pattern <Sparkles size={15} /></button><small data-glass-label><ShieldCheck size={12} /> Calcolato su {BEST_SESSION_30D.trades} operazioni</small>
+              <div className="insight-icon" data-glass-label><BrainCircuit size={20} /></div><p className="eyebrow" data-glass-label>Spherix insight</p><h2 data-glass-label>Fascia {BEST_SESSION_30D.name} · {signedMoney(BEST_SESSION_30D.net)}</h2><p data-glass-label>Nei 30 giorni dello storico questa fascia ha un profit factor di {BEST_SESSION_30D.factor.toLocaleString("it-IT")} e un win rate del {BEST_SESSION_30D.win.toLocaleString("it-IT")}%.</p><button data-glass-label onClick={() => goTo("analytics")}>Esplora il pattern <Sparkles size={15} /></button><small data-glass-label><ShieldCheck size={12} /> Calcolato su {BEST_SESSION_30D.trades} operazioni</small>
             </article>
           </section>
 
           <section className="story-card glass-card" id="story">
             <div className="section-head" data-glass-label><div><p className="eyebrow">Equity story</p><h2>Gli ultimi 30 giorni, in tre numeri.</h2></div><button className="quiet-button"><Sparkles size={14} /> Genera report</button></div>
-            <div className="story-line" data-glass-label><div className="story-item positive"><span>1</span><div><small>{BEST_RECENT_TRADE.date}</small><strong>{BEST_RECENT_TRADE.setup} · {BEST_RECENT_TRADE.symbol}</strong><p>La migliore operazione del periodo ha aggiunto <span data-sign={valueSign(BEST_RECENT_TRADE.netPnl)}>{money(BEST_RECENT_TRADE.netPnl)}</span> con un risultato di <span data-sign={valueSign(BEST_RECENT_TRADE.rMultiple)}>{BEST_RECENT_TRADE.rMultiple.toLocaleString("it-IT")}R</span>.</p></div></div><div className="story-item caution"><span>2</span><div><small>Rischio corrente</small><strong>{positions.length} posizioni aperte</strong><p>Il rischio complessivo è {ALPHA_ACCOUNT.activeRisk.toLocaleString("it-IT")}% dell’equity, contro un limite di {ALPHA_ACCOUNT.riskLimit.toLocaleString("it-IT")}%.</p></div></div><div className="story-item positive"><span>3</span><div><small>Equity riconciliata</small><strong>{money(ALPHA_ACCOUNT.equity)}</strong><p>Balance {money(ALPHA_ACCOUNT.balance)} più P&amp;L aperto <span data-sign={valueSign(OPEN_PNL)}>{signedMoney(OPEN_PNL)}</span>.</p></div></div></div>
+            <div className="story-line" data-glass-label><div className="story-item positive"><span>1</span><div><small>{BEST_RECENT_TRADE.date}</small><strong>{BEST_RECENT_TRADE.symbol} · {BEST_RECENT_TRADE.side}</strong><p>La migliore operazione del periodo ha aggiunto <span data-sign={valueSign(BEST_RECENT_TRADE.netPnl)}>{money(BEST_RECENT_TRADE.netPnl)}</span> netti.</p></div></div><div className="story-item caution"><span>2</span><div><small>Perimetro dello storico</small><strong>{positions.length} posizioni aperte</strong><p>Il demo include solo posizioni chiuse.</p></div></div><div className="story-item positive"><span>3</span><div><small>Equity dimostrativa</small><strong>{money(ALPHA_ACCOUNT.equity)}</strong><p>Capitale demo iniziale più il risultato netto delle operazioni chiuse.</p></div></div></div>
           </section>
 
           <section className="calendar-strip"><div data-glass-label><CalendarDays size={19} /><span><strong>3 eventi ad alto impatto</strong> nelle prossime 24 ore</span></div><div className="event-pills" data-glass-label><span>13:30 · USD GDP</span><span>15:00 · USD Consumer Confidence</span><button onClick={() => goTo("calendar")}>Apri calendario <ArrowRight size={14} /></button></div></section>

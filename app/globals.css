@@ -1032,7 +1032,7 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
 .inspector-values dt { margin-bottom: 7px; color: var(--muted); font-size: 8px; }
 .inspector-values dd { margin: 0; overflow: hidden; color: #d4dde2;color: light-dark(#2a3337,#d4dde2); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 .inspector-values-full { margin: 18px 0; }
-.trade-costs { display: grid; grid-template-columns: repeat(3,1fr); gap: 1px; margin: 0 0 14px; overflow: hidden; border: 1px solid transparent; border-radius: 10px; background: var(--stroke); background-clip: padding-box; }
+.trade-costs { display: grid; grid-template-columns: repeat(4,1fr); gap: 1px; margin: 0 0 14px; overflow: hidden; border: 1px solid transparent; border-radius: 10px; background: var(--stroke); background-clip: padding-box; }
 .trade-costs > div { min-width: 0; padding: 10px; background: rgba(8,13,18,.88); }
 .trade-costs dt { margin-bottom: 6px; color: var(--muted); font-size: 7px; }
 .trade-costs dd { margin: 0; overflow: hidden; color: #d7e0e5;color: light-dark(#283137,#d7e0e5); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }

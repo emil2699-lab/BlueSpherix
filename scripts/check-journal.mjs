@@ -34,7 +34,7 @@ assert.equal(await editor.getByLabel('Esecuzione e osservazioni').inputValue(),'
 await editor.getByRole('button',{name:'Salva revisione'}).click();
 await page.locator('nav').getByRole('button',{name:'Operazioni',exact:true}).click();
 await page.getByRole('tab',{name:'Diario',exact:true}).click();
-await page.locator('.timeline-trade').filter({hasText:id}).click();
+await page.locator('.timeline-trade').filter({hasText:id.slice(0,8)}).click();
 assert.equal(await editor.getByLabel('Esecuzione e osservazioni').inputValue(),'Bozza preservata');
 await editor.getByLabel('Esecuzione e osservazioni').fill('Nota condivisa da Operazioni');await editor.getByRole('button',{name:'Salva revisione'}).click();
 await page.locator('nav').getByRole('button',{name:'Diario',exact:true}).click();
@@ -42,13 +42,20 @@ assert.equal(await editor.getByLabel('Esecuzione e osservazioni').inputValue(),'
 await page.getByLabel('Cerca nel diario').fill('non-esiste-xyz');await page.getByRole('heading',{name:'Nessun trade trovato'}).waitFor();
 await page.getByRole('button',{name:'Mostra tutte le operazioni'}).click();
 await page.getByRole('button',{name:'1A',exact:true}).click();
-await page.getByRole('button',{name:'Successiva',exact:true}).click();
-assert.match(await page.locator('.diary-pagination > span').textContent(),/^2 \/ /);
+const nextPage = page.getByRole('button',{name:'Successiva',exact:true});
+if (await nextPage.isEnabled()) {
+  await nextPage.click();
+  assert.match(await page.locator('.diary-pagination > span').textContent(),/^2 \/ /);
+} else {
+  assert.equal(await page.locator('.diary-pagination > span').textContent(), '1 / 1');
+}
 await page.getByRole('button',{name:'Giornate',exact:true}).click();
 await editor.getByLabel('Riepilogo della giornata').fill('Riflessione della giornata');await editor.getByRole('button',{name:'Salva revisione'}).click();
 assert.equal(await page.locator('.diary-days button').count(),1);
 const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'Esporta diario'}).click();const download=await downloadPromise;
-const content=JSON.parse(await fs.readFile(await download.path(),'utf8')); assert.equal(content.entries['day:2026-10-28'].note,'Riflessione della giornata');
+const content=JSON.parse(await fs.readFile(await download.path(),'utf8')); const exportedDays = Object.entries(content.entries).filter(([entryId]) => entryId.startsWith('day:'));
+assert.equal(exportedDays.length, 1);
+assert.equal(exportedDays[0][1].note, 'Riflessione della giornata');
 await page.getByRole('button',{name:'Trade',exact:true}).click();await page.getByRole('button',{name:'30G',exact:true}).click();
 for (const width of [1440,1024,768,390]) {
  await page.setViewportSize({width,height:1000});await page.waitForTimeout(350);

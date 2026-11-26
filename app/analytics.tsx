@@ -2,7 +2,8 @@
 
 import { useMemo, useState, type CSSProperties } from "react";
 import { BarChart3, Clock3, Crosshair, ShieldCheck, Sparkles, TrendingUp } from "lucide-react";
-import { accountAnalytics, EXIT_OPPORTUNITY_PCT, TRADE_DNA, type DemoPeriod } from "./demo-data";
+import { DEMO_ACCOUNT_NAME } from "./demo-ledger";
+import { accountAnalytics, TRADE_DNA, type DemoPeriod } from "./demo-data";
 import { valueSign } from "./value-sign";
 import MonthlyPerformance from "./monthly-performance";
 import { alphaAnalysisStart, firstTradeDay, lastTradeDay, validStartDate } from "./analysis-preferences";
@@ -42,10 +43,10 @@ export default function Analytics() {
 
   return <div className="analytics-view">
     <section className="welcome"><div><p className="date-line">Dai risultati alle decisioni</p><h1>Analisi.</h1><p>Scopri quando il tuo metodo funziona e quanto è affidabile.</p></div><div className="range-switch analytics-period" aria-label="Periodo analisi">{(["30G", "90G", "1A"] as Period[]).map(item => <button key={item} aria-pressed={period === item} className={period === item ? "active" : ""} onClick={() => setPeriod(item)}>{item}</button>)}</div></section>
-    <div className="demo-notice"><ShieldCheck size={16} /><span><strong>Analisi dimostrativa.</strong> Le statistiche sono simulate per mostrare il prodotto prima del collegamento MT5.</span></div>
+    <div className="demo-notice"><ShieldCheck size={16} /><span><strong>Analisi dimostrativa.</strong> Statistiche sui trade chiusi da Notion. Le fasce di ingresso usano l’ora del rendiconto.</span></div>
 
     <div className="market-fields account-start">
-      <label>Data d’inizio · Alpha Momentum
+      <label>Data d’inizio · {DEMO_ACCOUNT_NAME}
         <input type="date" min={firstTradeDay} max={lastTradeDay} value={start} onChange={event => {
           const date = event.target.value;
           if (!date || validStartDate(date)) alphaAnalysisStart.save(() => date);
@@ -58,7 +59,7 @@ export default function Analytics() {
       <article className="glass-card"><span className="analytics-icon"><TrendingUp size={17} /></span><p className="eyebrow">Profitto netto</p><strong data-sign={valueSign(stats.net)}>{euro(stats.net)}</strong><small>{stats.trades} operazioni nel campione</small></article>
       <article className="glass-card"><span className="analytics-icon violet"><BarChart3 size={17} /></span><p className="eyebrow">Profit factor</p><strong>{stats.factor.toLocaleString("it-IT")}</strong><small>{stats.factor >= 1.7 ? "Edge robusto" : "Edge positivo"} sulle operazioni chiuse</small></article>
       <article className="glass-card"><span className="analytics-icon amber"><Crosshair size={17} /></span><p className="eyebrow">Expectancy</p><strong data-sign={valueSign(stats.expectancy)}>{euro(stats.expectancy)}</strong><small>Valore medio per operazione chiusa</small></article>
-      <article className="glass-card"><span className="analytics-icon"><ShieldCheck size={17} /></span><p className="eyebrow">Data confidence</p><strong>{stats.confidence}%</strong><small>{stats.trades ? (stats.confidence > 90 ? "Campione molto affidabile" : "Campione già significativo") : "Nessun trade nel periodo"}</small></article>
+      <article className="glass-card"><span className="analytics-icon"><ShieldCheck size={17} /></span><p className="eyebrow">Campione</p><strong>{stats.closedTrades}</strong><small>Trade chiusi nel periodo</small></article>
     </section>
 
     <section className="analytics-main">
@@ -80,6 +81,6 @@ export default function Analytics() {
       <article className="glass-card instruments-card"><div className="section-head"><div><p className="eyebrow">Strumenti</p><h2>Contributo al profitto.</h2></div><span className="portfolio-caption">{stats.trades} trade</span></div><div className="instrument-list">{instruments.map(item => <div className={`instrument-row ${item.net < 0 ? "negative-row" : ""}`} key={item.name}><div><strong>{item.name}</strong><small>{item.trades} operazioni · {item.factor.toLocaleString("it-IT")} PF</small></div><div className="instrument-track"><i style={{ width: `${Math.min(100, Math.max(0, item.share))}%` }} /></div><span data-sign={valueSign(item.net)}>{euro(item.net)}</span></div>)}</div></article>
     </section>
 
-    <section className="glass-card dna-card"><div><p className="eyebrow">Trade DNA</p><h2>La firma del tuo processo.</h2><p>Quattro dimensioni calcolate sull’intero storico dei trade chiusi.</p></div><div className="dna-list">{TRADE_DNA.map(item => <div className="dna-row" key={item.label}><span>{item.label}<small>{item.detail}</small></span><div><i style={{ width: `${item.score}%` }} /></div><strong>{item.score}</strong></div>)}</div><div className="dna-insight"><Sparkles size={19} /><div><strong>Opportunità principale</strong><p>Il margine medio non catturato rispetto al MFE è circa il {EXIT_OPPORTUNITY_PCT}%. Il prossimo Lab potrà simulare regole di uscita alternative.</p></div></div></section>
+    <section className="glass-card dna-card"><div><p className="eyebrow">Trade DNA</p><h2>La firma del tuo processo.</h2><p>Indicatori ricavati dalle metriche disponibili nello storico.</p></div><div className="dna-list">{TRADE_DNA.map(item => <div className="dna-row" key={item.label}><span>{item.label}<small>{item.detail}</small></span><div><i style={{ width: `${item.score ?? 0}%` }} /></div><strong>{item.score === null ? "—" : `${item.score}%`}</strong></div>)}</div><div className="dna-insight"><Sparkles size={19} /><div><strong>Metriche richieste</strong><p>Per analizzare uscita e rischio servono l’escursione favorevole e il rischio iniziale di ciascun trade.</p></div></div></section>
   </div>;
 }

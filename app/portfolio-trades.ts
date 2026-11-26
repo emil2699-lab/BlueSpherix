@@ -10,8 +10,8 @@ export type PortfolioTrade = {
   progress: number;
   returnPct: number;
   netPnl: number;
-  source: "ledger" | "strategy-demo";
-  trade?: DemoTrade;
+  source: "ledger";
+  trade: DemoTrade;
 };
 
 function curveAt(returns: number[], progress: number) {
@@ -20,32 +20,14 @@ function curveAt(returns: number[], progress: number) {
   return returns[left] + (returns[left + 1] - returns[left]) * (index - left);
 }
 
-// Alpha uses the shared ledger. The other demo accounts only have return
-// curves: their illustrative events are explicitly distinguished from orders.
-export const PORTFOLIO_TRADES = DEMO_ACCOUNTS.flatMap<PortfolioTrade>(account => {
-  if (account.id === "alpha") return tradesForPeriod("30G").map(trade => {
-    const progress = Math.max(0, Math.min(1, (Date.parse(trade.openedAt) - PORTFOLIO_START) / (PORTFOLIO_END - PORTFOLIO_START)));
-    return { id: trade.id, accountId: account.id, timestamp: trade.openedAt, progress, returnPct: curveAt(account.returns, progress), netPnl: trade.netPnl, source: "ledger" as const, trade };
-  }).sort((a, b) => a.progress - b.progress);
+export const PORTFOLIO_TRADES = tradesForPeriod("30G").map<PortfolioTrade>(trade => {
+  const account = DEMO_ACCOUNTS[0];
+  const progress = (Date.parse(trade.closedAt) - PORTFOLIO_START) / (PORTFOLIO_END - PORTFOLIO_START);
+  return { id: trade.id, accountId: account.id, timestamp: trade.closedAt, progress, returnPct: curveAt(account.returns, progress), netPnl: trade.netPnl, source: "ledger", trade };
+}).sort((a, b) => a.progress - b.progress);
 
-  const opening = account.equity / (1 + account.returns.at(-1)! / 100);
-  let previous = Math.round(opening * 100) / 100;
-  return Array.from({ length: account.trades }, (_, index) => {
-    const progress = (index + 1) / account.trades;
-    const returnPct = curveAt(account.returns, progress);
-    const equity = Math.round(opening * (1 + returnPct / 100) * 100) / 100;
-    const netPnl = Math.round((equity - previous) * 100) / 100;
-    previous = equity;
-    return {
-      id: `${account.id === "atlas" ? "AS" : "NL"}-${String(index + 1).padStart(3, "0")}`,
-      accountId: account.id, timestamp: new Date(PORTFOLIO_START + progress * (PORTFOLIO_END - PORTFOLIO_START)).toISOString(),
-      progress, returnPct, netPnl, source: "strategy-demo" as const,
-    };
-  });
-});
-
-export function portfolioDate(progress: number, withTime = false) {
+export function portfolioDate(progress: number) {
   return new Date(PORTFOLIO_START + progress * (PORTFOLIO_END - PORTFOLIO_START)).toLocaleString("it-IT", {
-    day: "numeric", month: "short", ...(withTime ? { hour: "2-digit", minute: "2-digit" } : {}), timeZone: "Europe/Rome",
+    day: "numeric", month: "short", timeZone: "UTC",
   }).replaceAll(".", "");
 }

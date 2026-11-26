@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Download, Printer } from "lucide-react";
-import { DEMO_AS_OF, LEDGER_TRADES } from "./demo-ledger";
+import { DEMO_ACCOUNT_NAME, DEMO_AS_OF, LEDGER_TRADES } from "./demo-ledger";
 import { buildPerformanceReport } from "./performance-report";
 import { downloadReport, type ReportTable } from "./report-download";
 import { useJournal } from "./journal-store";
@@ -32,7 +32,7 @@ export default function MonthlyPerformance({ start = "" }: { start?: string }) {
   const latest = DEMO_AS_OF.slice(0, 10);
   const effectiveFrom = from > earliest ? from : earliest;
   const invalidDates = !!(to && effectiveFrom > to);
-  const context = `Alpha Momentum · Demo · Chiusure UTC dal ${day(effectiveFrom)} al ${day(to || latest)} · ${symbol || "Tutti gli strumenti"} · ${side || "Tutte le direzioni"}${tag ? ` · Tag ${tag}` : ""} · Dettaglio: ${month ? months(month) : "intero periodo"}`;
+  const context = `${DEMO_ACCOUNT_NAME} · Demo · Chiusure (ora del rendiconto) dal ${day(effectiveFrom)} al ${day(to || latest)} · ${symbol || "Tutti gli strumenti"} · ${side || "Tutte le direzioni"}${tag ? ` · Tag ${tag}` : ""} · Dettaglio: ${month ? months(month) : "intero periodo"}`;
   const monthly: ReportTable = {
     title: "Risultati mensili",
     columns: ["Mese", "Trade chiusi", "Netto", "Win rate", "Profit factor"],
@@ -68,7 +68,7 @@ export default function MonthlyPerformance({ start = "" }: { start?: string }) {
 
   return <section className="glass-card performance-report" aria-labelledby="performance-title">
     <div className="section-head">
-      <div><p className="eyebrow">Alpha Momentum · Demo</p><h2 id="performance-title">Report di performance</h2></div>
+      <div><p className="eyebrow">{DEMO_ACCOUNT_NAME} · Demo</p><h2 id="performance-title">Report di performance</h2></div>
       <div className="performance-actions">
         <button type="button" className="portfolio-export" onClick={() => exportAs("csv")} disabled={invalidDates}><Download size={14} /> CSV</button>
         <button type="button" className="portfolio-export" onClick={() => exportAs("html")} disabled={invalidDates}><Download size={14} /> HTML</button>

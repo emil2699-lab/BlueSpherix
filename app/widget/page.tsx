@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { DEMO_ACCOUNTS } from "../demo-data";
+import { DEMO_AS_OF } from "../demo-ledger";
 import { returnScale } from "../portfolio-scale";
 import { valueSign } from "../value-sign";
 
@@ -26,7 +27,7 @@ export default function DemoWidget() {
         <div><dt>Rendimento mensile</dt><dd data-sign={valueSign(account.returns.at(-1)!)}>{percent.format(account.returns.at(-1)!)}%</dd></div>
       </dl>
       <ReturnChart returns={account.returns} />
-      <p className="portfolio-caption">Ottobre 2026 · Risultati simulati</p>
+      <p className="portfolio-caption">{DEMO_AS_OF.slice(0, 10)} · Trade chiusi da Notion · Capitale demo</p>
       <a className="portfolio-export" href="../#portfolio" target="_top">Apri Portafoglio</a>
     </article> : <p role="status">{id === null ? "Caricamento del profilo…" : "Conto dimostrativo sconosciuto."}</p>}
   </main>;

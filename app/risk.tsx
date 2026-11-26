@@ -3,6 +3,7 @@
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, BellRing, CalendarClock, CheckCircle2, Crosshair, Gauge, Layers3, Network, Plus, ShieldAlert, ShieldCheck, Sparkles, Target, TrendingDown } from "lucide-react";
 import { ALPHA_ACCOUNT, DEMO_EQUITY_SERIES, DEMO_TRADES, OPEN_TRADES, type DemoTrade } from "./demo-data";
+import { DEMO_AS_OF } from "./demo-ledger";
 import { valueSign } from "./value-sign";
 import { positionUnderlight } from "./glass-underlight";
 
@@ -36,13 +37,14 @@ const drawdownRanges = {
   "90G": { days: 90, series: DEMO_EQUITY_SERIES["3M"] },
 } satisfies Record<DrawdownRange, { days: number; series: number[] }>;
 
-const historicalRMultiples = DEMO_TRADES.filter(trade => trade.status === "Chiusa").map(trade => trade.rMultiple);
+const historicalRMultiples = DEMO_TRADES.flatMap(trade => trade.status === "Chiusa" && trade.rMultiple !== null ? [trade.rMultiple] : []);
 
 function percentile(sorted: number[], position: number) {
   return sorted[Math.min(sorted.length - 1, Math.max(0, Math.round((sorted.length - 1) * position)))] ?? 0;
 }
 
 function runMonteCarlo(riskPct: number, horizon: MonteCarloHorizon, pathCount = 500) {
+  if (!historicalRMultiples.length) return { bands: [{ p10: 100, p50: 100, p90: 100 }], medianReturn: 0, negativeProbability: 0, severeDrawdownProbability: 0, stressDrawdown: 0 };
   let seed = 421337;
   const random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
   const paths: number[][] = [];
@@ -88,7 +90,7 @@ function drawdownFrom(values: number[]) {
 function pointDate(range: DrawdownRange, index: number, count: number) {
   const days = drawdownRanges[range].days;
   const daysAgo = Math.round((count - 1 - index) * (days - 1) / Math.max(1, count - 1));
-  const date = new Date(Date.UTC(2026, 9, 28 - daysAgo));
+  const date = new Date(Date.parse(DEMO_AS_OF) - daysAgo * 86400000);
   return new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "short", timeZone: "UTC" }).format(date);
 }
 
@@ -102,7 +104,7 @@ export default function Risk() {
   const [protections, setProtections] = useState<Record<ProtectionId, boolean>>({ "daily-loss": true, "loss-streak": true, margin: true, news: true });
   const [monteCarloRisk, setMonteCarloRisk] = useState(.5);
   const [monteCarloHorizon, setMonteCarloHorizon] = useState<MonteCarloHorizon>(40);
-  const openRisk = useMemo(() => OPEN_TRADES.reduce((total, trade) => total + trade.riskUsd, 0), []);
+  const openRisk = useMemo(() => OPEN_TRADES.reduce((total, trade) => total + (trade.riskUsd ?? 0), 0), []);
   const budgetUsd = ALPHA_ACCOUNT.equity * ALPHA_ACCOUNT.riskLimit / 100;
   const budgetUsed = openRisk / budgetUsd * 100;
   const remainingRisk = Math.max(0, budgetUsd - openRisk);
@@ -114,7 +116,7 @@ export default function Risk() {
   const projectedDrawdown = ALPHA_ACCOUNT.currentDrawdown + stressPct;
   const riskTone = ALPHA_ACCOUNT.riskScore < 35 ? "calm" : ALPHA_ACCOUNT.riskScore < 70 ? "warning" : "critical";
   const budgetTone = budgetUsed < 60 ? "calm" : budgetUsed < 90 ? "warning" : "critical";
-  const largestRisk = [...OPEN_TRADES].sort((a, b) => b.riskUsd - a.riskUsd)[0];
+  const largestRisk = [...OPEN_TRADES].sort((a, b) => (b.riskUsd ?? 0) - (a.riskUsd ?? 0))[0];
   const candidateRiskUsd = ALPHA_ACCOUNT.equity * candidateRiskPct / 100;
   const projectedOpenRisk = openRisk + candidateRiskUsd;
   const projectedRiskPct = projectedOpenRisk / ALPHA_ACCOUNT.equity * 100;
@@ -124,8 +126,8 @@ export default function Risk() {
   const tradeFits = bufferAfterTrade >= 0;
   const selectedCorrelation = correlationPairs.find(pair => pair.id === correlationId) ?? correlationPairs[0];
   const correlatedTrades = OPEN_TRADES.filter(trade => trade.symbol === selectedCorrelation.left || trade.symbol === selectedCorrelation.right);
-  const correlatedRisk = correlatedTrades.reduce((total, trade) => total + trade.riskUsd, 0);
-  const correlatedShare = correlatedRisk / openRisk * 100;
+  const correlatedRisk = correlatedTrades.reduce((total, trade) => total + (trade.riskUsd ?? 0), 0);
+  const correlatedShare = openRisk ? correlatedRisk / openRisk * 100 : 0;
   const correlationTone = Math.abs(selectedCorrelation.value) >= .65 ? "critical" : Math.abs(selectedCorrelation.value) >= .35 ? "warning" : "calm";
   const equityHistory = drawdownRanges[drawdownRange].series;
   const drawdownHistory = useMemo(() => drawdownFrom(equityHistory), [equityHistory]);
@@ -143,9 +145,9 @@ export default function Risk() {
   const timeUnderwater = selectedDrawdown < .01 ? 0 : Math.max(1, Math.round((activeDrawdownPoint - previousPeakIndex) * (drawdownRanges[drawdownRange].days - 1) / Math.max(1, drawdownHistory.length - 1)));
   const drawdownLimit = 8;
   const drawdownStrength = Math.min(1, selectedDrawdown / drawdownLimit);
-  const latestClosedTrades = DEMO_TRADES.filter(trade => trade.status === "Chiusa").sort((a, b) => b.openedAt.localeCompare(a.openedAt));
+  const latestClosedTrades = DEMO_TRADES.filter(trade => trade.status === "Chiusa").sort((a, b) => b.closedAt.localeCompare(a.closedAt));
   const consecutiveLosses = latestClosedTrades.findIndex(trade => trade.netPnl >= 0) === -1 ? latestClosedTrades.length : latestClosedTrades.findIndex(trade => trade.netPnl >= 0);
-  const todayClosedNet = latestClosedTrades.filter(trade => trade.openedAt.startsWith("2026-10-28")).reduce((total, trade) => total + trade.netPnl, 0);
+  const todayClosedNet = latestClosedTrades.filter(trade => trade.closedAt.startsWith(DEMO_AS_OF.slice(0, 10))).reduce((total, trade) => total + trade.netPnl, 0);
   const dailyLossPct = Math.max(0, -todayClosedNet / ALPHA_ACCOUNT.equity * 100);
   const protectionRules = [
     { id: "daily-loss" as const, icon: <TrendingDown size={17} />, label: "Perdita giornaliera", detail: "Avvisa quando le perdite chiuse raggiungono il 2% dell’equity.", value: `${percent(dailyLossPct)} / ${percent(2)}`, used: dailyLossPct / 2 * 100, tone: dailyLossPct >= 2 ? "critical" : dailyLossPct >= 1.4 ? "warning" : "calm", triggered: dailyLossPct >= 2 },
@@ -174,7 +176,7 @@ export default function Risk() {
       <span className={`risk-live-status ${budgetTone}`}><i /> {budgetTone === "calm" ? "Ampio margine" : budgetTone === "warning" ? "Budget quasi pieno" : "Limite critico"}</span>
     </section>
 
-    <div className="demo-notice"><ShieldCheck size={16} /><span><strong>Risk Center dimostrativo.</strong> I calcoli usano le posizioni simulate e saranno aggiornati in tempo reale dal collegamento MT5.</span></div>
+    <div className="demo-notice"><ShieldCheck size={16} /><span><strong>Risk Center dimostrativo.</strong> Drawdown dai trade chiusi e dal capitale demo. I limiti e le correlazioni sono scenari illustrativi.</span></div>
 
     <section className="risk-overview">
       <article className={`glass-card risk-score-card risk-${riskTone}`}>
@@ -194,7 +196,7 @@ export default function Risk() {
       <RiskKpi icon={<TrendingDown size={18} />} label="Drawdown corrente" value={percent(ALPHA_ACCOUNT.currentDrawdown)} detail={`Massimo storico ${percent(ALPHA_ACCOUNT.maxDrawdown)}`} severity={ALPHA_ACCOUNT.currentDrawdown / Math.max(1, ALPHA_ACCOUNT.maxDrawdown)} />
       <RiskKpi icon={<Activity size={18} />} label="Uso margine" value={percent(ALPHA_ACCOUNT.marginUsage, 1)} detail="Stima sul rischio aperto" severity={ALPHA_ACCOUNT.marginUsage / 10} />
       <RiskKpi icon={<Layers3 size={18} />} label="Posizioni aperte" value={String(OPEN_TRADES.length)} detail={`${OPEN_TRADES.filter(trade => trade.side === "Long").length} Long · ${OPEN_TRADES.filter(trade => trade.side === "Short").length} Short`} severity={OPEN_TRADES.length / 8} />
-      <RiskKpi icon={<Crosshair size={18} />} label="Concentrazione massima" value={largestRisk ? percent(largestRisk.riskUsd / openRisk * 100, 1) : "0%"} detail={largestRisk ? `${largestRisk.symbol} · ${money(largestRisk.riskUsd)}` : "Nessuna esposizione"} severity={largestRisk ? largestRisk.riskUsd / openRisk : 0} />
+      <RiskKpi icon={<Crosshair size={18} />} label="Concentrazione massima" value={largestRisk ? percent((largestRisk.riskUsd ?? 0) / (openRisk || 1) * 100, 1) : "0%"} detail={largestRisk ? `${largestRisk.symbol} · ${money(largestRisk.riskUsd ?? 0)}` : "Nessuna esposizione"} severity={largestRisk ? (largestRisk.riskUsd ?? 0) / (openRisk || 1) : 0} />
     </section>
 
     <section className="risk-main-grid">
@@ -203,7 +205,7 @@ export default function Risk() {
         <div className="exposure-list">
           {OPEN_TRADES.map((trade) => <ExposureRow key={trade.id} trade={trade} totalRisk={openRisk} selected={trade.id === selectedTrade?.id} onSelect={() => setSelectedId(trade.id)} />)}
         </div>
-        {selectedTrade && <div className="exposure-focus" aria-live="polite"><div><span>Posizione selezionata</span><strong>{selectedTrade.symbol} · {selectedTrade.side}</strong></div><dl><div><dt>Rischio</dt><dd>{money(selectedTrade.riskUsd)}</dd></div><div><dt>Risultato aperto</dt><dd data-sign={valueSign(selectedTrade.netPnl)}>{signedMoney(selectedTrade.netPnl)}</dd></div><div><dt>MAE</dt><dd data-sign={valueSign(selectedTrade.maeUsd)}>{money(selectedTrade.maeUsd)}</dd></div><div><dt>R corrente</dt><dd data-sign={valueSign(selectedTrade.rMultiple)}>{selectedTrade.rMultiple.toLocaleString("it-IT")}R</dd></div></dl></div>}
+        {selectedTrade && <div className="exposure-focus" aria-live="polite"><div><span>Posizione selezionata</span><strong>{selectedTrade.symbol} · {selectedTrade.side}</strong></div><dl><div><dt>Rischio</dt><dd>{selectedTrade.riskUsd === null ? "—" : money(selectedTrade.riskUsd)}</dd></div><div><dt>Risultato aperto</dt><dd data-sign={valueSign(selectedTrade.netPnl)}>{signedMoney(selectedTrade.netPnl)}</dd></div><div><dt>MAE</dt><dd data-sign={valueSign(selectedTrade.maeUsd ?? 0)}>{selectedTrade.maeUsd === null ? "—" : money(selectedTrade.maeUsd)}</dd></div><div><dt>R corrente</dt><dd data-sign={valueSign(selectedTrade.rMultiple ?? 0)}>{selectedTrade.rMultiple === null ? "—" : `${selectedTrade.rMultiple.toLocaleString("it-IT")}R`}</dd></div></dl></div>}
       </article>
 
       <article className={`glass-card stress-card stress-${scenario}`}>
@@ -316,7 +318,7 @@ export default function Risk() {
       </aside>
     </section>
 
-    <section className={`glass-card monte-carlo-lab risk-${monteCarloTone}`} aria-labelledby="monte-carlo-title">
+    {historicalRMultiples.length ? <section className={`glass-card monte-carlo-lab risk-${monteCarloTone}`} aria-labelledby="monte-carlo-title">
       <div className="monte-carlo-main">
         <div className="section-head monte-carlo-head"><div><p className="eyebrow">Monte Carlo lab</p><h2 id="monte-carlo-title">Cinquecento futuri possibili, partendo dal tuo storico.</h2></div><span className="portfolio-caption">{historicalRMultiples.length} trade chiusi · risultati in R</span></div>
         <div className="monte-carlo-controls">
@@ -346,11 +348,14 @@ export default function Risk() {
         <div className="monte-carlo-message"><Sparkles size={16} /><p>{monteCarloTone === "critical" ? "La coda di rischio è significativa. Ridurre la size comprime il ventaglio dei risultati e i drawdown estremi." : monteCarloTone === "warning" ? "Una parte degli scenari supera il 10% di drawdown. Valuta una size inferiore prima di aumentare l’orizzonte." : "Nelle simulazioni la coda di drawdown resta sotto il 10%, ma gli esiti negativi rimangono possibili."}</p></div>
         <small><ShieldCheck size={12} /> Simulazione statistica dimostrativa: descrive una distribuzione, non una previsione.</small>
       </aside>
-    </section>
+    </section> : <section className="glass-card monte-carlo-lab" aria-labelledby="monte-carlo-title">
+      <div className="section-head"><div><p className="eyebrow">Monte Carlo lab</p><h2 id="monte-carlo-title">Simulazione in R</h2></div></div>
+      <p>Per avviare la simulazione serve il rischio iniziale di ogni trade.</p>
+    </section>}
 
     <section className="risk-bottom-grid">
       <article className="glass-card limits-card"><div className="section-head"><div><p className="eyebrow">Guardrail</p><h2>Limiti operativi.</h2></div><Target size={19} /></div><div className="limit-list"><LimitRow label="Rischio complessivo" current={ALPHA_ACCOUNT.activeRisk} limit={ALPHA_ACCOUNT.riskLimit} /><LimitRow label="Drawdown corrente" current={ALPHA_ACCOUNT.currentDrawdown} limit={8} /><LimitRow label="Margine utilizzato" current={ALPHA_ACCOUNT.marginUsage} limit={20} /></div></article>
-      <article className="glass-card risk-insight"><Sparkles size={20} /><div><p className="eyebrow">Spherix guard</p><h2>Il rischio è moderato, ma il {percent(budgetUsed, 0)} del budget è già impegnato.</h2><p>Una nuova posizione delle dimensioni medie attuali supererebbe il limite di {percent(ALPHA_ACCOUNT.riskLimit, 1)}. Riduci prima l’esposizione o attendi la chiusura di un trade.</p><small><ShieldCheck size={12} /> Basato su {OPEN_TRADES.length} posizioni e {money(openRisk)} di rischio previsto</small></div></article>
+      <article className="glass-card risk-insight"><Sparkles size={20} /><div><p className="eyebrow">Spherix guard</p><h2>Budget demo utilizzato: {percent(budgetUsed, 0)}.</h2><p>Il simulatore mostra come un nuovo trade inciderebbe sul limite demo di {percent(ALPHA_ACCOUNT.riskLimit, 1)}.</p><small><ShieldCheck size={12} /> Basato su {OPEN_TRADES.length} posizioni e {money(openRisk)} di rischio previsto</small></div></article>
     </section>
   </div>;
 }
@@ -380,9 +385,9 @@ function RiskKpi({ icon, label, value, detail, severity }: { icon: ReactNode; la
 }
 
 function ExposureRow({ trade, totalRisk, selected, onSelect }: { trade: DemoTrade; totalRisk: number; selected: boolean; onSelect: () => void }) {
-  const share = trade.riskUsd / totalRisk * 100;
+  const share = totalRisk ? (trade.riskUsd ?? 0) / totalRisk * 100 : 0;
   const heat = .035 + share / 100 * .16;
-  return <button className={`exposure-row ${selected ? "selected" : ""}`} data-glass-underlight={positionUnderlight(trade.netPnl, ALPHA_ACCOUNT.balance)} onClick={onSelect} style={{ background: `linear-gradient(90deg,rgba(255,111,125,${heat}),rgba(255,111,125,.012) 78%)` }}><span className="exposure-symbol"><i>{trade.symbol.slice(0, 2)}</i><span><strong>{trade.symbol}</strong><small>{trade.setup}</small></span></span><span className={trade.side === "Long" ? "long" : "short"}>{trade.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{trade.side}</span><span className="exposure-share"><i><b style={{ width: `${share}%` }} /></i><small>{percent(share, 1)} del rischio</small></span><strong>{money(trade.riskUsd)}</strong></button>;
+  return <button className={`exposure-row ${selected ? "selected" : ""}`} data-glass-underlight={positionUnderlight(trade.netPnl, ALPHA_ACCOUNT.balance)} onClick={onSelect} style={{ background: `linear-gradient(90deg,rgba(255,111,125,${heat}),rgba(255,111,125,.012) 78%)` }}><span className="exposure-symbol"><i>{trade.symbol.slice(0, 2)}</i><span><strong>{trade.symbol}</strong><small>{trade.setup}</small></span></span><span className={trade.side === "Long" ? "long" : "short"}>{trade.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{trade.side}</span><span className="exposure-share"><i><b style={{ width: `${share}%` }} /></i><small>{percent(share, 1)} del rischio</small></span><strong>{trade.riskUsd === null ? "—" : money(trade.riskUsd)}</strong></button>;
 }
 
 function LimitRow({ label, current, limit }: { label: string; current: number; limit: number }) {

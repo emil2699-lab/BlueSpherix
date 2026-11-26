@@ -21,14 +21,14 @@ npm run build
 npm run start
 ```
 
-The demo ledger is deterministic and contains 314 operations. Regenerate its downloadable CSV with:
+The demo uses a single account with de-identified closed trades from Notion. Regenerate its downloadable CSV with:
 
 ```bash
 npm run data:csv
 npm run data:check
 ```
 
-The generated file is `public/data/demo-operations.csv`. Dashboard, Analytics, Operations, and the Alpha Momentum account in Portfolio calculate their totals from the same ledger: balance, equity, open P&L, win rate, profit factor, expectancy, average R, drawdown, sessions, instruments, heatmaps, and period curves are not maintained as independent display values.
+The generated file is `public/data/demo-operations.csv`. Dashboard, Analytics, Operations, and Portfolio use the same trade history. Timestamps retain the original statement time. Balance, equity, and percentage returns use a USD 100,000 demo opening balance. The public dataset includes only trade fields and excludes account numbers, broker tickets, and notes.
 
 ## Current scope
 
@@ -36,7 +36,7 @@ The generated file is `public/data/demo-operations.csv`. Dashboard, Analytics, O
 - Equity and balance timeline with period controls
 - Risk Weather, performance metrics, open positions, insights, and Equity Story
 - Dark visual system and installable web-app metadata
-- Deterministic 314-operation demo ledger with a downloadable CSV
+- Notion closed-trade demo history with a downloadable CSV
 - Shared calculation layer used across all product sections
 - Monthly performance reports with date, symbol, and direction filters, plus CSV, HTML, and print/PDF export
 - Ten local trading calculators and demo calendar event export (ICS)

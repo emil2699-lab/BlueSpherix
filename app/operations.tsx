@@ -12,9 +12,10 @@ import {
   Sparkles,
   Target,
 } from "lucide-react";
-import { ALPHA_ACCOUNT, DEMO_PENDING_ORDERS, DEMO_PERIOD_STATS, DEMO_TRADES, OPEN_PNL, RECENT_PLAN_COUNT, tradesForPeriod, type DemoPendingOrder, type DemoPeriod, type DemoTrade } from "./demo-data";
+import { ALPHA_ACCOUNT, DEMO_PENDING_ORDERS, DEMO_PERIOD_STATS, DEMO_TRADES, OPEN_PNL, formatPrice as price, tradesForPeriod, type DemoPendingOrder, type DemoPeriod, type DemoTrade } from "./demo-data";
 import { FilterSelect, DateFilterPicker } from "./trade-controls";
 import { JournalEditor } from "./journal-editor";
+import { DEMO_ACCOUNT_NAME, statementTime } from "./demo-ledger";
 import { valueSign } from "./value-sign";
 import { positionUnderlight } from "./glass-underlight";
 
@@ -29,21 +30,12 @@ const trades = DEMO_TRADES;
 const money = (value: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value);
 const signedMoney = (value: number) => `${value > 0 ? "+" : ""}${money(value)}`;
 const groupedTradeDays = (items: DemoTrade[]) => [...new Map(items.map((trade) => [trade.day, trade.day])).keys()].map((day) => ({ day, trades: items.filter((trade) => trade.day === day) }));
-const priceDigits: Record<string, number> = { EURUSD: 5, GBPUSD: 5, GBPJPY: 3, USDJPY: 3, XAUUSD: 2, US500: 2 };
-const price = (symbol: string, value: number) => value.toLocaleString("it-IT", { minimumFractionDigits: priceDigits[symbol] ?? 2, maximumFractionDigits: priceDigits[symbol] ?? 2 });
-const distanceFor = (symbol: string) => ({ EURUSD: .0016, GBPUSD: .0018, GBPJPY: .24, USDJPY: .22, XAUUSD: 8.2, US500: 18 }[symbol] ?? 1);
-const levelsFor = (trade: DemoTrade) => {
-  const direction = trade.side === "Long" ? 1 : -1;
-  const distance = distanceFor(trade.symbol);
-  return { stopLoss: trade.entry - direction * distance, takeProfit: trade.entry + direction * distance * 2 };
-};
-
 export default function Operations() {
   const [period, setPeriod] = useState<Period>("30G");
   const [filter, setFilter] = useState<TradeFilter>("Tutte");
   const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState("T-1048");
-  const [selectedPendingId, setSelectedPendingId] = useState(DEMO_PENDING_ORDERS[0].id);
+  const [selected, setSelected] = useState(trades[0]?.id ?? "");
+  const [selectedPendingId, setSelectedPendingId] = useState(DEMO_PENDING_ORDERS[0]?.id ?? "");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [accountFilter, setAccountFilter] = useState("Tutti");
   const [symbolFilter, setSymbolFilter] = useState("Tutti");
@@ -55,7 +47,7 @@ export default function Operations() {
   const [dateTo, setDateTo] = useState("");
   const stats = periodStats[period];
   const periodTrades = useMemo(() => tradesForPeriod(period), [period]);
-  const setupOptions = useMemo(() => [...new Set([...periodTrades.map((trade) => trade.setup), ...DEMO_PENDING_ORDERS.map((order) => order.setup)])].sort(), [periodTrades]);
+  const setupOptions = useMemo(() => [...new Set([...periodTrades.map((trade) => trade.setup), ...DEMO_PENDING_ORDERS.map((order) => order.setup)])].filter(Boolean).sort(), [periodTrades]);
   const symbolOptions = useMemo(() => [...new Set([...periodTrades.map((trade) => trade.symbol), ...DEMO_PENDING_ORDERS.map((order) => order.symbol)])].sort(), [periodTrades]);
 
   const visibleTrades = useMemo(() => {
@@ -92,9 +84,9 @@ export default function Operations() {
     });
   }, [accountFilter, dateFrom, dateTo, directionFilter, filter, query, setupFilter, symbolFilter]);
 
-  const selectedTrade = visibleTrades.find((trade) => trade.id === selected) ?? visibleTrades[0] ?? periodTrades[0] ?? trades[0];
-  const selectedPending = visiblePending.find((order) => order.id === selectedPendingId) ?? visiblePending[0] ?? DEMO_PENDING_ORDERS[0];
-  const maxFlow = Math.max(...stats.flow.map((value) => Math.abs(value)));
+  const selectedTrade = visibleTrades.find((trade) => trade.id === selected) ?? visibleTrades[0];
+  const selectedPending = visiblePending.find((order) => order.id === selectedPendingId) ?? visiblePending[0];
+  const maxFlow = Math.max(1, ...stats.flow.map((value) => Math.abs(value)));
   const clearAdvancedFilters = () => {
     setAccountFilter("Tutti");
     setSymbolFilter("Tutti");
@@ -108,8 +100,8 @@ export default function Operations() {
 
   const download = () => {
     const rows = filter === "Pendenti"
-      ? [["Dati dimostrativi — nessun conto collegato"], ["ID", "Strumento", "Tipo", "Volume", "Prezzo previsto", "Mercato", "SL", "TP", "Scadenza", "Rischio USD", "Setup"], ...visiblePending.map((order) => [order.id, order.symbol, order.type, order.volume, order.trigger, order.current, order.stopLoss, order.takeProfit, order.expiry, order.riskUsd, order.setup])]
-      : [["Dati dimostrativi — nessun conto collegato"], ["Ticket", "Data", "Strumento", "Direzione", "Volume", "Ingresso", "Corrente", "Uscita", "Lordo USD", "Commissioni", "Swap", "Netto USD", "Rischio USD", "Stato", "Setup"], ...visibleTrades.map((trade) => [trade.id, trade.date, trade.symbol, trade.side, trade.volume, trade.entry, trade.current ?? "", trade.exit ?? "", trade.grossPnl, trade.commission, trade.swap, trade.result, trade.riskUsd, trade.status, trade.setup])];
+      ? [["Storico da Notion — orari del rendiconto"], ["ID", "Strumento", "Tipo", "Volume", "Prezzo previsto", "Mercato", "SL", "TP", "Scadenza", "Rischio USD", "Setup"], ...visiblePending.map((order) => [order.id, order.symbol, order.type, order.volume, order.trigger, order.current, order.stopLoss, order.takeProfit, order.expiry, order.riskUsd, order.setup])]
+      : [["Storico da Notion — orari del rendiconto"], ["ID pubblico", "Apertura", "Chiusura", "Strumento", "Direzione", "Volume", "Ingresso", "Corrente", "Uscita", "Lordo USD", "Commissioni", "Swap", "Fee", "Netto USD", "Rischio USD", "Stato", "Setup"], ...visibleTrades.map((trade) => [trade.id, statementTime(trade.openedAt), statementTime(trade.closedAt), trade.symbol, trade.side, trade.volume, trade.entry, trade.current ?? "", trade.exit ?? "", trade.grossPnl, trade.commission, trade.swap, trade.fee, trade.result, trade.riskUsd, trade.status, trade.setup])];
     const blob = new Blob(["\uFEFF" + rows.map((row) => row.join(";")).join("\r\n")], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -136,7 +128,7 @@ export default function Operations() {
         </div>
       </section>
 
-      <div className="demo-notice"><ShieldCheck size={16} /><span><strong>Registro dimostrativo.</strong> Operazioni e risultati sono simulati; il registro verrà popolato automaticamente dal collegamento MT5.</span></div>
+      <div className="demo-notice"><ShieldCheck size={16} /><span><strong>Registro dimostrativo.</strong> Trade interamente chiusi da Notion. Le date e gli orari seguono il rendiconto.</span></div>
 
       <HybridOverview stats={stats} period={period} maxFlow={maxFlow} periodTrades={periodTrades} />
 
@@ -184,14 +176,14 @@ function HybridOverview({ stats, period, maxFlow, periodTrades }: { stats: (type
   const stackedFlow = Math.abs(stats.net) > 99998;
   const gross = periodTrades.reduce((total, trade) => total + trade.grossPnl, 0);
   const commissions = periodTrades.reduce((total, trade) => total + trade.commission, 0);
-  const swaps = periodTrades.reduce((total, trade) => total + trade.swap, 0);
+  const carryCosts = periodTrades.reduce((total, trade) => total + trade.swap + trade.fee, 0);
   const metrics = [
     { label: "Operazioni", value: stats.trades.toString(), detail: `${stats.closedTrades} chiuse · ${stats.trades - stats.closedTrades} aperte` },
     { label: "Win rate", value: `${stats.win.toLocaleString("it-IT")}%`, detail: `${stats.wins} vincenti su ${stats.closedTrades} chiuse` },
-    { label: "R medio", value: `${stats.averageR.toLocaleString("it-IT", { minimumFractionDigits: 2 })}R`, detail: "sulle operazioni chiuse", signValue: stats.averageR },
-    { label: "Oggi", value: signedMoney(OPEN_PNL), detail: `${trades.filter(trade => trade.status === "Aperta").length} posizioni aperte`, signValue: OPEN_PNL },
-    { label: "Qualità", value: `${ALPHA_ACCOUNT.executionQuality}/100`, detail: "sopra la media" },
-    { label: "Rischio", value: `${ALPHA_ACCOUNT.activeRisk.toLocaleString("it-IT")}%`, detail: `zona abituale · limite ${ALPHA_ACCOUNT.riskLimit.toLocaleString("it-IT", { minimumFractionDigits: 2 })}%` },
+    { label: "R medio", value: stats.averageR === null ? "—" : `${stats.averageR.toLocaleString("it-IT", { minimumFractionDigits: 2 })}R`, detail: "Richiede il rischio iniziale", signValue: stats.averageR ?? undefined },
+    { label: "Flottante demo", value: signedMoney(OPEN_PNL), detail: "Storico di posizioni chiuse", signValue: OPEN_PNL },
+    { label: "Lotti chiusi", value: periodTrades.reduce((total, trade) => total + trade.volume, 0).toLocaleString("it-IT", { maximumFractionDigits: 2 }), detail: "Volume di apertura riconciliato" },
+    { label: "Rischio demo", value: `${ALPHA_ACCOUNT.activeRisk.toLocaleString("it-IT")}%`, detail: `limite demo ${ALPHA_ACCOUNT.riskLimit.toLocaleString("it-IT", { minimumFractionDigits: 2 })}%` },
   ];
   return <section className="hybrid-overview">
     <article className={`glass-card hybrid-flow-card ${stackedFlow ? "is-stacked" : ""}`}>
@@ -208,10 +200,10 @@ function HybridOverview({ stats, period, maxFlow, periodTrades }: { stats: (type
       <dl className="net-breakdown" aria-label="Composizione del risultato netto">
         <div><dt>Lordo</dt><dd data-sign={valueSign(gross)}>{signedMoney(gross)}</dd></div>
         <div><dt>Commissioni</dt><dd data-sign={valueSign(commissions)}>{money(commissions)}</dd></div>
-        <div><dt>Swap</dt><dd data-sign={valueSign(swaps)}>{money(swaps)}</dd></div>
+        <div><dt>Swap e fee</dt><dd data-sign={valueSign(carryCosts)}>{money(carryCosts)}</dd></div>
         <div><dt>Netto reale</dt><dd data-sign={valueSign(stats.net)}>{signedMoney(stats.net)}</dd></div>
       </dl>
-      <div className="hybrid-insight"><Sparkles size={15} /><span>Il netto include commissioni e swap · rapporto medio guadagno/perdita {stats.averageWinLoss.toLocaleString("it-IT")}.</span></div>
+      <div className="hybrid-insight"><Sparkles size={15} /><span>Il netto include commissioni, swap e fee · rapporto medio guadagno/perdita {stats.averageWinLoss.toLocaleString("it-IT")}.</span></div>
     </article>
     <div className="hybrid-metrics">
       {metrics.map((metric) => <article className="glass-card" key={metric.label}><p>{metric.label}</p><strong data-sign={metric.signValue === undefined ? undefined : valueSign(metric.signValue)}>{metric.value}</strong><small>{metric.detail}</small></article>)}
@@ -223,8 +215,8 @@ function TimelineWorkspace({ contained = false, visible, pendingOrders, selected
   contained?: boolean;
   visible: typeof trades;
   pendingOrders: DemoPendingOrder[];
-  selectedTrade: typeof trades[number];
-  selectedPending: DemoPendingOrder;
+  selectedTrade?: DemoTrade;
+  selectedPending?: DemoPendingOrder;
   setSelected: (id: string) => void;
   setSelectedPending: (id: string) => void;
   query: string;
@@ -257,7 +249,7 @@ function TimelineWorkspace({ contained = false, visible, pendingOrders, selected
   const [focusHeight, setFocusHeight] = useState(578);
   const [focusTab, setFocusTab] = useState<FocusTab>("Dettagli");
   const pendingMode = filter === "Pendenti";
-  const activeId = pendingMode ? selectedPending.id : selectedTrade.id;
+  const activeId = pendingMode ? selectedPending?.id : selectedTrade?.id;
 
   useEffect(() => {
     if (!contained || !inspectorRef.current) return;
@@ -290,9 +282,9 @@ function TimelineWorkspace({ contained = false, visible, pendingOrders, selected
           const total = dayTrades.reduce((sum, trade) => sum + trade.result, 0);
           return <div className="timeline-day" key={day}>
             <div className="timeline-day-head"><span>{day}</span><strong data-sign={valueSign(total)}>{signedMoney(total)}</strong></div>
-            {dayTrades.map((trade) => <button key={trade.id} className={`timeline-trade ${selectedTrade.id === trade.id ? "selected" : ""} ${trade.result < 0 ? (Math.abs(trade.result) >= 200 ? "loss severe" : "loss") : ""}`} data-glass-underlight={positionUnderlight(trade.result, ALPHA_ACCOUNT.balance)} onClick={() => setSelected(trade.id)}>
-              <time>{trade.time}<small>{trade.id}</small></time>
-              <span className="timeline-symbol"><i>{trade.symbol.slice(0, 2)}</i><span><strong>{trade.symbol}</strong><small>{trade.setup}</small></span></span>
+            {dayTrades.map((trade) => <button key={trade.id} className={`timeline-trade ${selectedTrade?.id === trade.id ? "selected" : ""} ${trade.result < 0 ? (Math.abs(trade.result) >= 200 ? "loss severe" : "loss") : ""}`} data-glass-underlight={positionUnderlight(trade.result, ALPHA_ACCOUNT.balance)} onClick={() => setSelected(trade.id)}>
+              <time>{trade.time}<small>{trade.id.slice(0, 8)}</small></time>
+              <span className="timeline-symbol"><i>{trade.symbol.slice(0, 2)}</i><span><strong>{trade.symbol}</strong><small>{trade.setup || "Notion"}</small></span></span>
               <span className={trade.side === "Long" ? "long" : "short"}>{trade.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{trade.side}<small>{trade.volumeLabel} lot</small></span>
               <span className="timeline-status">{trade.status}</span>
               <strong data-sign={valueSign(trade.result)}>{signedMoney(trade.result)}</strong>
@@ -303,10 +295,10 @@ function TimelineWorkspace({ contained = false, visible, pendingOrders, selected
       </div>
     </article>
 
-    <aside ref={inspectorRef} className={`glass-card trade-inspector ${!pendingMode && selectedTrade.result < 0 ? `negative-surface ${Math.abs(selectedTrade.result) >= 200 ? "negative-strong" : ""}` : ""}`}>
-      {pendingMode
-        ? <PendingInspector order={selectedPending} />
-        : <TradeInspector trade={selectedTrade} focusTab={focusTab} setFocusTab={setFocusTab} />}
+    <aside ref={inspectorRef} className={`glass-card trade-inspector ${!pendingMode && selectedTrade && selectedTrade.result < 0 ? `negative-surface ${Math.abs(selectedTrade.result) >= 200 ? "negative-strong" : ""}` : ""}`}>
+      {pendingMode && selectedPending && <PendingInspector order={selectedPending} />}
+      {!pendingMode && selectedTrade && <TradeInspector trade={selectedTrade} focusTab={focusTab} setFocusTab={setFocusTab} />}
+      {!(pendingMode ? selectedPending : selectedTrade) && <p className="ledger-empty">Nessuna operazione da mostrare.</p>}
     </aside>
   </section>;
 }
@@ -323,7 +315,7 @@ function AdvancedFilters({ accountFilter, setAccountFilter, symbolFilter, setSym
   clear: () => void; pendingMode: boolean;
 }) {
   return <div className="advanced-filters">
-    <FilterSelect label="Conto" value={accountFilter} options={["Tutti", "Alpha Momentum"]} onChange={setAccountFilter} />
+    <FilterSelect label="Conto" value={accountFilter} options={["Tutti", DEMO_ACCOUNT_NAME]} onChange={setAccountFilter} />
     <FilterSelect label="Simbolo" value={symbolFilter} options={["Tutti", ...symbolOptions]} onChange={setSymbolFilter} />
     <FilterSelect label="Direzione" value={directionFilter} options={["Tutte", "Long", "Short"]} onChange={(value) => setDirectionFilter(value as DirectionFilter)} />
     <FilterSelect label="Setup" value={setupFilter} options={["Tutti", ...setupOptions]} onChange={setSetupFilter} />
@@ -334,12 +326,12 @@ function AdvancedFilters({ accountFilter, setAccountFilter, symbolFilter, setSym
   </div>;
 }
 
-function PendingStream({ orders, selected, setSelected }: { orders: DemoPendingOrder[]; selected: DemoPendingOrder; setSelected: (id: string) => void }) {
+function PendingStream({ orders, selected, setSelected }: { orders: DemoPendingOrder[]; selected?: DemoPendingOrder; setSelected: (id: string) => void }) {
   return <div className="timeline-day pending-day">
     <div className="timeline-day-head"><span>Ordini pendenti</span><strong>{orders.length} attivi</strong></div>
     {orders.map((order) => {
       const distance = Math.abs(order.trigger - order.current) / order.current * 100;
-      return <button key={order.id} className={`timeline-trade pending-order ${selected.id === order.id ? "selected" : ""}`} onClick={() => setSelected(order.id)}>
+      return <button key={order.id} className={`timeline-trade pending-order ${selected?.id === order.id ? "selected" : ""}`} onClick={() => setSelected(order.id)}>
         <time>{order.createdAt.slice(11, 16)}<small>{order.id}</small></time>
         <span className="timeline-symbol"><i>{order.symbol.slice(0, 2)}</i><span><strong>{order.symbol}</strong><small>{order.type}</small></span></span>
         <span className={order.side === "Long" ? "long" : "short"}>{order.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{order.side}<small>{order.volume.toLocaleString("it-IT", { minimumFractionDigits: 2 })} lot</small></span>
@@ -356,41 +348,39 @@ function TradeInspector({ trade, focusTab, setFocusTab }: {
   setFocusTab: (tab: FocusTab) => void;
 }) {
   const [tabHasMoved, setTabHasMoved] = useState(false);
-  const levels = levelsFor(trade);
   const selectFocusTab = (tab: FocusTab) => {
     if (tab === focusTab) return;
     setTabHasMoved(true);
     setFocusTab(tab);
   };
-  const closedAt = trade.closedAt ? new Date(trade.closedAt).toLocaleString("it-IT", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) : "In corso";
+  const closedAt = trade.closedAt ? statementTime(trade.closedAt) : "In corso";
   return <>
     <div className="inspector-head">
       <span className="inspector-symbol">{trade.symbol.slice(0, 2)}</span>
-      <div><p>{trade.id} · {trade.status}</p><h2>{trade.symbol}</h2><span className={trade.side === "Long" ? "long" : "short"}>{trade.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{trade.side} · {trade.volumeLabel} lot</span></div>
+      <div><p>{trade.id.slice(0, 8)} · {trade.status}</p><h2>{trade.symbol}</h2><span className={trade.side === "Long" ? "long" : "short"}>{trade.side === "Long" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{trade.side} · {trade.volumeLabel} lot</span></div>
     </div>
     <div className={`focus-tabs ${focusTab === "Diario" ? "show-journal" : "show-details"} ${tabHasMoved ? "is-switching" : ""}`} role="tablist" aria-label="Dettaglio del trade">
       <span className="focus-tab-indicator" aria-hidden="true" />
       {(["Dettagli", "Diario"] as FocusTab[]).map((tab) => <button key={tab} role="tab" aria-selected={focusTab === tab} onClick={() => selectFocusTab(tab)}>{tab === "Dettagli" ? <Target size={14} /> : <BookOpen size={14} />}{tab}</button>)}
     </div>
     {focusTab === "Dettagli" ? <>
-      <div className="inspector-result"><span>Risultato netto</span><strong data-sign={valueSign(trade.result)}>{signedMoney(trade.result)}</strong><small><span data-sign={valueSign(trade.r)}>{trade.r > 0 ? "+" : ""}{trade.r}R</span> · {trade.duration} · rischio {money(trade.riskUsd)}</small></div>
+      <div className="inspector-result"><span>Risultato netto</span><strong data-sign={valueSign(trade.result)}>{signedMoney(trade.result)}</strong><small>{trade.duration} · Orari del rendiconto</small></div>
       <div className="trade-journey">
         <div className="section-head"><div><p className="eyebrow">Trade journey</p><h3>Dal rischio al risultato</h3></div><Target size={18} /></div>
-        <div className="journey-track"><i className="mae" style={{ width: `${Math.min(38, 12 + Math.abs(trade.mae) / 12)}%` }} /><i className="mfe" style={{ width: `${Math.min(55, 16 + trade.mfe / 25)}%` }} /><span /></div>
-        <div className="journey-labels"><span>MAE<strong data-sign={valueSign(trade.mae)}>{money(trade.mae)}</strong></span><span>MFE<strong data-sign={valueSign(trade.mfe)}>+{money(trade.mfe)}</strong></span></div>
+        <div className="journey-labels"><span>MAE<strong>{trade.mae === null ? "—" : money(trade.mae)}</strong></span><span>MFE<strong>{trade.mfe === null ? "—" : money(trade.mfe)}</strong></span></div>
       </div>
       <dl className="inspector-values inspector-values-full">
         <div><dt>Ingresso</dt><dd>{trade.entryLabel}</dd></div>
         <div><dt>{trade.status === "Aperta" ? "Prezzo corrente" : "Uscita"}</dt><dd>{trade.status === "Aperta" ? trade.currentLabel : trade.exitLabel}</dd></div>
-        <div><dt>Stop loss</dt><dd>{price(trade.symbol, levels.stopLoss)}</dd></div>
-        <div><dt>Take profit</dt><dd>{price(trade.symbol, levels.takeProfit)}</dd></div>
-        <div><dt>Apertura</dt><dd>{trade.date}</dd></div>
+        <div><dt>Stop loss</dt><dd>—</dd></div>
+        <div><dt>Take profit</dt><dd>—</dd></div>
+        <div><dt>Apertura</dt><dd>{statementTime(trade.openedAt)}</dd></div>
         <div><dt>Chiusura</dt><dd>{closedAt}</dd></div>
-        <div><dt>Setup</dt><dd>{trade.setup}</dd></div>
-        <div><dt>Ticket MT5</dt><dd>{trade.id}</dd></div>
+        <div><dt>Setup</dt><dd>{trade.setup || "—"}</dd></div>
+        <div><dt>ID pubblico</dt><dd>{trade.id}</dd></div>
       </dl>
-      <dl className="trade-costs"><div><dt>Lordo</dt><dd data-sign={valueSign(trade.grossPnl)}>{signedMoney(trade.grossPnl)}</dd></div><div><dt>Commissioni</dt><dd data-sign={valueSign(trade.commission)}>{money(trade.commission)}</dd></div><div><dt>Swap</dt><dd data-sign={valueSign(trade.swap)}>{money(trade.swap)}</dd></div></dl>
-      <div className="inspector-note"><Sparkles size={16} /><div><strong>Lettura operativa</strong><p>{trade.note}</p></div></div>
+      <dl className="trade-costs"><div><dt>Lordo</dt><dd data-sign={valueSign(trade.grossPnl)}>{signedMoney(trade.grossPnl)}</dd></div><div><dt>Commissioni</dt><dd data-sign={valueSign(trade.commission)}>{money(trade.commission)}</dd></div><div><dt>Swap</dt><dd data-sign={valueSign(trade.swap)}>{money(trade.swap)}</dd></div><div><dt>Fee</dt><dd data-sign={valueSign(trade.fee)}>{money(trade.fee)}</dd></div></dl>
+      <div className="inspector-note"><Sparkles size={16} /><div><strong>Dettagli del rendiconto</strong><p>Stop, target e rischio iniziale richiedono i dati dell’ordine originario.</p></div></div>
     </> : <JournalEditor key={trade.id} entryId={trade.id} trade={trade} />}
   </>;
 }
@@ -413,10 +403,12 @@ function PendingInspector({ order }: { order: DemoPendingOrder }) {
 }
 
 function FocusPattern() {
+  const recent = trades.slice(0, 8);
+  const wins = recent.filter(trade => trade.result > 0).length;
   return <article className="glass-card focus-pattern">
-    <div className="pattern-score"><span><Sparkles size={16} /> Spherix pattern</span><strong>{RECENT_PLAN_COUNT} su 8</strong><small>trade coerenti con il piano</small></div>
-    <div className="pattern-copy"><p className="eyebrow">Cosa sta funzionando</p><h2>London breakout rimane il setup più pulito.</h2><p>Le entrate tra le 08:40 e le 10:10 mostrano escursioni avverse più contenute e un R medio superiore.</p></div>
-    <div className="pattern-bars" aria-label="Coerenza degli ultimi otto trade">{trades.slice(0, 8).map((trade) => <i key={trade.id} className={trade.result >= 0 ? "positive" : "negative"} title={`${trade.symbol}: ${signedMoney(trade.result)}`} />)}</div>
+    <div className="pattern-score"><span><Sparkles size={16} /> Spherix pattern</span><strong>{wins} su {recent.length}</strong><small>trade con risultato positivo</small></div>
+    <div className="pattern-copy"><p className="eyebrow">Cosa sta funzionando</p><h2>Risultato delle operazioni recenti.</h2><p>I colori seguono il risultato netto di ciascun trade chiuso.</p></div>
+    <div className="pattern-bars" aria-label="Risultato degli ultimi trade">{recent.map((trade) => <i key={trade.id} className={trade.result >= 0 ? "positive" : "negative"} title={`${trade.symbol}: ${signedMoney(trade.result)}`} />)}</div>
   </article>;
 }
 

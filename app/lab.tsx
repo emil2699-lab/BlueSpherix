@@ -32,9 +32,13 @@ const experiments = [
   { id: "exit" as const, icon: WandSparkles, title: "Uscita adattiva", caption: "Recupera parte del movimento lasciato al mercato." },
 ];
 
+const hasInitialRisk = CLOSED_TRADES.some(trade => trade.riskUsd !== null);
+const canReviewQuality = CLOSED_TRADES.some(trade => trade.planAligned !== null || (trade.maeUsd !== null && trade.riskUsd !== null));
+const canModelExit = CLOSED_TRADES.some(trade => trade.mfeUsd !== null);
+
 const frictionProfiles = [
   { id: "normal" as const, label: "Normale", detail: "Esecuzione storica" },
-  { id: "spread" as const, label: "Spread ×2", detail: "Costo spread raddoppiato" },
+  { id: "spread" as const, label: "Commissioni ×2", detail: "Commissioni storiche raddoppiate" },
   { id: "slippage" as const, label: "Slippage", detail: "0,05R per ingresso" },
   { id: "delay" as const, label: "Uscita lenta", detail: "−10% sui trade positivi" },
   { id: "combined" as const, label: "Stress totale", detail: "Tutte le frizioni insieme" },
@@ -46,15 +50,15 @@ const sum = (values: number[]) => values.reduce((total, value) => total + value,
 
 function scenarioResult(trade: DemoTrade, experiment: ExperimentId, includeCosts: boolean, capture: Capture) {
   let result = trade.netPnl;
-  if (!includeCosts) result -= trade.commission + trade.swap;
-  if (experiment === "exit" && result > 0) result += Math.max(0, trade.mfeUsd - trade.netPnl) * capture / 100;
+  if (!includeCosts) result -= trade.commission + trade.swap + trade.fee;
+  if (experiment === "exit" && trade.mfeUsd !== null && result > 0) result += Math.max(0, trade.mfeUsd - trade.netPnl) * capture / 100;
   return result;
 }
 
 function selectedTrades(trades: DemoTrade[], experiment: ExperimentId, session: SessionFocus, quality: QualityGate) {
   if (experiment === "session") return trades.filter(trade => trade.session === session);
   if (experiment === "discipline") return trades.filter(trade => {
-    const controlledMae = Math.abs(trade.maeUsd) <= trade.riskUsd * .75;
+    const controlledMae = trade.maeUsd !== null && trade.riskUsd !== null && Math.abs(trade.maeUsd) <= trade.riskUsd * .75;
     if (quality === "plan") return trade.planAligned;
     if (quality === "mae") return controlledMae;
     return trade.planAligned && controlledMae;
@@ -66,7 +70,7 @@ function applyFriction(trade: DemoTrade, result: number, profile: FrictionId) {
   if (profile === "normal") return result;
   let stressed = result;
   if (profile === "spread" || profile === "combined") stressed -= Math.abs(trade.commission);
-  if (profile === "slippage" || profile === "combined") stressed -= trade.riskUsd * .05;
+  if (profile === "slippage" || profile === "combined") stressed -= (trade.riskUsd ?? 0) * .05;
   if ((profile === "delay" || profile === "combined") && stressed > 0) stressed *= .9;
   return stressed;
 }
@@ -107,14 +111,14 @@ function equityPath(results: number[], width = 720, height = 220) {
 }
 
 export default function Lab() {
-  const [experiment, setExperiment] = useState<ExperimentId>("exit");
+  const [experiment, setExperiment] = useState<ExperimentId>("session");
   const [sample, setSample] = useState<Sample>("1A");
   const [risk, setRisk] = useState<Risk>(0.5);
   const [includeCosts, setIncludeCosts] = useState(true);
   const [sessionFocus, setSessionFocus] = useState<SessionFocus>("Londra");
   const [qualityGate, setQualityGate] = useState<QualityGate>("plan");
   const [capture, setCapture] = useState<Capture>(22);
-  const [friction, setFriction] = useState<FrictionId>("combined");
+  const [friction, setFriction] = useState<FrictionId>("normal");
   const { value: savedExperiments, error: vaultError } = experimentVault.useStore();
   const current = experiments.find(item => item.id === experiment) ?? experiments[2];
   const parameterLabel = experiment === "session" ? sessionFocus : experiment === "discipline" ? ({ plan: "Piano", mae: "MAE ≤ 0,75R", both: "Entrambi" } as const)[qualityGate] : `${capture}% MFE`;
@@ -124,8 +128,8 @@ export default function Lab() {
     const asOf = new Date(DEMO_AS_OF).getTime();
     const days = sample === "90G" ? 90 : 365;
     const baseTrades = [...CLOSED_TRADES]
-      .filter(trade => asOf - new Date(trade.openedAt).getTime() <= days * 86400000)
-      .sort((a, b) => a.openedAt.localeCompare(b.openedAt));
+      .filter(trade => asOf - Date.parse(trade.closedAt) <= days * 86400000)
+      .sort((a, b) => a.closedAt.localeCompare(b.closedAt));
     const simulatedTrades = selectedTrades(baseTrades, experiment, sessionFocus, qualityGate);
     const scale = risk / .5;
     const baselineResults = baseTrades.map(trade => trade.netPnl * scale);
@@ -162,7 +166,7 @@ export default function Lab() {
   const verdictTone = verdict === "Promettente" ? "positive" : verdict === "Fragile" ? "negative" : "warning";
   const sensitivityOptions = experiment === "session" ? (["Asia", "Londra", "New York"] as SessionFocus[]) : experiment === "discipline" ? (["plan", "mae", "both"] as QualityGate[]) : ([10, 22, 35] as Capture[]);
   const sampleDays = sample === "90G" ? 90 : 365;
-  const sensitivityBase = [...CLOSED_TRADES].filter(trade => new Date(DEMO_AS_OF).getTime() - new Date(trade.openedAt).getTime() <= sampleDays * 86400000);
+  const sensitivityBase = [...CLOSED_TRADES].filter(trade => new Date(DEMO_AS_OF).getTime() - Date.parse(trade.closedAt) <= sampleDays * 86400000);
   const sensitivityResults = sensitivityOptions.map(option => {
     const optionSession = experiment === "session" ? option as SessionFocus : sessionFocus;
     const optionQuality = experiment === "discipline" ? option as QualityGate : qualityGate;
@@ -181,16 +185,16 @@ export default function Lab() {
 
   return <div className="lab-view">
     <section className="welcome"><div><p className="date-line">Dall’intuizione alla prova</p><h1>Strategy Lab.</h1><p>Modifica una regola, confronta il risultato e verifica se regge fuori dal campione.</p></div><span className="lab-beta"><FlaskConical size={15} /> Beta · simulazione locale</span></section>
-    <div className="demo-notice"><ShieldCheck size={16} /><span><strong>Nessun trade viene eseguito.</strong> Il Lab ricalcola lo storico dimostrativo includendo commissioni e swap.</span></div>
+    <div className="demo-notice"><ShieldCheck size={16} /><span><strong>Nessun trade viene eseguito.</strong> Il Lab parte dai risultati storici di Notion, incluse commissioni, swap e fee. Le simulazioni su piano, MFE e slippage richiedono dati aggiuntivi.</span></div>
 
     <section className="lab-canvas glass-card">
       <div className="lab-canvas-head"><div><p className="eyebrow">Experiment canvas</p><h2>Scegli una sola ipotesi da mettere sotto stress.</h2></div><div className="lab-run-state"><i /><span>Ricalcolo istantaneo</span></div></div>
-      <div className="lab-experiments" role="tablist" aria-label="Ipotesi di strategia">{experiments.map(item => { const Icon = item.icon; return <button role="tab" aria-selected={experiment === item.id} className={experiment === item.id ? "active" : ""} key={item.id} onClick={() => setExperiment(item.id)}><span><Icon size={18} /></span><strong>{item.title}</strong><small>{item.caption}</small>{experiment === item.id && <Check size={14} />}</button>; })}</div>
+      <div className="lab-experiments" role="tablist" aria-label="Ipotesi di strategia">{experiments.map(item => { const Icon = item.icon; return <button role="tab" aria-selected={experiment === item.id} className={experiment === item.id ? "active" : ""} key={item.id} disabled={item.id === "discipline" ? !canReviewQuality : item.id === "exit" && !canModelExit} onClick={() => setExperiment(item.id)}><span><Icon size={18} /></span><strong>{item.title}</strong><small>{item.caption}</small>{experiment === item.id && <Check size={14} />}</button>; })}</div>
       <div className="lab-rule"><Beaker size={17} /><div><span>Regola simulata</span><strong>{rule}</strong></div><div className="lab-parameter" role="group" aria-label="Parametro esperimento" data-glass-multiple>{sensitivityOptions.map(option => { const active = experiment === "session" ? option === sessionFocus : experiment === "discipline" ? option === qualityGate : option === capture; const label = experiment === "discipline" ? ({ plan: "Piano", mae: "MAE", both: "Entrambi" } as const)[option as QualityGate] : experiment === "exit" ? `${option}%` : option; return <button className={active ? "active" : ""} aria-pressed={active} data-glass-underlight="1" key={String(option)} onClick={() => { if (experiment === "session") setSessionFocus(option as SessionFocus); else if (experiment === "discipline") setQualityGate(option as QualityGate); else setCapture(option as Capture); }}>{label}</button>; })}</div></div>
       <div className="lab-controls">
         <div><span>Campione</span><div className="range-switch" data-glass-multiple>{(["90G", "1A"] as Sample[]).map(item => <button className={sample === item ? "active" : ""} aria-pressed={sample === item} data-glass-underlight="1" key={item} onClick={() => setSample(item)}>{item}</button>)}</div></div>
         <div><span>Rischio per trade</span><div className="range-switch" data-glass-multiple>{([.25, .5, 1] as Risk[]).map(item => <button className={risk === item ? "active" : ""} aria-pressed={risk === item} data-glass-underlight="1" key={item} onClick={() => setRisk(item)}>{item.toLocaleString("it-IT")}%</button>)}</div></div>
-        <label className="lab-cost-toggle"><span><strong>Costi reali</strong><small>Commissioni e swap</small></span><input type="checkbox" checked={includeCosts} onChange={event => setIncludeCosts(event.target.checked)} /><i aria-hidden="true"><b className="glass-switch-thumb" /></i></label>
+        <label className="lab-cost-toggle"><span><strong>Costi reali</strong><small>Commissioni, swap e fee</small></span><input type="checkbox" checked={includeCosts} onChange={event => setIncludeCosts(event.target.checked)} /><i aria-hidden="true"><b className="glass-switch-thumb" /></i></label>
       </div>
     </section>
 
@@ -229,7 +233,7 @@ export default function Lab() {
     <section className={`lab-friction glass-card ${frictionPassed ? "passed" : "failed"}`}>
       <div className="lab-friction-head"><div><p className="eyebrow">Execution Friction Test</p><h2>Quanto margine resta quando l’esecuzione peggiora?</h2><p>Applica costi e inefficienze dopo il segnale, senza cambiare la logica dell’ipotesi.</p></div><span>{money(breakEvenCost)}<small>costo extra medio di pareggio</small></span></div>
       <div className="lab-friction-grid">
-        <div className="lab-friction-profiles" role="tablist" aria-label="Scenario di frizione">{analysis.frictionResults.map(profile => <button role="tab" aria-selected={friction === profile.id} className={friction === profile.id ? "active" : ""} key={profile.id} onClick={() => setFriction(profile.id)}><span>{profile.label}<small>{profile.detail}</small></span><strong data-sign={valueSign(profile.stats.net)}>{money(profile.stats.net)}</strong><i><b style={{ width: `${clamp(Math.abs(profile.stats.net) / Math.max(1, Math.abs(analysis.simulation.net)) * 100, 3, 100)}%` }} /></i></button>)}</div>
+        <div className="lab-friction-profiles" role="tablist" aria-label="Scenario di frizione">{analysis.frictionResults.map(profile => <button role="tab" aria-selected={friction === profile.id} className={friction === profile.id ? "active" : ""} key={profile.id} disabled={!hasInitialRisk && (profile.id === "slippage" || profile.id === "combined")} onClick={() => setFriction(profile.id)}><span>{profile.label}<small>{profile.detail}</small></span><strong data-sign={valueSign(profile.stats.net)}>{money(profile.stats.net)}</strong><i><b style={{ width: `${clamp(Math.abs(profile.stats.net) / Math.max(1, Math.abs(analysis.simulation.net)) * 100, 3, 100)}%` }} /></i></button>)}</div>
         <aside className="lab-friction-result"><div className={frictionPassed ? "positive" : "negative"}><CircleGauge size={19} /></div><p className="eyebrow">Scenario selezionato</p><h3>{selectedFriction.label}</h3><dl><div><dt>Profit factor</dt><dd>{selectedFriction.stats.factor.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd></div><div><dt>Impatto netto</dt><dd data-sign={valueSign(frictionLoss)}>{frictionLoss > 0 ? "+" : ""}{money(frictionLoss)}</dd></div><div><dt>Drawdown</dt><dd data-sign={valueSign(-selectedFriction.stats.drawdown)}>{selectedFriction.stats.drawdown.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%</dd></div></dl><p>{frictionPassed ? "L’edge resta positivo anche con questa qualità di esecuzione." : "La frizione assorbe troppo margine: l’ipotesi richiede esecuzione più precisa o un edge maggiore."}</p></aside>
       </div>
     </section>
