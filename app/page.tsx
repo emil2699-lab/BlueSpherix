@@ -25,7 +25,6 @@ import {
   Target,
   TrendingUp,
   WalletCards,
-  X,
   Zap,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
@@ -177,6 +176,8 @@ export default function Home() {
   const connectedPortfolio = view === "portfolio-accounts" || view === "portfolio" && account;
   const connectedView = account && ["overview", "analytics", "positions", "risk"].includes(view);
   const contentRef = useRef<HTMLDivElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const sidebarGlassRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const applyHash = (behavior: ScrollBehavior) => {
       const target = window.location.hash.slice(1) || "overview";
@@ -201,10 +202,6 @@ export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuOpen = compactSidebar ? mobileMenuOpen : desktopMenuOpen;
   const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const mobileCloseRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (compactSidebar && mobileMenuOpen) mobileCloseRef.current?.focus({ preventScroll: true });
-  }, [compactSidebar, mobileMenuOpen]);
   const [privateMode, setPrivateMode] = useState(true);
   const [realized, setRealized] = useState(false);
   const { value: accountStart } = alphaAnalysisStart.useStore();
@@ -219,23 +216,27 @@ export default function Home() {
   const drawdownPressure = ALPHA_ACCOUNT.currentDrawdown / 8;
 
   const closeMenu = () => {
+    menuButtonRef.current?.focus({ preventScroll: true });
     if (compactSidebar) setMobileMenuOpen(false);
     else setDesktopMenuOpen(false);
-    requestAnimationFrame(() => menuButtonRef.current?.focus({ preventScroll: true }));
   };
 
   const toggleMenu = () => {
-    if (menuOpen) closeMenu();
-    else if (compactSidebar) setMobileMenuOpen(true);
+    if (menuOpen) {
+      closeMenu();
+      return;
+    }
+    menuButtonRef.current?.focus({ preventScroll: true });
+    if (compactSidebar) setMobileMenuOpen(true);
     else setDesktopMenuOpen(true);
   };
 
   const handleMenuKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.key === "Escape") {
+    if (event.key === "Escape" && menuOpen) {
       event.stopPropagation();
       closeMenu();
     }
-    if (!compactSidebar || event.key !== "Tab") return;
+    if (!compactSidebar || !menuOpen || event.key !== "Tab") return;
 
     const controls = event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)");
     const first = controls[0];
@@ -261,31 +262,48 @@ export default function Home() {
       <div className="ambient ambient-one" /><div className="ambient ambient-two" />
       <aside
         className="sidebar"
-        id="primary-sidebar"
-        inert={!menuOpen}
-        role={compactSidebar ? "dialog" : undefined}
+        ref={sidebarRef}
+        role={compactSidebar && menuOpen ? "dialog" : undefined}
         aria-label="Menu della dashboard"
         aria-modal={compactSidebar && menuOpen ? true : undefined}
         onKeyDown={handleMenuKeyDown}
       >
-        <div className="brand"><div className="brand-mark"><Orbit size={21} /></div><span>BlueSpherix</span><button type="button" className="mobile-close" ref={mobileCloseRef} onClick={closeMenu} aria-label="Chiudi menu"><X size={18} /></button></div>
-        <div className="account-pill"><div className="avatar">{account ? "MT" : "BS"}</div><div><strong>{account?.account ?? DEMO_ACCOUNT_NAME}</strong><span><i /> {account ? mt5AccountKind(account) : "Dati dimostrativi"}</span></div><ShieldCheck size={15} aria-hidden="true" /></div>
-        <div className="sidebar-navigation">
-          <nav aria-label="Navigazione principale">
-            <p className="nav-label">Workspace</p>
-            {navItems.map(({ label, icon: Icon, target }) => {
-              const current = view === target || target === "portfolio" && view === "portfolio-accounts";
-              return <button className={current ? "active" : ""} aria-current={current ? "page" : undefined} key={label} onClick={() => goTo(target)}><Icon size={18} /><span>{label}</span>{label === "Lab" && <em>Beta</em>}</button>;
-            })}
-            <p className="nav-label spaced">Strumenti</p>
-            <button className={view === "journal" ? "active" : ""} aria-current={view === "journal" ? "page" : undefined} onClick={() => goTo("journal")}><BookOpen size={18} /><span>Diario</span></button>
-            <button className={view === "calendar" ? "active" : ""} aria-current={view === "calendar" ? "page" : undefined} onClick={() => goTo("calendar")}><CalendarDays size={18} /><span>Calendario</span><b>3</b></button>
-            <button className={view === "markets" ? "active" : ""} aria-current={view === "markets" ? "page" : undefined} onClick={() => goTo("markets")}><TrendingUp size={18} /><span>Mercati</span></button>
-            <button className={view === "tools" ? "active" : ""} aria-current={view === "tools" ? "page" : undefined} onClick={() => goTo("tools")}><Calculator size={18} /><span>Calcolatori</span></button>
-          </nav>
-          <div className="sidebar-bottom">
-            <button className={view === "mt5" ? "active" : ""} aria-current={view === "mt5" ? "page" : undefined} onClick={() => goTo("mt5")}><Settings size={18} /><span>Conti MT5</span></button>
-            <div className="sync-status"><span><Zap size={13} /> Anteprima</span><small>{activeAccountSynced ? "MT5 in sincronizzazione" : account ? "MT5 · ultimo snapshot" : "MT5 non collegato"}</small></div>
+        <canvas ref={sidebarGlassRef} className="sidebar-glass-canvas" aria-hidden="true" />
+        <button
+          type="button"
+          className="sidebar-toggle"
+          ref={menuButtonRef}
+          aria-label={menuOpen ? "Nascondi menu" : "Apri menu"}
+          title={menuOpen ? "Nascondi menu" : "Apri menu"}
+          aria-controls="primary-sidebar"
+          aria-expanded={menuOpen}
+          onClick={toggleMenu}
+        >
+          <PanelLeftClose className="sidebar-close-icon" size={19} aria-hidden="true" />
+          <Menu className="sidebar-open-icon" size={20} aria-hidden="true" />
+        </button>
+        <div className="sidebar-content-clip" id="primary-sidebar" inert={!menuOpen}>
+          <div className="sidebar-content">
+            <div className="brand"><div className="brand-mark"><Orbit size={18} /></div><span>BlueSpherix</span></div>
+            <div className="account-pill"><div className="avatar">{account ? "MT" : "BS"}</div><div><strong>{account?.account ?? DEMO_ACCOUNT_NAME}</strong><span><i /> {account ? mt5AccountKind(account) : "Dati dimostrativi"}</span></div><ShieldCheck size={15} aria-hidden="true" /></div>
+            <div className="sidebar-navigation">
+              <nav aria-label="Navigazione principale">
+                <p className="nav-label">Workspace</p>
+                {navItems.map(({ label, icon: Icon, target }) => {
+                  const current = view === target || target === "portfolio" && view === "portfolio-accounts";
+                  return <button className={current ? "active" : ""} aria-current={current ? "page" : undefined} key={label} onClick={() => goTo(target)}><Icon size={18} /><span>{label}</span>{label === "Lab" && <em>Beta</em>}</button>;
+                })}
+                <p className="nav-label spaced">Strumenti</p>
+                <button className={view === "journal" ? "active" : ""} aria-current={view === "journal" ? "page" : undefined} onClick={() => goTo("journal")}><BookOpen size={18} /><span>Diario</span></button>
+                <button className={view === "calendar" ? "active" : ""} aria-current={view === "calendar" ? "page" : undefined} onClick={() => goTo("calendar")}><CalendarDays size={18} /><span>Calendario</span><b>3</b></button>
+                <button className={view === "markets" ? "active" : ""} aria-current={view === "markets" ? "page" : undefined} onClick={() => goTo("markets")}><TrendingUp size={18} /><span>Mercati</span></button>
+                <button className={view === "tools" ? "active" : ""} aria-current={view === "tools" ? "page" : undefined} onClick={() => goTo("tools")}><Calculator size={18} /><span>Calcolatori</span></button>
+              </nav>
+              <div className="sidebar-bottom">
+                <button className={view === "mt5" ? "active" : ""} aria-current={view === "mt5" ? "page" : undefined} onClick={() => goTo("mt5")}><Settings size={18} /><span>Conti MT5</span></button>
+                <div className="sync-status"><span><Zap size={13} /> Anteprima</span><small>{activeAccountSynced ? "MT5 in sincronizzazione" : account ? "MT5 · ultimo snapshot" : "MT5 non collegato"}</small></div>
+              </div>
+            </div>
           </div>
         </div>
       </aside>
@@ -295,18 +313,6 @@ export default function Home() {
       <section className="workspace" inert={compactSidebar && mobileMenuOpen}>
         <header className="topbar">
           <div className="topbar-start">
-            <button
-              type="button"
-              className="menu-button"
-              ref={menuButtonRef}
-              aria-label={menuOpen ? "Nascondi menu" : "Apri menu"}
-              title={menuOpen ? "Nascondi menu" : "Apri menu"}
-              aria-controls="primary-sidebar"
-              aria-expanded={menuOpen}
-              onClick={toggleMenu}
-            >
-              {menuOpen ? <PanelLeftClose size={19} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}
-            </button>
             <button className="command-search"><Search size={17} /><span>Cerca metriche, trade o strumenti…</span><kbd><Command size={12} /> K</kbd></button>
           </div>
           <div className="top-actions">
@@ -318,7 +324,7 @@ export default function Home() {
         </header>
 
         <div className="content" ref={contentRef}>
-          <IceGlass rootRef={contentRef} />
+          <IceGlass rootRef={contentRef} sidebarRef={sidebarRef} sidebarCanvasRef={sidebarGlassRef} />
           {connectedPortfolio && <Mt5Portfolio mt5={mt5} goTo={goTo} onDemo={() => { mt5.select(""); goTo("portfolio"); }} />}
           {view === "portfolio" && !connectedPortfolio && <Portfolio onMt5={() => goTo("portfolio-accounts")} />}
           {connectedView && <Mt5AccountView view={view} mt5={mt5} goTo={goTo} />}

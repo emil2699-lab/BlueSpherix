@@ -65,7 +65,7 @@ await selected(accounts.nth(1)); assert(await page.evaluate(()=>document.documen
 await page.locator('nav').getByRole('button',{name:'Rischio',exact:true}).evaluate(button=>button.click());
 await page.getByRole('heading',{name:'Rischio.',exact:true}).waitFor();
 assert.equal(await page.locator('.exposure-share').first().evaluate(el=>getComputedStyle(el,'::before').content),'none','vertical row dividers disappear on mobile');
-assert.equal(await page.locator('canvas').count(),1);
+assert.equal(await page.locator('canvas.ice-glass-canvas').count(),1);
 
 const fallback = await browser.newPage({viewport:{width:1024,height:820},reducedMotion:'reduce'});
 await fallback.addInitScript(()=>{const get=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(type,...args){return type==='webgl2'?null:get.call(this,type,...args);};});

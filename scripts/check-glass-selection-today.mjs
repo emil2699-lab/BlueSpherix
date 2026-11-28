@@ -41,6 +41,6 @@ await page.locator('nav').getByRole('button', { name: 'Diario', exact: true }).c
 const journal = page.getByRole('button', { name: '90G', exact: true }); await journal.click(); await selected(journal);
 await page.locator('nav').getByRole('button', { name: 'Oggi', exact: true }).click(); await cleared();
 await period.click(); await selected(period);
-assert.equal(await page.locator('canvas').count(), 1); assert.deepEqual(errors, []);
+assert.equal(await page.locator('canvas.ice-glass-canvas').count(), 1); assert.deepEqual(errors, []);
 await fs.writeFile(`${dir}/checks.json`, JSON.stringify({ pass: true, tint, errors, checks: 'period, positive/negative positions, transfer, outside, Escape, keyboard, mobile, navigation round trip, single canvas' }, null, 2));
 console.log(JSON.stringify({ pass: true, tint, errors })); await browser.close();

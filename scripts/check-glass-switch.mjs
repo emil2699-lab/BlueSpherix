@@ -90,7 +90,7 @@ try {
   assert(await costThumb.evaluate(el=>el.getAnimations().length)>0,'Lab keyboard switch has the same elastic animation');
   await costThumb.evaluate(el=>{for(const a of el.getAnimations())a.finish();});await advance(800);
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
-  assert.equal(await page.locator('canvas').count(),1);assert.deepEqual(errors,[]);
+  assert.equal(await page.locator('canvas.ice-glass-canvas').count(),1);assert.deepEqual(errors,[]);
   await page.screenshot({path:`${dir}/mobile-switch.png`});
   const fallback=await browser.newPage({viewport:{width:1024,height:820},reducedMotion:'reduce'});
   await fallback.addInitScript(()=>{const get=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(t,...args){return t==='webgl2'?null:get.call(this,t,...args);};});

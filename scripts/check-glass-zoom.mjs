@@ -26,7 +26,14 @@ await page.addInitScript(() => {
   }
   proto.drawArrays = function (...args) {
     draw.call(this, ...args); window.glassProbe.draws++;
-    if (coating[1] && window.glassProbe.sample) {
+    if (coating[1] && window.glassProbe.sample && window.glassProbe.target) {
+      // Several switches can draw before the correlation cell. Sample the
+      // draw closest to the cell under test, so their geometry stays separate.
+      const target = window.glassProbe.target.getBoundingClientRect();
+      const canvas = this.canvas.getBoundingClientRect();
+      if (Math.abs(rect[0] - (target.left - canvas.left)) > 25
+        || Math.abs(rect[1] - (target.top - canvas.top)) > 25
+        || Math.abs(rect[2] - target.width) > 25 || Math.abs(rect[3] - target.height) > 25) return;
       const pixel = new Uint8Array(4);
       this.readPixels(Math.floor((rect[0] + rect[2] / 2) * dpr), Math.floor(this.drawingBufferHeight - (rect[1] + rect[3] / 2) * dpr), 1, 1, this.RGBA, this.UNSIGNED_BYTE, pixel);
       window.glassProbe.control = { rect, resolution, dpr, alpha: pixel[3], error: this.getError() };
@@ -47,7 +54,11 @@ await cell.screenshot({ path: `${dir}/correlation-glass.png` });
 const samples = [];
 async function sample(label) {
   await cell.scrollIntoViewIfNeeded();
-  await page.evaluate(() => { window.glassProbe.sample = true; window.dispatchEvent(new Event('resize')); });
+  await cell.evaluate(el => {
+    window.glassProbe.target = el;
+    window.glassProbe.sample = true;
+    window.dispatchEvent(new Event('resize'));
+  });
   await page.waitForFunction(() => !window.glassProbe.sample);
   const state = await cell.evaluate(el => {
     const canvas = document.querySelector('.ice-glass-canvas'), c = canvas.getBoundingClientRect(), r = el.getBoundingClientRect();
@@ -87,10 +98,12 @@ await page.waitForFunction(() => Math.abs(window.glassProbe.dpr - 1.25) < .001);
 // Failed allocation must expose the static glass fallback, never empty cards.
 await page.evaluate(() => { window.glassProbe.failAllocation = true; window.dispatchEvent(new Event('resize')); });
 await page.locator('.content:not([data-ice-glass=ready])').waitFor();
+await page.locator('.sidebar:not([data-ice-glass=ready])').waitFor();
 assert.equal(await page.locator('.ice-glass-canvas').evaluate(el => getComputedStyle(el).visibility), 'hidden');
 assert.notEqual(await cell.evaluate(el => getComputedStyle(el).backgroundImage), 'none');
 await page.evaluate(() => { window.glassProbe.failAllocation = false; window.dispatchEvent(new Event('resize')); });
 await page.locator('.content[data-ice-glass=ready]').waitFor();
+await page.locator('.sidebar[data-ice-glass=ready]').waitFor();
 await sample('allocation-recovered');
 await page.evaluate(() => {
   const gl = document.querySelector('.ice-glass-canvas').getContext('webgl2');
@@ -100,14 +113,16 @@ await page.evaluate(() => {
   window.glassLoss = gl.getExtension('WEBGL_lose_context'); window.glassLoss.loseContext();
 });
 await page.locator('.content:not([data-ice-glass=ready])').waitFor();
+await page.locator('.sidebar:not([data-ice-glass=ready])').waitFor();
 await page.waitForTimeout(150); await page.evaluate(() => window.glassLoss.restoreContext());
 await page.locator('.content[data-ice-glass=ready]').waitFor();
+await page.locator('.sidebar[data-ice-glass=ready]').waitFor();
 await sample('context-restored');
 assert(samples.at(-1).canvas.every(side => side <= 1024), 'restoration rechecks hardware axis limits');
 await page.keyboard.press('Escape');
 assert.notEqual(await cell.evaluate(el => getComputedStyle(el, '::before').backgroundImage), 'none', 'flat palette returns on deselection');
 assert.equal(await cell.getAttribute('aria-selected'), 'true', 'deselection keeps the functional filter value');
-assert.equal(await page.locator('canvas').count(), 1);
+assert.equal(await page.locator('canvas.ice-glass-canvas').count(), 1);
 assert.deepEqual(errors, []);
 await fs.writeFile(`${dir}/zoom.json`, JSON.stringify({ pass: true, material, samples, errors, safariNative: false }, null, 2));
 console.log(JSON.stringify({ pass: true, scenarios: samples.length, errors })); await browser.close();

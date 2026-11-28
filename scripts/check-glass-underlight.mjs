@@ -102,7 +102,7 @@ for (const [name, selector] of sections) {
   assert.equal(await page.evaluate(() => window.underlightFrames.length), 0, `${name}: no idle animation after deselection`);
   console.log(name,'checked');
 }
-assert.equal(await page.locator('canvas').count(), 1);
+assert.equal(await page.locator('canvas.ice-glass-canvas').count(), 1);
 const reduced = await browser.newPage({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
 await reduced.addInitScript(instrument); reduced.on('pageerror', e => errors.push(e.message));
 await reduced.goto(`${url}#overview`); await reduced.locator('.content[data-ice-glass=ready]').waitFor();

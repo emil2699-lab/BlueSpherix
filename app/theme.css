@@ -39,7 +39,7 @@ html[data-theme="light"] .topbar {
 }
 html[data-theme="light"] .account-pill,
 html[data-theme="light"] .command-search,
-html[data-theme="light"] :is(.privacy,.icon-button,.menu-button,.mobile-close),
+html[data-theme="light"] :is(.privacy,.icon-button),
 html[data-theme="light"] .range-switch,
 html[data-theme="light"] .risk-live-status,
 html[data-theme="light"] .calendar-timezone,
@@ -166,13 +166,13 @@ html[data-theme="light"] .today-kpi.violet .mini-chart path { stroke: var(--viol
 html[data-theme="light"] .today-kpi.amber .mini-chart path { stroke: var(--amber); }
 html[data-theme="light"] select { color-scheme: light; }
 
-html[data-theme-changing="true"] :is(body,.topbar,.glass-card,.calendar-strip,.demo-notice,button,input,select,textarea) {
+html[data-theme-changing="true"] :is(body,.topbar,.glass-card,.calendar-strip,.demo-notice,button:not(.sidebar-toggle),input,select,textarea) {
   transition-property: color,background-color,background-image,border-color,box-shadow,filter,transform;
   transition-duration: .48s;
   transition-timing-function: var(--ease-apple-layout);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html[data-theme-changing="true"] :is(body,.topbar,.glass-card,.calendar-strip,.demo-notice,button,input,select,textarea) { transition-duration: 0s; }
+  html[data-theme-changing="true"] :is(body,.topbar,.glass-card,.calendar-strip,.demo-notice,button:not(.sidebar-toggle),input,select,textarea) { transition-duration: 0s; }
   html[data-theme="light"] .content[data-ice-glass="ready"] [data-ice-lens-active] { filter: none !important; }
 }
