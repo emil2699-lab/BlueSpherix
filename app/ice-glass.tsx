@@ -44,12 +44,16 @@ export function IceGlass({ rootRef, sidebarRef, sidebarCanvasRef }: {
     const gl = canvas.getContext("webgl2", { alpha: true, antialias: false, depth: false, premultipliedAlpha: true, powerPreference: "low-power" });
     if (!gl) return; // The original dark cards are the no-WebGL fallback.
     const sidebar = sidebarRef.current ?? undefined;
+    const sidebarShell = sidebar?.parentElement;
     const sidebarCanvas = sidebarCanvasRef.current;
     const sidebarOutput = sidebarCanvas?.getContext("2d");
     let sidebarBounds: DOMRect | undefined;
     let sidebarRadius = 0;
+    let sidebarTaper = 0;
     let sidebarDirty = true;
     let sidebarKey = "";
+    const sidebarTransitions = new Set<string>();
+    let sidebarRasterWidth = "";
     const lenses = createGlassLenses(definitions);
     const parallax = createDaylightParallax();
     let caustics: ReturnType<typeof createDaylightCaustics> | undefined;
@@ -148,6 +152,10 @@ export function IceGlass({ rootRef, sidebarRef, sidebarCanvasRef }: {
       const cssHeight=`${height}px`,cssTop=`${top}px`;
       if(canvas.style.height!==cssHeight)canvas.style.height=cssHeight;
       if(canvas.style.top!==cssTop)canvas.style.top=cssTop;
+      // The content width changes on desktop. Keep one raster wide enough
+      // for both layouts throughout the morph, instead of reallocating it on
+      // each CSS frame. The scissored cards still use their live rectangles.
+      if(canvas.style.width!==sidebarRasterWidth)canvas.style.width=sidebarRasterWidth;
       const rect = canvas.getBoundingClientRect();
       return {
         left: rect.left,
@@ -223,17 +231,27 @@ export function IceGlass({ rootRef, sidebarRef, sidebarCanvasRef }: {
       if (Math.abs(target-state.value) < .002) state.value = target;
       return state.value;
     };
-    const pointerOverSidebar = () => sidebarBounds && pointer.presence > 0
-      && pointer.x >= sidebarBounds.left && pointer.x <= sidebarBounds.right
-      && pointer.y >= sidebarBounds.top && pointer.y <= sidebarBounds.bottom;
+    const pointerOverSidebar = () => {
+      if (!sidebarBounds || pointer.presence <= 0 || pointer.x < sidebarBounds.left || pointer.x > sidebarBounds.right
+        || pointer.y < sidebarBounds.top || pointer.y > sidebarBounds.bottom) return false;
+      if (!sidebarTaper) return true;
+      const { left, top, width, height } = sidebarBounds;
+      const anchor = Math.min(23, width*.5);
+      const y = (pointer.y-top)/height;
+      const scale = 1-sidebarTaper*y*y*(3-2*y);
+      const x = anchor+(pointer.x-left-anchor)/scale;
+      return x >= 0 && x <= width;
+    };
 
     // The fixed menu paints above the mobile scrim. Use a small tile in the
     // shared WebGL buffer and copy it to its DOM layer before painting cards.
     const paintSidebar = (width: number, height: number, time: number, daylight: boolean) => {
       if (!sidebar || !sidebarCanvas || !sidebarOutput) return false;
-      if (sidebarDirty) {
+      if (sidebarDirty || sidebarTransitions.size) {
         sidebarBounds = sidebar.getBoundingClientRect();
-        sidebarRadius = parseFloat(getComputedStyle(sidebar).borderTopLeftRadius) || 18;
+        const style = getComputedStyle(sidebar);
+        sidebarRadius = parseFloat(style.borderTopLeftRadius) || 18;
+        sidebarTaper = Number(style.getPropertyValue("--sidebar-taper")) || 0;
         sidebarDirty = false;
       }
       if (!sidebarBounds || !sidebarBounds.width || !sidebarBounds.height) return false;
@@ -248,7 +266,7 @@ export function IceGlass({ rootRef, sidebarRef, sidebarCanvasRef }: {
       const top = Math.max(0,Math.floor(bounds.top-padY));
       const tileWidth = Math.max(1,Math.ceil(Math.min(innerWidth,bounds.right+padX)-left));
       const tileHeight = Math.max(1,Math.ceil(Math.min(innerHeight,bounds.bottom+padY)-top));
-      const tileDpr = Math.min(dpr,width/tileWidth,height/tileHeight);
+      const tileDpr = Math.min(sidebarTransitions.size ? Math.max(dpr,.43) : dpr,width/tileWidth,height/tileHeight);
       const w = Math.max(1,Math.floor(tileWidth*tileDpr)), h = Math.max(1,Math.floor(tileHeight*tileDpr));
       const lightDistance = Math.hypot(
         Math.max(0,bounds.left-pointer.x,pointer.x-bounds.right),
@@ -256,7 +274,7 @@ export function IceGlass({ rootRef, sidebarRef, sidebarCanvasRef }: {
       );
       // sampleGlassLight has zero radiance beyond this exact cutoff.
       const presence = daylight || reduced.matches || lightDistance >= config.lightFalloff*2.75 ? 0 : pointer.presence;
-      const key = [bounds.left,bounds.top,bounds.width,bounds.height,sidebarRadius,daylight,
+      const key = [bounds.left,bounds.top,bounds.width,bounds.height,sidebarRadius,sidebarTaper,daylight,
         lift,w,h,tileDpr,presence,presence ? pointer.x : 0,presence ? pointer.y : 0].join();
       if (key === sidebarKey) return lift !== target;
 
@@ -279,6 +297,7 @@ export function IceGlass({ rootRef, sidebarRef, sidebarCanvasRef }: {
       gl.uniform4f(uniform("uRect"),rect.left,rect.top,rect.width,rect.height);
       gl.uniform4f(uniform("uDrawRect"),drawn.left,drawn.top,drawn.width,drawn.height);
       gl.uniform1f(uniform("uRadius"),sidebarRadius);
+      gl.uniform1f(uniform("uTaper"),sidebarTaper);
       gl.uniform1f(uniform("uLift"),lift);
       gl.uniform1f(uniform("uProjection"),projection);
       gl.uniform1f(uniform("uReferenceGlass"),daylight ? 1 : 0);
@@ -286,7 +305,7 @@ export function IceGlass({ rootRef, sidebarRef, sidebarCanvasRef }: {
       gl.uniform1f(uniform("uCrownHeight"),crownFor(rect.width,rect.height,sidebarRadius,daylight));
       gl.uniform3f(uniform("uTint"),DEFAULT_TINT[0],DEFAULT_TINT[1],DEFAULT_TINT[2]);
       gl.drawArrays(gl.TRIANGLES,0,6);
-      if (daylight) caustics?.draw(sidebar,w,h,tileDpr,rect,drawn,sidebarRadius,lift,config.glassIOR);
+      if (daylight) caustics?.draw(sidebar,w,h,tileDpr,rect,drawn,sidebarRadius,lift,config.glassIOR,sidebarTaper);
 
       if (sidebarCanvas.width !== w) sidebarCanvas.width = w;
       if (sidebarCanvas.height !== h) sidebarCanvas.height = h;
@@ -304,6 +323,7 @@ export function IceGlass({ rootRef, sidebarRef, sidebarCanvasRef }: {
       gl.useProgram(program);
       gl.uniform2f(uniform("uResolution"),width,height);
       gl.uniform1f(uniform("uDPR"),dpr);
+      gl.uniform1f(uniform("uTaper"),0);
       return lift !== target;
     };
     const fitDrawingBuffer = (quality = 1) => {
@@ -333,8 +353,12 @@ export function IceGlass({ rootRef, sidebarRef, sidebarCanvasRef }: {
     const draw = (time: number) => {
       frame = 0;
       if (lost || !program || document.hidden) return;
+      const sidebarMoving=sidebarTransitions.size>0;
       const nextViewport = readViewport();
-      if (dirty || viewportChanged(nextViewport)) measure(nextViewport);
+      const mobileShift=sidebarMoving && !sidebarRasterWidth
+        && nextViewport.width===viewport.width && nextViewport.height===viewport.height && nextViewport.top===viewport.top;
+      if (dirty || sidebarRasterWidth || (!mobileShift && viewportChanged(nextViewport))) measure(nextViewport);
+      else if (mobileShift) viewport=nextViewport;
       const viewWidth = viewport.width, viewHeight = viewport.height;
       const lightMode = document.documentElement.dataset.theme === "light";
       // Daylight caustics extend beyond every silhouette. A modest shared raster
@@ -343,7 +367,9 @@ export function IceGlass({ rootRef, sidebarRef, sidebarCanvasRef }: {
       const referenceVisible=lightMode && cards.some(card=>card.reference);
       const referenceQuality=softwareRenderer ? Math.min(.58,.9/(devicePixelRatio || 1))
         : Math.min(.86,1.15/(devicePixelRatio || 1));
-      const buffer = fitDrawingBuffer(referenceVisible ? referenceQuality : lightMode ? .82 : 1);
+      const quality=referenceVisible ? referenceQuality : lightMode ? .82 : 1;
+      const movingQuality=softwareRenderer ? .30/(devicePixelRatio || 1) : .76;
+      const buffer = fitDrawingBuffer(sidebarMoving ? Math.min(quality,movingQuality) : quality);
       if (!buffer) return;
       const { width, height } = buffer;
       gl.disable(gl.SCISSOR_TEST);
@@ -508,7 +534,7 @@ export function IceGlass({ rootRef, sidebarRef, sidebarCanvasRef }: {
         gl.uniform1f(uniform("uInteractiveLight"),usesSelectedHeatLight ? 1 : 0);
         gl.drawArrays(gl.TRIANGLES,0,6);
         if(referenceGlass) {
-          caustics?.draw(element,width,height,dpr,rect,drawRect,radius,lift,config.glassIOR);
+          caustics?.draw(element,width,height,dpr,rect,drawRect,radius,lift,config.glassIOR,0,sidebarMoving);
           gl.useProgram(program);
         }
       }
@@ -523,7 +549,7 @@ export function IceGlass({ rootRef, sidebarRef, sidebarCanvasRef }: {
       // A browser zoom can move a card for several frames while responsive CSS
       // and font metrics settle. ResizeObserver sees size changes, not every
       // positional shift caused by siblings, so remeasure briefly after zoom.
-      if (settling || coatingMoving || liftMoving) { if (settling) dirty = true; schedule(); }
+      if (settling || coatingMoving || liftMoving || sidebarTransitions.size) { if (settling) dirty = true; schedule(); }
       // Slow under-glass motion needs only about 30 fps at rest. Pointer/layout
       // events bypass the timer and still render on the next available frame.
       else if (underlightMoving) underlightTimer = setTimeout(schedule, 16);
@@ -534,6 +560,21 @@ export function IceGlass({ rootRef, sidebarRef, sidebarCanvasRef }: {
     };
     const invalidate = () => { dirty = true; schedule(); };
     const settleLayout = () => { settleUntil = performance.now()+700; invalidate(); };
+    const sidebarTransition = (event: TransitionEvent) => {
+      if (event.target !== sidebarShell || !["--sidebar-width-progress", "--sidebar-height-progress"].includes(event.propertyName)) return;
+      if (event.type === "transitionrun") {
+        if (!sidebarTransitions.size && matchMedia("(width > 900px)").matches) {
+          const maxWidth=parseFloat(getComputedStyle(root).maxWidth) || Infinity;
+          sidebarRasterWidth=`${Math.min(maxWidth,document.documentElement.clientWidth)}px`;
+        }
+        sidebarTransitions.add(event.propertyName);
+      } else {
+        sidebarTransitions.delete(event.propertyName);
+        if (!sidebarTransitions.size) sidebarRasterWidth="";
+      }
+      sidebarDirty = true;
+      invalidate();
+    };
     const watchResolution = () => {
       resolutionQuery?.removeEventListener("change",resolutionChanged);
       resolutionQuery = matchMedia(`(resolution: ${devicePixelRatio || 1}dppx)`);
@@ -583,7 +624,7 @@ export function IceGlass({ rootRef, sidebarRef, sidebarCanvasRef }: {
     const themeChanged = () => { settleUntil=performance.now()+650; invalidate(); };
     initialize();
     watchResolution();
-    resize = new ResizeObserver(settleLayout);
+    resize = new ResizeObserver(() => sidebarTransitions.size ? invalidate() : settleLayout());
     resize.observe(root);
     const sidebarResize = sidebar && new ResizeObserver(() => { sidebarDirty = true; schedule(); });
     if (sidebar && sidebarResize) sidebarResize.observe(sidebar);
@@ -606,6 +647,9 @@ export function IceGlass({ rootRef, sidebarRef, sidebarCanvasRef }: {
     root.addEventListener("transitionrun",settleLayout);
     root.addEventListener("transitionend",invalidate);
     root.addEventListener("glassswitchmotion",settleLayout);
+    sidebarShell?.addEventListener("transitionrun",sidebarTransition);
+    sidebarShell?.addEventListener("transitionend",sidebarTransition);
+    sidebarShell?.addEventListener("transitioncancel",sidebarTransition);
     document.addEventListener("visibilitychange",visibility);
     window.addEventListener("bluespherix:theme",themeChanged);
     reduced.addEventListener("change",schedule);
@@ -619,10 +663,14 @@ export function IceGlass({ rootRef, sidebarRef, sidebarCanvasRef }: {
       window.removeEventListener("pointerout",leave); window.removeEventListener("resize",settleLayout);
       window.removeEventListener("scroll",invalidate,true); root.removeEventListener("transitionrun",settleLayout); root.removeEventListener("transitionend",invalidate);
       root.removeEventListener("glassswitchmotion",settleLayout);
+      sidebarShell?.removeEventListener("transitionrun",sidebarTransition);
+      sidebarShell?.removeEventListener("transitionend",sidebarTransition);
+      sidebarShell?.removeEventListener("transitioncancel",sidebarTransition);
       window.visualViewport?.removeEventListener("resize",settleLayout); window.visualViewport?.removeEventListener("scroll",invalidate);
       document.removeEventListener("visibilitychange",visibility); reduced.removeEventListener("change",schedule);
       window.removeEventListener("bluespherix:theme",themeChanged);
       canvas.removeEventListener("webglcontextlost",contextLost); canvas.removeEventListener("webglcontextrestored",contextRestored);
+      canvas.style.width="";
       delete root.dataset.iceGlass;dispose();
     };
   },[rootRef, sidebarRef, sidebarCanvasRef, coatings]);

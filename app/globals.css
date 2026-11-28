@@ -24,6 +24,22 @@ body { margin: 0; color: var(--text); background: radial-gradient(circle at 78% 
 button { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 
+@property --sidebar-width-progress {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+@property --sidebar-height-progress {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+@property --sidebar-taper {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
 .app-shell {
   --sidebar-width: 240px;
   --sidebar-inset: 12px;
@@ -31,19 +47,38 @@ button, a { -webkit-tap-highlight-color: transparent; }
   --sidebar-button-size: 46px;
   --sidebar-panel-width: calc(var(--sidebar-width) - 2 * var(--sidebar-inset));
   --sidebar-panel-height: max(var(--sidebar-button-size), 100dvh - var(--sidebar-top) - var(--sidebar-inset));
-  --sidebar-duration: .44s;
+  --sidebar-duration: .64s;
   --sidebar-fold: 0;
+  --sidebar-width-progress: 1;
+  --sidebar-height-progress: 1;
+  --sidebar-width-ease: var(--ease-apple-spring);
+  --sidebar-height-ease: var(--ease-apple-spring);
+  --sidebar-close-width-ease: var(--ease-apple-layout);
+  --sidebar-close-height-ease: var(--ease-apple-layout);
   min-height: 100vh;
   display: grid;
-  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  grid-template-columns: calc(var(--sidebar-width) * max(0, var(--sidebar-width-progress))) minmax(0, 1fr);
   position: relative;
   overflow: clip;
+  transition: --sidebar-width-progress var(--sidebar-duration) var(--sidebar-width-ease),
+    --sidebar-height-progress var(--sidebar-duration) var(--sidebar-height-ease);
+}
+@supports (transition-timing-function: linear(0, 1)) {
+  .app-shell {
+    /* Extend the body first. The long axis overshoots by only a few pixels. */
+    --sidebar-width-ease: linear(0, .02 8%, .09 16%, .29 26%, .56 38%, .81 49%, .96 59%, 1.034 67%, 1.055 73%, 1.021 80%, .992 88%, 1);
+    --sidebar-height-ease: linear(0, .13 7%, .37 16%, .62 26%, .84 38%, .96 49%, 1.002 59%, 1.012 72%, .998 88%, 1);
+    /* Pull into the button first, then rebound at the button's own scale. */
+    --sidebar-close-width-ease: linear(0, .09 8%, .28 17%, .47 26%, .65 35%, .83 47%, .93 57%, 1 69%, .969 76%, .952 81%, .968 88%, 1);
+    --sidebar-close-height-ease: linear(0, .022 8%, .08 17%, .20 26%, .35 35%, .66 47%, .89 57%, .975 63%, 1 69%, .99 81%, 1);
+  }
 }
 .ambient { position: fixed; border-radius: 999px; filter: blur(90px); pointer-events: none; z-index: 0; opacity: .14; }
 .ambient-one { width: 400px; height: 400px; background: #4cf1d9; right: -200px; top: 25%; }
 .ambient-two { width: 480px; height: 480px; background: #7459ff; left: 28%; bottom: -380px; }
 
 .sidebar {
+  --sidebar-taper: clamp(0, (var(--sidebar-height-progress) - var(--sidebar-width-progress)) * 2.2, .6);
   --sidebar-face-start: rgb(23 37 49 / .81);
   --sidebar-face-end: rgb(8 16 24 / .86);
   --sidebar-edge: rgb(124 177 198 / .22);
@@ -53,12 +88,12 @@ button, a { -webkit-tap-highlight-color: transparent; }
   position: fixed;
   inset: var(--sidebar-top) auto auto var(--sidebar-inset);
   z-index: 20;
-  width: calc(var(--sidebar-panel-width) + (var(--sidebar-button-size) - var(--sidebar-panel-width)) * var(--sidebar-fold));
-  height: calc(var(--sidebar-panel-height) + (var(--sidebar-button-size) - var(--sidebar-panel-height)) * var(--sidebar-fold));
+  width: calc(var(--sidebar-button-size) + (var(--sidebar-panel-width) - var(--sidebar-button-size)) * var(--sidebar-width-progress));
+  height: calc(var(--sidebar-button-size) + (var(--sidebar-panel-height) - var(--sidebar-button-size)) * var(--sidebar-height-progress));
   contain: layout;
   isolation: isolate;
   border: 1px solid var(--sidebar-edge);
-  border-radius: calc(36px - 18px * var(--sidebar-fold));
+  border-radius: calc(18px + 18px * clamp(0, var(--sidebar-width-progress), 1));
   background:
     radial-gradient(ellipse 90% 11% at 28% 0%, var(--sidebar-specular), transparent 96%),
     radial-gradient(ellipse 70% 24% at 76% 100%, var(--sidebar-refracted), transparent),
@@ -71,9 +106,6 @@ button, a { -webkit-tap-highlight-color: transparent; }
   -webkit-backdrop-filter: blur(14px) saturate(124%);
   backdrop-filter: blur(14px) saturate(124%);
   transition:
-    width var(--sidebar-duration) var(--ease-apple-fade),
-    height var(--sidebar-duration) var(--ease-apple-fade),
-    border-radius var(--sidebar-duration) var(--ease-apple-fade),
     border-color .28s var(--ease-apple-fade),
     box-shadow .28s var(--ease-apple-fade);
 }
@@ -110,13 +142,11 @@ button, a { -webkit-tap-highlight-color: transparent; }
   display: flex;
   flex-direction: column;
   opacity: calc(1 - var(--sidebar-fold));
-  transform: translateY(calc(-9px * var(--sidebar-fold)));
-  transition:
-    opacity .19s var(--ease-apple-fade) calc(.09s * (1 - var(--sidebar-fold))),
-    transform .26s var(--ease-apple-fade) calc(.09s * (1 - var(--sidebar-fold)));
+  transform: translateY(calc(-16px * (1 - min(1, var(--sidebar-height-progress)))));
+  transition: opacity .14s var(--ease-apple-fade) calc(.34s * (1 - var(--sidebar-fold)));
 }
 .sidebar-toggle {
-  --sidebar-toggle-inset: calc(6px * (1 - var(--sidebar-fold)));
+  --sidebar-toggle-inset: calc(6px * clamp(0, var(--sidebar-width-progress), 1));
   position: absolute;
   z-index: 2;
   inset: var(--sidebar-toggle-inset) auto auto var(--sidebar-toggle-inset);
@@ -129,10 +159,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
   border-radius: 15px;
   background-color: light-dark(rgb(255 255 255 / calc(.52 * (1 - var(--sidebar-fold)))), rgb(255 255 255 / calc(.06 * (1 - var(--sidebar-fold)))));
   cursor: pointer;
-  transition:
-    top var(--sidebar-duration) var(--ease-apple-fade),
-    left var(--sidebar-duration) var(--ease-apple-fade),
-    background-color .25s var(--ease-apple-fade);
+  transition: background-color .25s var(--ease-apple-fade);
 }
 .sidebar-toggle:hover { color: var(--aqua); }
 .sidebar-toggle svg {
@@ -1509,15 +1536,17 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
 }
 
 @media (width > 900px) {
+  .topbar-start {
+    --sidebar-header-space: calc((var(--sidebar-button-size) + 2 * var(--sidebar-inset) - 28px) * max(0, 1 - var(--sidebar-width-progress)));
+  }
   .app-shell[data-desktop-menu="closed"] {
     --sidebar-fold: 1;
+    --sidebar-width-progress: 0;
+    --sidebar-height-progress: 0;
+    --sidebar-width-ease: var(--sidebar-close-width-ease);
+    --sidebar-height-ease: var(--sidebar-close-height-ease);
     --sidebar-content-visibility: hidden;
-    --sidebar-header-space: calc(var(--sidebar-button-size) + 2 * var(--sidebar-inset) - 28px);
-    grid-template-columns: 0px minmax(0, 1fr);
-    /* Keep dashboard geometry stable while the independent panel morphs. */
-    transition: grid-template-columns 0s var(--sidebar-duration);
   }
-  .app-shell[data-desktop-menu="closed"] .topbar-start { transition: padding-inline-start 0s var(--sidebar-duration); }
 }
 
 @media (max-width: 900px) {
@@ -1530,6 +1559,10 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
   }
   .app-shell[data-mobile-menu="closed"] {
     --sidebar-fold: 1;
+    --sidebar-width-progress: 0;
+    --sidebar-height-progress: 0;
+    --sidebar-width-ease: var(--sidebar-close-width-ease);
+    --sidebar-height-ease: var(--sidebar-close-height-ease);
     --sidebar-content-visibility: hidden;
   }
   .sidebar-navigation button { min-height: 44px; }
@@ -1545,7 +1578,7 @@ button.hybrid-row { width: 100%; border: 0; background: transparent; text-align:
     transition: opacity .25s var(--ease-apple-fade), visibility 0s calc(.25s * var(--sidebar-fold));
   }
   .app-shell[data-mobile-menu="closed"] .scrim { opacity: 0; visibility: hidden; pointer-events: none; }
-  .workspace { min-height: 100vh; }
+  .workspace { min-height: 100vh; left: calc(18px * var(--sidebar-width-progress)); }
   .topbar { padding: 0 16px; height: 60px; }
   .command-search { width: min(330px, 48vw); }
   .privacy span { display: none; }
