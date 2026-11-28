@@ -26,7 +26,7 @@ uniform vec3 uSun;
 vec4 referenceGlass(vec2 pixel) {
   vec2 halfSize=uRect.zw*.5;
   vec2 base=pixel-uRect.xy-halfSize;
-  vec2 p=glassUntaperPoint(base/uProjection,halfSize,uTaper);
+  vec2 p=base/uProjection;
   // The measured CSS radius is shared by the restored soap, shadow and rays.
   float radius=min(uRadius,min(halfSize.x,halfSize.y)*.95);
   float d=boxSDF(p,halfSize,radius);
@@ -39,7 +39,7 @@ vec4 referenceGlass(vec2 pixel) {
   // Clear dielectric blocks only a small fraction of light: broad transmission
   // loss, not an opaque rectangle. Penumbra expands with the same elevation.
   vec2 shadowShift=-L.xy/L.z*(elevation+thickness*.55);
-  float shadowD=boxSDF(glassUntaperPoint(base-shadowShift,halfSize,uTaper),halfSize,radius);
+  float shadowD=boxSDF(base-shadowShift,halfSize,radius);
   float penumbra=3.5+elevation*.16;
   float shadowCoverage=1.0-smoothstep(-penumbra,penumbra*2.0,shadowD);
   float shadowRim=exp(-pow(shadowD/(penumbra*1.35),2.0));
@@ -47,8 +47,7 @@ vec4 referenceGlass(vec2 pixel) {
   vec4 result=vec4(vec3(.12,.22,.24)*shadowAlpha,shadowAlpha);
   if(coverage<=0.0) return result;
   // Material equations from 3f3fcd6, without its old shadow, lift or DOM lens.
-  vec2 boxNormal=roundedSurfaceNormal(p,halfSize,radius);
-  vec2 referenceNormal=uTaper>0.0 ? normalize(glassTaperNormal(boxNormal,p,halfSize,uTaper)+vec2(1e-7,0.0)) : boxNormal;
+  vec2 referenceNormal=roundedSurfaceNormal(p,halfSize,radius);
   float outerRim=exp(-depth/2.2);
   float innerShoulder=exp(-pow((depth-7.0)/5.5,2.0));
   vec2 crownSlope=-p/max(halfSize,vec2(1.0))*.10;
@@ -87,14 +86,12 @@ uniform vec2 uResolution;
 uniform float uDPR;
 uniform vec4 uRect;
 uniform float uRadius;
-uniform float uTaper;
 uniform float uElevation;
 uniform float uIOR;
 uniform vec3 uSun;
 out vec2 vSource;
 out float vTransmission;
 out vec2 vSize;
-out float vArea;
 flat out float vRadius;
 __GEOMETRY__
 void main() {
@@ -112,12 +109,12 @@ void main() {
   vec2 b=uRect.zw*.5;
   float thickness=min(${DAYLIGHT_GLASS.thickness.toFixed(1)},min(b.x,b.y)*.4);
   vec3 surface=soapSurface(p,b,uRadius,thickness);
-  vec3 N=normalize(vec3(glassTaperNormal(-surface.xy,p,b,uTaper),1.0));
+  vec3 N=normalize(vec3(-surface.xy,1.0));
   vec2 aperture[3]=vec2[3](vec2(-.866,-.5),vec2(.866,-.5),vec2(0,1));
   vec3 L=normalize(uSun+vec3(aperture[sampleIndex]*${DAYLIGHT_GLASS.angularRadius.toFixed(3)},0));
   vec3 inside=refract(-L,N,1.0/uIOR);
   float path=surface.z/max(-inside.z,.01);
-  vec2 exitPoint=glassTaperPoint(p,b,uTaper)+inside.xy*path;
+  vec2 exitPoint=p+inside.xy*path;
   vec3 outgoing=refract(inside,vec3(0,0,1),uIOR);
   float valid=step(.01,-outgoing.z);
   vec2 target=exitPoint+outgoing.xy*(uElevation/max(-outgoing.z,.01));
@@ -125,7 +122,6 @@ void main() {
   float reflected=f0+(1.0-f0)*pow(1.0-max(dot(N,L),0.0),5.0);
   vTransmission=(1.0-reflected)*(1.0-f0)*exp(-.003*path)*valid/3.0;
   vSource=p;
-  vArea=glassTaperProfile(p.y,b,uTaper).x;
   vSize=b;
   vRadius=uRadius;
   vec2 pixel=uRect.xy+b+target;
@@ -139,7 +135,6 @@ uniform float uDPR;
 in vec2 vSource;
 in float vTransmission;
 in vec2 vSize;
-in float vArea;
 flat in float vRadius;
 out vec4 outColor;
 void main() {
@@ -147,7 +142,7 @@ void main() {
   float d=min(max(q.x,q.y),0.0)+length(max(q,0.0))-vRadius;
   if(d>-.7 || vTransmission<=0.0) discard;
   vec2 dx=dFdx(vSource)*uDPR,dy=dFdy(vSource)*uDPR;
-  float flux=abs(dx.x*dy.y-dx.y*dy.x)*vArea;
+  float flux=abs(dx.x*dy.y-dx.y*dy.x);
   // Source area / receiver area transports concentrated flux. Normal flat
   // transmission is left to the transparent material, not painted as a glow.
   float focused=max(flux-1.06,0.0)*vTransmission;
@@ -216,10 +211,7 @@ void main(){
     shaders.forEach(shader=>gl.deleteShader(shader)); programs.forEach(program=>gl.deleteProgram(program));
     throw new Error("Daylight glass: framebuffer unavailable");
   }
-  const cache=new Map<HTMLElement,{
-    texture: WebGLTexture; key: string; width: number; height: number;
-    sourceWidth: number; sourceHeight: number; quality: number;
-  }>();
+  const cache=new Map<HTMLElement,{texture: WebGLTexture; key: string; width: number; height: number}>();
   const locations=new Map<WebGLProgram,Map<string,WebGLUniformLocation | null>>();
   const uniform=(program: WebGLProgram,name: string) => {
     if(!locations.has(program)) locations.set(program,new Map());
@@ -229,18 +221,18 @@ void main(){
   };
   type Rect={left: number; top: number; width: number; height: number};
   return {
-    draw(element: HTMLElement,width: number,height: number,dpr: number,rect: Rect,drawRect: Rect,radius: number,lift: number,ior: number,taper = 0,reuseField = false) {
+    draw(element: HTMLElement,width: number,height: number,dpr: number,rect: Rect,drawRect: Rect,radius: number,lift: number,ior: number) {
       const pad=96, quality=Math.min(.65,1024/(rect.width+pad*2),1024/(rect.height+pad*2));
       const tw=Math.ceil((rect.width+pad*2)*quality),th=Math.ceil((rect.height+pad*2)*quality);
       const elevation=DAYLIGHT_GLASS.clearance+DAYLIGHT_GLASS.lift*lift;
-      const key=[tw,th,rect.width,rect.height,radius,elevation.toFixed(2),ior,taper].join(":");
+      const key=[tw,th,rect.width,rect.height,radius,elevation.toFixed(2),ior].join(":");
       let entry=cache.get(element);
       if(!entry) {
         const texture=gl.createTexture();
         if(!texture) return;
-        entry={texture,key:"",width:0,height:0,sourceWidth:0,sourceHeight:0,quality};cache.set(element,entry);
+        entry={texture,key:"",width:0,height:0};cache.set(element,entry);
       }
-      if(entry.key!==key && !(reuseField && entry.key)) {
+      if(entry.key!==key) {
         gl.bindTexture(gl.TEXTURE_2D,entry.texture);
         if(entry.width!==tw || entry.height!==th) {
           gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,tw,th,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
@@ -256,12 +248,10 @@ void main(){
         gl.uniform2f(uniform(rays,"uResolution"),tw,th);gl.uniform1f(uniform(rays,"uDPR"),quality);
         gl.uniform4f(uniform(rays,"uRect"),pad,pad,rect.width,rect.height);
         gl.uniform1f(uniform(rays,"uRadius"),Math.min(radius,rect.width*.475,rect.height*.475));
-        gl.uniform1f(uniform(rays,"uTaper"),taper);
         gl.uniform1f(uniform(rays,"uElevation"),elevation);gl.uniform1f(uniform(rays,"uIOR"),ior);
         gl.uniform3f(uniform(rays,"uSun"),...DAYLIGHT_GLASS.sun);
         gl.drawArrays(gl.TRIANGLES,0,DAYLIGHT_GLASS.meshColumns*DAYLIGHT_GLASS.meshRows*6*3);
         entry.key=key;entry.width=tw;entry.height=th;
-        entry.sourceWidth=rect.width;entry.sourceHeight=rect.height;entry.quality=quality;
       }
       gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,width,height);
       const left=Math.max(0,Math.floor(drawRect.left*dpr)),bottom=Math.max(0,Math.floor(height-(drawRect.top+drawRect.height)*dpr));
@@ -269,13 +259,9 @@ void main(){
       gl.useProgram(composite);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,entry.texture);
       gl.uniform1i(uniform(composite,"uField"),0);
       gl.uniform2f(uniform(composite,"uResolution"),width,height);gl.uniform1f(uniform(composite,"uDPR"),dpr);
-      // Reproject cached light with its card while the dashboard is resizing.
-      // Both axes use the measured geometry again at the end of the motion.
-      const sx=rect.width/entry.sourceWidth,sy=rect.height/entry.sourceHeight;
-      gl.uniform4f(uniform(composite,"uQuad"),rect.left-pad*sx,rect.top-pad*sy,
-        entry.width/entry.quality*sx,entry.height/entry.quality*sy);
-      const blur=(1.3+elevation*DAYLIGHT_GLASS.angularRadius)*entry.quality;
-      gl.uniform2f(uniform(composite,"uBlur"),blur/entry.width,blur/entry.height);
+      gl.uniform4f(uniform(composite,"uQuad"),rect.left-pad,rect.top-pad,tw/quality,th/quality);
+      const blur=(1.3+elevation*DAYLIGHT_GLASS.angularRadius)*quality;
+      gl.uniform2f(uniform(composite,"uBlur"),blur/tw,blur/th);
       gl.drawArrays(gl.TRIANGLES,0,6);
     },
     retain(elements: Set<HTMLElement>) {

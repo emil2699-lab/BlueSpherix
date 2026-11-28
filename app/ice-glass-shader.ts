@@ -22,29 +22,6 @@ vec2 roundedSurfaceNormal(vec2 p, vec2 b, float r) {
   if (q.x > 0.0 && q.y > 0.0) return normalize(q)*sign(p);
   return q.x > q.y ? vec2(sign(p.x),0.0) : vec2(0.0,sign(p.y));
 }
-// Pinch the trailing end around the menu button. The second component is
-// the width derivative, so optical normals follow the bent edge.
-vec2 glassTaperProfile(float y, vec2 b, float amount) {
-  float v=clamp((y+b.y)/(2.0*b.y),0.0,1.0);
-  return vec2(1.0-amount*v*v*(3.0-2.0*v),-3.0*amount*v*(1.0-v)/b.y);
-}
-float glassTaperAnchor(vec2 b) { return min(23.0,b.x)-b.x; }
-vec2 glassTaperPoint(vec2 p, vec2 b, float amount) {
-  if(amount<=0.0) return p;
-  float anchor=glassTaperAnchor(b);
-  return vec2(anchor+(p.x-anchor)*glassTaperProfile(p.y,b,amount).x,p.y);
-}
-vec2 glassUntaperPoint(vec2 p, vec2 b, float amount) {
-  if(amount<=0.0) return p;
-  float anchor=glassTaperAnchor(b);
-  return vec2(anchor+(p.x-anchor)/glassTaperProfile(p.y,b,amount).x,p.y);
-}
-vec2 glassTaperNormal(vec2 normal, vec2 p, vec2 b, float amount) {
-  if(amount<=0.0) return normal;
-  vec2 profile=glassTaperProfile(p.y,b,amount);
-  float nx=normal.x/profile.x;
-  return vec2(nx,normal.y-nx*(p.x-glassTaperAnchor(b))*profile.y);
-}
 vec2 innerFaceWeights(vec2 p, vec2 b, float softness) {
   vec2 faceDistance = max(b-abs(p),vec2(.001));
   float nearest = min(faceDistance.x,faceDistance.y);
@@ -142,7 +119,6 @@ uniform float uTheme; // 0: preserved dark room, 1: daylight room
 uniform float uLift;
 uniform float uLiftDistance;
 uniform float uProjection; // viewer-facing perspective, centred on the base
-uniform float uTaper;
 uniform float uLightGlass;
 uniform float uDaylightThickness;
 
@@ -388,7 +364,7 @@ void main() {
   // Inverse perspective maps the projected glass back to its material plane.
   // The centre never drifts, and the DOM/base rectangle is not transformed.
   float projectionScale=max(uProjection,1.0);
-  vec2 p = glassUntaperPoint(basePoint/projectionScale,halfSize,uTaper);
+  vec2 p = basePoint/projectionScale;
   // A soap volume needs a broad shoulder and rolled corners, rather than the
   // narrow fillet of the original flat slab. Keep its bounding rectangle fixed.
   float daylightCard = uTheme*uLightGlass;
@@ -449,7 +425,6 @@ void main() {
   float blendEnd = max(3.0,min(radius*.55,thickness*.5));
   float interiorBlend = smoothstep(.75,blendEnd,depth);
   vec2 surfaceNormal = roundedSurfaceNormal(p,halfSize,radius);
-  if(uTaper>0.0) surfaceNormal = normalize(glassTaperNormal(surfaceNormal,p,halfSize,uTaper)+vec2(1e-7,0.0));
   float opticalDepth = mix(depth,continuousInnerDepth(p,halfSize,normalSoftness),interiorBlend);
   float bevel = exp(-opticalDepth/max(thickness,1.0));
   // A stable, low-frequency liquid normal varies the optical path, not the DOM.
@@ -471,7 +446,7 @@ void main() {
   // Preserve the existing stationary liquid microstructure, fading it smoothly
   // into the vertical sides so it cannot cut a crease into the outer silhouette.
   vec2 normalXY = -surface.xy + waveGradient*3.2*bevel*smoothstep(0.0,thickness*.4,depth);
-  vec3 N = normalize(vec3(glassTaperNormal(normalXY,p,halfSize,uTaper)*volume,1.0));
+  vec3 N = normalize(vec3(normalXY*volume,1.0));
   vec3 V = vec3(0,0,1);
   vec3 sunL = normalize(vec3(-.42,-.72,1.55));
   float daylightSource=uTheme*(1.0-uInteractiveLight);

@@ -40,6 +40,7 @@ import MarketDashboard from "./market-dashboard";
 import Mt5Monitor from "./mt5-monitor";
 import { Mt5AccountView, Mt5Portfolio } from "./mt5-dashboard";
 import { useMt5Accounts } from "./mt5-accounts";
+import { useSidebarMotion } from "./sidebar-motion";
 import { mt5AccountKey, mt5AccountKind } from "./mt5-snapshot";
 import { DEMO_ACCOUNT_NAME, DEMO_AS_OF, statementTime } from "./demo-ledger";
 import { ALPHA_ACCOUNT, BEST_RECENT_TRADE, BEST_SESSION_30D, DASHBOARD_RANGE_STATS, DEMO_BALANCE_SERIES, DEMO_EQUITY_SERIES, DEMO_PERIOD_STATS, OPEN_PNL, OPEN_TRADES, realizedResults, type DashboardRange } from "./demo-data";
@@ -176,6 +177,7 @@ export default function Home() {
   const connectedPortfolio = view === "portfolio-accounts" || view === "portfolio" && account;
   const connectedView = account && ["overview", "analytics", "positions", "risk"].includes(view);
   const contentRef = useRef<HTMLDivElement>(null);
+  const shellRef = useRef<HTMLElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const sidebarGlassRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -201,6 +203,7 @@ export default function Home() {
   const [desktopMenuOpen, setDesktopMenuOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuOpen = compactSidebar ? mobileMenuOpen : desktopMenuOpen;
+  useSidebarMotion(shellRef, menuOpen, compactSidebar);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const [privateMode, setPrivateMode] = useState(true);
   const [realized, setRealized] = useState(false);
@@ -258,7 +261,7 @@ export default function Home() {
   };
 
   return (
-    <main className="app-shell" data-desktop-menu={desktopMenuOpen ? "open" : "closed"} data-mobile-menu={mobileMenuOpen ? "open" : "closed"}>
+    <main ref={shellRef} className="app-shell" data-desktop-menu={desktopMenuOpen ? "open" : "closed"} data-mobile-menu={mobileMenuOpen ? "open" : "closed"}>
       <div className="ambient ambient-one" /><div className="ambient ambient-two" />
       <aside
         className="sidebar"
@@ -269,6 +272,7 @@ export default function Home() {
         onKeyDown={handleMenuKeyDown}
       >
         <canvas ref={sidebarGlassRef} className="sidebar-glass-canvas" aria-hidden="true" />
+        <canvas width={1} height={1} className="sidebar-motion-canvas" aria-hidden="true" />
         <button
           type="button"
           className="sidebar-toggle"
