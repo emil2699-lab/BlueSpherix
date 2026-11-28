@@ -10,6 +10,12 @@ const errors = [];
 page.on('pageerror', error => errors.push(error.message));
 await page.addInitScript(() => {
   window.glassProbe = { failAllocation: false, sample: false, control: null, draws: 0 };
+  const matchMedia = window.matchMedia.bind(window);
+  window.matchMedia = query => {
+    const media = matchMedia(query);
+    if (query.startsWith('(resolution:')) window.glassProbe.resolutionQuery = media;
+    return media;
+  };
   const proto = WebGL2RenderingContext.prototype;
   const get = proto.getUniformLocation, put1 = proto.uniform1f, put2 = proto.uniform2f, put4 = proto.uniform4f, draw = proto.drawArrays;
   const locations = new WeakMap();
@@ -93,8 +99,14 @@ await page.screenshot({ path: `${dir}/pinch-zoom.png` });
 await client.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 });
 // A DPR change with identical CSS dimensions must still repaint at rest.
 await page.waitForTimeout(900);
+const drawsBeforeDprChange = await page.evaluate(() => window.glassProbe.draws);
 await client.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1.25, mobile: false });
-await page.waitForFunction(() => Math.abs(window.glassProbe.dpr - 1.25) < .001);
+// CDP updates devicePixelRatio without reliably delivering the media event.
+await page.evaluate(() => window.glassProbe.resolutionQuery.dispatchEvent(new Event('change')));
+await page.waitForFunction(previous => window.devicePixelRatio === 1.25 && window.glassProbe.draws > previous,
+  drawsBeforeDprChange);
+const adaptedDpr = await page.evaluate(() => window.glassProbe.dpr);
+assert(adaptedDpr > 0 && adaptedDpr <= 1.25, 'DPR adapts within the browser and rendering budgets');
 // Failed allocation must expose the static glass fallback, never empty cards.
 await page.evaluate(() => { window.glassProbe.failAllocation = true; window.dispatchEvent(new Event('resize')); });
 await page.locator('.content:not([data-ice-glass=ready])').waitFor();
