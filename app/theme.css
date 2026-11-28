@@ -26,8 +26,12 @@ html[data-theme="light"] .ambient { opacity: .1; filter: blur(110px); }
 html[data-theme="light"] .ambient-one { background: #58d8c8; }
 html[data-theme="light"] .ambient-two { background: #9ba6ff; opacity: .07; }
 html[data-theme="light"] .sidebar {
-  background: rgb(245 250 249 / .72);
-  box-shadow: 18px 0 55px rgb(40 74 75 / .055);
+  --sidebar-face-start: rgb(250 255 254 / .5);
+  --sidebar-face-end: rgb(223 238 237 / .56);
+  --sidebar-edge: rgb(57 109 109 / .25);
+  --sidebar-specular: rgb(255 255 255 / .94);
+  --sidebar-refracted: rgb(112 166 164 / .23);
+  --sidebar-shadow: rgb(43 79 81 / .13);
 }
 html[data-theme="light"] .topbar {
   background: rgb(241 248 247 / .68);
@@ -162,13 +166,13 @@ html[data-theme="light"] .today-kpi.violet .mini-chart path { stroke: var(--viol
 html[data-theme="light"] .today-kpi.amber .mini-chart path { stroke: var(--amber); }
 html[data-theme="light"] select { color-scheme: light; }
 
-html[data-theme-changing="true"] :is(body,.sidebar,.topbar,.glass-card,.calendar-strip,.demo-notice,button,input,select,textarea) {
+html[data-theme-changing="true"] :is(body,.topbar,.glass-card,.calendar-strip,.demo-notice,button,input,select,textarea) {
   transition-property: color,background-color,background-image,border-color,box-shadow,filter,transform;
   transition-duration: .48s;
   transition-timing-function: var(--ease-apple-layout);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html[data-theme-changing="true"] :is(body,.sidebar,.topbar,.glass-card,.calendar-strip,.demo-notice,button,input,select,textarea) { transition-duration: 0s; }
+  html[data-theme-changing="true"] :is(body,.topbar,.glass-card,.calendar-strip,.demo-notice,button,input,select,textarea) { transition-duration: 0s; }
   html[data-theme="light"] .content[data-ice-glass="ready"] [data-ice-lens-active] { filter: none !important; }
 }

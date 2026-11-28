@@ -17,6 +17,7 @@ import {
   LockKeyhole,
   Menu,
   Orbit,
+  PanelLeftClose,
   Search,
   Settings,
   ShieldCheck,
@@ -27,7 +28,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import Portfolio from "./portfolio";
 import Analytics from "./analytics";
 import Operations from "./operations";
@@ -62,6 +63,15 @@ const navItems = [
   { label: "Lab", icon: FlaskConical, target: "lab" },
 ];
 const fullViews = new Set([...navItems.map(item => item.target).filter(target => target !== "overview"), "journal", "calendar", "tools", "markets", "mt5", "portfolio-accounts"]);
+const compactSidebarQuery = "(max-width: 900px)";
+
+function subscribeToSidebarViewport(listener: () => void) {
+  const viewport = window.matchMedia(compactSidebarQuery);
+  viewport.addEventListener("change", listener);
+  return () => viewport.removeEventListener("change", listener);
+}
+
+const isCompactSidebarViewport = () => window.matchMedia(compactSidebarQuery).matches;
 
 const money = (value: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(value);
 const signedMoney = (value: number) => `${value > 0 ? "+" : ""}${money(value)}`;
@@ -186,7 +196,15 @@ export default function Home() {
     };
   }, []);
   const [range, setRange] = useState<Range>("1M");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const compactSidebar = useSyncExternalStore(subscribeToSidebarViewport, isCompactSidebarViewport, () => false);
+  const [desktopMenuOpen, setDesktopMenuOpen] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const menuOpen = compactSidebar ? mobileMenuOpen : desktopMenuOpen;
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileCloseRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (compactSidebar && mobileMenuOpen) mobileCloseRef.current?.focus({ preventScroll: true });
+  }, [compactSidebar, mobileMenuOpen]);
   const [privateMode, setPrivateMode] = useState(true);
   const [realized, setRealized] = useState(false);
   const { value: accountStart } = alphaAnalysisStart.useStore();
@@ -200,43 +218,97 @@ export default function Home() {
   const marginPressure = ALPHA_ACCOUNT.marginUsage / 20;
   const drawdownPressure = ALPHA_ACCOUNT.currentDrawdown / 8;
 
+  const closeMenu = () => {
+    if (compactSidebar) setMobileMenuOpen(false);
+    else setDesktopMenuOpen(false);
+    requestAnimationFrame(() => menuButtonRef.current?.focus({ preventScroll: true }));
+  };
+
+  const toggleMenu = () => {
+    if (menuOpen) closeMenu();
+    else if (compactSidebar) setMobileMenuOpen(true);
+    else setDesktopMenuOpen(true);
+  };
+
+  const handleMenuKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key === "Escape") {
+      event.stopPropagation();
+      closeMenu();
+    }
+    if (!compactSidebar || event.key !== "Tab") return;
+
+    const controls = event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)");
+    const first = controls[0];
+    const last = controls[controls.length - 1];
+    if (event.shiftKey && event.target === first) {
+      event.preventDefault();
+      last?.focus();
+    } else if (!event.shiftKey && event.target === last) {
+      event.preventDefault();
+      first?.focus();
+    }
+  };
+
   const goTo = (target: string) => {
     setView(target);
     window.history.pushState(null, "", `#${target}`);
     window.dispatchEvent(new HashChangeEvent("hashchange"));
-    setSidebarOpen(false);
+    if (compactSidebar && mobileMenuOpen) closeMenu();
   };
 
   return (
-    <main className="app-shell">
+    <main className="app-shell" data-desktop-menu={desktopMenuOpen ? "open" : "closed"} data-mobile-menu={mobileMenuOpen ? "open" : "closed"}>
       <div className="ambient ambient-one" /><div className="ambient ambient-two" />
-      <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
-        <div className="brand"><div className="brand-mark"><Orbit size={21} /></div><span>BlueSpherix</span><button className="mobile-close" onClick={() => setSidebarOpen(false)} aria-label="Chiudi menu"><X size={18} /></button></div>
+      <aside
+        className="sidebar"
+        id="primary-sidebar"
+        inert={!menuOpen}
+        role={compactSidebar ? "dialog" : undefined}
+        aria-label="Menu della dashboard"
+        aria-modal={compactSidebar && menuOpen ? true : undefined}
+        onKeyDown={handleMenuKeyDown}
+      >
+        <div className="brand"><div className="brand-mark"><Orbit size={21} /></div><span>BlueSpherix</span><button type="button" className="mobile-close" ref={mobileCloseRef} onClick={closeMenu} aria-label="Chiudi menu"><X size={18} /></button></div>
         <div className="account-pill"><div className="avatar">{account ? "MT" : "BS"}</div><div><strong>{account?.account ?? DEMO_ACCOUNT_NAME}</strong><span><i /> {account ? mt5AccountKind(account) : "Dati dimostrativi"}</span></div><ShieldCheck size={15} aria-hidden="true" /></div>
-        <nav aria-label="Navigazione principale">
-          <p className="nav-label">Workspace</p>
-          {navItems.map(({ label, icon: Icon, target }) => {
-            const current = view === target || target === "portfolio" && view === "portfolio-accounts";
-            return <button className={current ? "active" : ""} aria-current={current ? "page" : undefined} key={label} onClick={() => goTo(target)}><Icon size={18} /><span>{label}</span>{label === "Lab" && <em>Beta</em>}</button>;
-          })}
-          <p className="nav-label spaced">Strumenti</p>
-          <button className={view === "journal" ? "active" : ""} aria-current={view === "journal" ? "page" : undefined} onClick={() => goTo("journal")}><BookOpen size={18} /><span>Diario</span></button>
-          <button className={view === "calendar" ? "active" : ""} aria-current={view === "calendar" ? "page" : undefined} onClick={() => goTo("calendar")}><CalendarDays size={18} /><span>Calendario</span><b>3</b></button>
-          <button className={view === "markets" ? "active" : ""} aria-current={view === "markets" ? "page" : undefined} onClick={() => goTo("markets")}><TrendingUp size={18} /><span>Mercati</span></button>
-          <button className={view === "tools" ? "active" : ""} aria-current={view === "tools" ? "page" : undefined} onClick={() => goTo("tools")}><Calculator size={18} /><span>Calcolatori</span></button>
-        </nav>
-        <div className="sidebar-bottom">
-          <button className={view === "mt5" ? "active" : ""} aria-current={view === "mt5" ? "page" : undefined} onClick={() => goTo("mt5")}><Settings size={18} /><span>Conti MT5</span></button>
-          <div className="sync-status"><span><Zap size={13} /> Anteprima</span><small>{activeAccountSynced ? "MT5 in sincronizzazione" : account ? "MT5 · ultimo snapshot" : "MT5 non collegato"}</small></div>
+        <div className="sidebar-navigation">
+          <nav aria-label="Navigazione principale">
+            <p className="nav-label">Workspace</p>
+            {navItems.map(({ label, icon: Icon, target }) => {
+              const current = view === target || target === "portfolio" && view === "portfolio-accounts";
+              return <button className={current ? "active" : ""} aria-current={current ? "page" : undefined} key={label} onClick={() => goTo(target)}><Icon size={18} /><span>{label}</span>{label === "Lab" && <em>Beta</em>}</button>;
+            })}
+            <p className="nav-label spaced">Strumenti</p>
+            <button className={view === "journal" ? "active" : ""} aria-current={view === "journal" ? "page" : undefined} onClick={() => goTo("journal")}><BookOpen size={18} /><span>Diario</span></button>
+            <button className={view === "calendar" ? "active" : ""} aria-current={view === "calendar" ? "page" : undefined} onClick={() => goTo("calendar")}><CalendarDays size={18} /><span>Calendario</span><b>3</b></button>
+            <button className={view === "markets" ? "active" : ""} aria-current={view === "markets" ? "page" : undefined} onClick={() => goTo("markets")}><TrendingUp size={18} /><span>Mercati</span></button>
+            <button className={view === "tools" ? "active" : ""} aria-current={view === "tools" ? "page" : undefined} onClick={() => goTo("tools")}><Calculator size={18} /><span>Calcolatori</span></button>
+          </nav>
+          <div className="sidebar-bottom">
+            <button className={view === "mt5" ? "active" : ""} aria-current={view === "mt5" ? "page" : undefined} onClick={() => goTo("mt5")}><Settings size={18} /><span>Conti MT5</span></button>
+            <div className="sync-status"><span><Zap size={13} /> Anteprima</span><small>{activeAccountSynced ? "MT5 in sincronizzazione" : account ? "MT5 · ultimo snapshot" : "MT5 non collegato"}</small></div>
+          </div>
         </div>
       </aside>
 
-      {sidebarOpen && <button className="scrim" onClick={() => setSidebarOpen(false)} aria-label="Chiudi menu" />}
+      <div className="scrim" onClick={closeMenu} aria-hidden="true" />
 
-      <section className="workspace">
+      <section className="workspace" inert={compactSidebar && mobileMenuOpen}>
         <header className="topbar">
-          <button className="menu-button" onClick={() => setSidebarOpen(true)} aria-label="Apri menu"><Menu size={20} /></button>
-          <button className="command-search"><Search size={17} /><span>Cerca metriche, trade o strumenti…</span><kbd><Command size={12} /> K</kbd></button>
+          <div className="topbar-start">
+            <button
+              type="button"
+              className="menu-button"
+              ref={menuButtonRef}
+              aria-label={menuOpen ? "Nascondi menu" : "Apri menu"}
+              title={menuOpen ? "Nascondi menu" : "Apri menu"}
+              aria-controls="primary-sidebar"
+              aria-expanded={menuOpen}
+              onClick={toggleMenu}
+            >
+              {menuOpen ? <PanelLeftClose size={19} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}
+            </button>
+            <button className="command-search"><Search size={17} /><span>Cerca metriche, trade o strumenti…</span><kbd><Command size={12} /> K</kbd></button>
+          </div>
           <div className="top-actions">
             <ThemeToggle />
             <button className={`privacy ${account || connectedPortfolio || privateMode ? "on" : ""}`} disabled={!!(account || connectedPortfolio)} onClick={() => setPrivateMode(!privateMode)}><LockKeyhole size={15} /><span>{account || connectedPortfolio || privateMode ? "Privato" : "Condiviso"}</span></button>
